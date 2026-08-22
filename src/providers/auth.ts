@@ -17,6 +17,8 @@ export type AuthConfig = {
   cookie?: string;
   /** Where the credential comes from (see the secret providers). */
   from?: SecretSource;
+  /** `basic`: who the credential belongs to. A secret source like any other. */
+  username?: SecretSource;
   /** `login`: the request that mints a token, and where the token is in its answer. */
   login?: { url: string; body?: Record<string, unknown>; tokenPath?: string; headers?: Record<string, string> };
   /** `login`: extra headers derived from the login answer, e.g. a practice id. */
@@ -55,6 +57,21 @@ export const authProviders = new Registry<AuthProvider>("auth")
   })
   /** The same, as a bearer token. */
   .register("bearer", async (config, { stack }) => ({ Authorization: `Bearer ${credential(config, stack)}` }))
+  /**
+   * A username and a password, the way half the world's admin APIs still want them.
+   *
+   * Grafana, Elasticsearch, a Jenkins, anything behind a reverse proxy with htpasswd on it. The username
+   * is a secret source like any other, because it is as likely to live in a container's environment as
+   * the password is.
+   */
+  .register("basic", async (config, { stack }) => {
+    const user = resolveSecret(config.username, stack);
+    const password = credential(config, stack);
+    if (!user || !password) {
+      throw new Error(`basic auth needs a username and a password (got ${user ? "no password" : "no username"})`);
+    }
+    return { Authorization: `Basic ${Buffer.from(`${user}:${password}`).toString("base64")}` };
+  })
   /** A session cookie the caller already holds — `call(op, { sid })`. */
   .register("cookie", async (config, { params }) => {
     const name = config.cookie ?? "sid";

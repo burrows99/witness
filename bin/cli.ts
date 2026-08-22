@@ -113,6 +113,10 @@ const init: Parameters<Cli["command"]>[1] = {
     const root = args.find(a => !a.startsWith("--")) ?? process.cwd();
     const dir = path.join(path.resolve(root), Workspace.DIRECTORY);
     const entry = entryPoint(dir);
+    // The same question as `entry`, for the runner's reporter: a package subpath when this is installed,
+    // a path when it is a checkout. Naming the package in a project that vendors witness is a config
+    // that cannot load — which is exactly what witness's own example did.
+    const reporter = entry.startsWith(".") ? entry.replace(/index\.ts$/, "evidence/reporter.ts") : `${entry}/reporter`;
     const { workspace, written } = Workspace.create(root, {
       "config.jsonc": Template.forWitness().render(),
       // How to use this, generated from what this copy can actually do — so an agent that opens the
@@ -121,7 +125,21 @@ const init: Parameters<Cli["command"]>[1] = {
       // Everything a run leaves behind lands here, and none of it belongs in a commit. Kept beside the
       // output rather than in the project's own .gitignore: this directory brings its own rules with it.
       ".gitignore": "# What runs leave behind. The description beside it is worth committing; this is not.\nartifacts/\n",
-      "app.ts": `import { System } from "${entry}";\n\n/** The product this project describes. Specs import this. */\nexport const app = System.find();\n`,
+      // Everything a spec needs, from one place. A spec that has to name the package works only in a
+      // project that installed it under that name — and the second thing anyone writes is a spec.
+      "app.ts": [
+        `import { beat, caption, slide, System, testFor } from "${entry}";`,
+        "",
+        "/** The product this project describes. */",
+        "export const app = System.find();",
+        "",
+        "/** The runner, with this project's identities already in every browser context it opens. */",
+        "export const test = testFor(app);",
+        "",
+        'export { expect } from "@playwright/test";',
+        "export { beat, caption, slide };",
+        "",
+      ].join("\n"),
       // A runner, so a spec can be written on the first day rather than after inventing a config: what
       // to run, where recordings go, the teardown that renders them, and the reporter that says where
       // to read what happened.
@@ -140,7 +158,7 @@ const init: Parameters<Cli["command"]>[1] = {
         "  workers: 1,",
         "  timeout: 120_000,",
         "  // The list reporter says what passed; the other says where to read what happened when it did not.",
-        '  reporter: [["list"], ["@burrows99/witness/reporter"]],',
+        `  reporter: [["list"], ["${reporter}"]],`,
         "  use: {",
         '    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",',
         '    ...devices["Desktop Chrome"],',
@@ -155,12 +173,9 @@ const init: Parameters<Cli["command"]>[1] = {
       // A spec, so `specs/` exists and the runner has something to find. `testDir` pointing at a
       // directory nobody created answers "No tests found", which says nothing about what to do.
       "specs/first.spec.ts": [
-        'import { expect } from "@playwright/test";',
-        `import { caption, testFor } from "${entry.replace(/\/index\.ts$/, "/index.ts")}";`,
-        "",
-        'import { app } from "../app.ts";',
-        "",
-        "const test = testFor(app);",
+        // From `app.ts`, never from the package: a spec that names the package works only in a project
+        // that installed it under that name, and this file is the shape every other spec is copied from.
+        'import { app, caption, expect, test } from "../app.ts";',
         "",
         "/**",
         " * The first thing this project needs to prove.",
