@@ -4,6 +4,7 @@ import type { BrowserContext, test as base } from "@playwright/test";
 
 import { requirePlaywright } from "./playwright.ts";
 
+import type { IdentityConfig } from "../config/schema.ts";
 import type { System } from "../system.ts";
 
 /**
@@ -18,18 +19,7 @@ import type { System } from "../system.ts";
  */
 export function testFor(system: System): typeof base {
   const { test } = requirePlaywright("the test fixture");
-  const cookies = Object.values(system.config.identities ?? {}).flatMap(identity =>
-    (identity.cookies ?? []).map(cookie => ({
-      name: cookie.name,
-      value: cookie.json !== undefined
-        ? cookie.urlEncode
-          ? encodeURIComponent(JSON.stringify(cookie.json))
-          : JSON.stringify(cookie.json)
-        : (cookie.value ?? ""),
-      domain: cookie.domain ?? "localhost",
-      path: cookie.path ?? "/",
-    })),
-  );
+  const cookies = identityCookies(system.config.identities);
 
   return test.extend<{ evidenceManifest: void }>({
     context: async ({ context }: { context: BrowserContext }, use: (c: BrowserContext) => Promise<void>) => {
@@ -82,4 +72,33 @@ export function testFor(system: System): typeof base {
       { auto: true },
     ],
   }) as typeof base;
+}
+
+/**
+ * The cookies the config's identities declare, for every browser context this tool opens.
+ *
+ * Shared with the command line rather than living in the fixture, because the type that declares them
+ * says "injected into every browser context the system opens" — and an `action run` that quietly did
+ * not was the most expensive false sentence in the documentation: it is the one that tells you not to
+ * go looking for a sign-in.
+ */
+export function identityCookies(identities: Record<string, IdentityConfig> | undefined): {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+}[] {
+  return Object.values(identities ?? {}).flatMap(identity =>
+    (identity.cookies ?? []).map(cookie => ({
+      name: cookie.name,
+      value:
+        cookie.json !== undefined
+          ? cookie.urlEncode
+            ? encodeURIComponent(JSON.stringify(cookie.json))
+            : JSON.stringify(cookie.json)
+          : (cookie.value ?? ""),
+      domain: cookie.domain ?? "localhost",
+      path: cookie.path ?? "/",
+    })),
+  );
 }
