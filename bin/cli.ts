@@ -91,7 +91,14 @@ const skill: Parameters<Cli["command"]>[1] = {
 function describe(): string {
   try {
     return Skill.for({ system: System.fromConfig(Workspace.find({ config: configFile }).configFile) }).render();
-  } catch {
+  } catch (err) {
+    // Falling back is right — the instructions are useful before a description exists. Falling back
+    // SILENTLY is not: the generic version names commands this project does not have, and the reader
+    // has no way to know they are reading the wrong thing.
+    process.stderr.write(
+      `[skill] describing the tool generically: this project's own config could not be read — ` +
+        `${err instanceof Error ? err.message : String(err)}\n`,
+    );
     return Skill.for().render();
   }
 }
