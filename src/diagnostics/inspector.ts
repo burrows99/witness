@@ -135,7 +135,11 @@ export class Inspector {
   private static worthReading(record: RequestRecord): boolean {
     if ((record.status ?? 0) >= 400) return true;
     if (record.resourceType === "image" || record.resourceType === "font" || record.resourceType === "media") return false;
-    return /json|text|xml|html/.test(record.contentType ?? "");
+    const type = record.contentType ?? "";
+    // `text/css` and `text/javascript` both contain "text", which is how a stylesheet ended up stored
+    // as a response body worth reading: 109KB of Bootstrap in the middle of a debug story.
+    if (/css|javascript|ecmascript/.test(type)) return false;
+    return /json|xml|text\/plain|text\/html|text\/markdown/.test(type);
   }
 
   private static async readBody(response: Response, record: RequestRecord): Promise<void> {

@@ -149,3 +149,36 @@ test("a failure with no readable body says why, rather than saying nothing", asy
   equal(seen.requests[0].bodyUnavailable, "the response had no body");
   equal(seen.requests[1].bodyUnavailable, "Response body is unavailable for redirect responses");
 });
+
+test("a stylesheet is not a response body worth reading, however much text it contains", async () => {
+  // `text/css` contains "text", which is how 109KB of Bootstrap landed in the middle of a debug story.
+  const { page, emit } = fakePage();
+  const inspector = new Inspector(page);
+
+  for (const [type, body] of [
+    ["text/css", "html{font-family:sans-serif}"],
+    ["text/javascript", "export const a = 1;"],
+    ["application/json", '{"ok":true}'],
+    ["text/html", "<h1>hello</h1>"],
+    ["text/plain", "pong"],
+  ] as const) {
+    const req = request({ url: () => `http://localhost:3000/${type}` });
+    emit("request", req);
+    emit("response", response(req, { headers: () => ({ "content-type": type }), text: async () => body }));
+  }
+
+  const seen = await inspector.stop();
+  deepEqual(
+    seen.requests.map(r => r.responseBody),
+    [undefined, undefined, '{"ok":true}', "<h1>hello</h1>", "pong"],
+  );
+});
+
+test("a stylesheet that 404s is still worth reading — a failure is a failure", async () => {
+  const { page, emit } = fakePage();
+  const inspector = new Inspector(page);
+  const req = request({ url: () => "http://localhost:3000/missing.css" });
+  emit("request", req);
+  emit("response", response(req, { status: () => 404, headers: () => ({ "content-type": "text/css" }), text: async () => "not found" }));
+  equal((await inspector.stop()).requests[0].responseBody, "not found");
+});
