@@ -1,4 +1,6 @@
-import { test as base, type BrowserContext } from "@playwright/test";
+import type { BrowserContext, test as base } from "@playwright/test";
+
+import { requirePlaywright } from "./playwright.ts";
 
 import type { System } from "../system.ts";
 
@@ -13,6 +15,7 @@ import type { System } from "../system.ts";
  * Members are not identities — they are the cast, and they sign in for real (`app.<app>.signIn`).
  */
 export function testFor(system: System): typeof base {
+  const { test } = requirePlaywright("the test fixture");
   const cookies = Object.values(system.config.identities ?? {}).flatMap(identity =>
     (identity.cookies ?? []).map(cookie => ({
       name: cookie.name,
@@ -26,7 +29,7 @@ export function testFor(system: System): typeof base {
     })),
   );
 
-  return base.extend<{ evidenceManifest: void }>({
+  return test.extend<{ evidenceManifest: void }>({
     context: async ({ context }: { context: BrowserContext }, use: (c: BrowserContext) => Promise<void>) => {
       if (cookies.length) await context.addCookies(cookies);
       await use(context);

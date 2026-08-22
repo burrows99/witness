@@ -1,7 +1,9 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { expect, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { requirePlaywright } from "../browser/playwright.ts";
 
 import { fill } from "../config/index.ts";
 import type { Evidence } from "../evidence/evidence.ts";
@@ -201,6 +203,7 @@ export class Actions {
       values[step.capture.as] = this.pick(body, step.capture.pick);
     }
     if (step.expect) {
+      const { expect } = requirePlaywright("an `expect` step");
       const target = at(step.expect.on);
       const timeout = step.expect.timeout ?? 30_000;
       const because = step.expect.because;

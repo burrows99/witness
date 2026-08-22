@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { Cli, System, Workspace } from "../src/index.ts";
@@ -54,13 +55,31 @@ const config: Parameters<Cli["command"]>[1] = {
   },
 };
 
+/**
+ * What the generated entry point should import.
+ *
+ * The package name when this is running from an install, and the path to the sources when it is running
+ * from a checkout of itself — a generated file that points into `node_modules` is one that breaks the
+ * first time anything is reinstalled.
+ */
+function entryPoint(dir: string): string {
+  const here = import.meta.dirname;
+  if (here.includes(`${path.sep}node_modules${path.sep}`)) {
+    for (let at = here; at !== path.dirname(at); at = path.dirname(at)) {
+      const manifest = path.join(at, "package.json");
+      if (fs.existsSync(manifest)) return (JSON.parse(fs.readFileSync(manifest, "utf8")) as { name: string }).name;
+    }
+  }
+  return path.relative(dir, path.join(here, "..", "src", "index.ts"));
+}
+
 /** `witness init`: the directory, a description generated from the types, and what specs import. */
 const init: Parameters<Cli["command"]>[1] = {
   summary: `make a ${Workspace.DIRECTORY}/ in this directory`,
   passthrough: (args: string[]) => {
     const root = args.find(a => !a.startsWith("--")) ?? process.cwd();
     const dir = path.join(path.resolve(root), Workspace.DIRECTORY);
-    const entry = path.relative(dir, path.join(import.meta.dirname, "..", "src", "index.ts"));
+    const entry = entryPoint(dir);
     const { workspace, written } = Workspace.create(root, {
       "config.jsonc": Template.forWitness().render(),
       // Everything a run leaves behind lands here, and none of it belongs in a commit. Kept beside the

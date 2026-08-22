@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import { test } from "@playwright/test";
+import { playwright } from "../browser/playwright.ts";
 
 /**
  * Where a run's artefacts go, decided by the run rather than by whoever typed the spec.
@@ -70,10 +70,12 @@ export function currentContext(fallbackLabel = "cli"): EvidenceContext {
 }
 
 /** `test.info()` throws outside a test; a system that can also be driven from a shell must cope. */
-export function safeInfo(): ReturnType<typeof test.info> | undefined {
+export function safeInfo(): TestInfo | undefined {
   try {
-    return test.info();
+    return playwright()?.test.info();
   } catch {
     return undefined;
   }
 }
+
+type TestInfo = ReturnType<NonNullable<ReturnType<typeof playwright>>["test"]["info"]>;
