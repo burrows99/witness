@@ -21,9 +21,9 @@ const page = () => {
   const surface = {
     getByRole: (role: string, opts: { name?: unknown; exact?: boolean }) =>
       found(`role=${role}${opts.name instanceof RegExp ? ` name~${opts.name.source}` : opts.name ? ` name=${String(opts.name)}` : ""}`),
-    getByPlaceholder: (value: string) => found(`placeholder=${value}`),
+    getByPlaceholder: (value: string, opts: { exact?: boolean } = {}) => found(`placeholder=${value}${opts.exact ? " exact" : ""}`),
     getByTestId: (value: string) => found(`testId=${value}`),
-    getByLabel: (value: string) => found(`label=${value}`),
+    getByLabel: (value: string, opts: { exact?: boolean } = {}) => found(`label=${value}${opts.exact ? " exact" : ""}`),
     getByText: (value: string, opts: { exact?: boolean }) => found(`text=${value}${opts.exact ? " exact" : ""}`),
     locator: (selector: string) => found(`css=${selector}`),
     frameLocator: (selector: string) => ({ ...surface, inFrame: selector }),
@@ -58,6 +58,15 @@ test("a label without htmlFor is reached from its label's sibling", () => {
   // "Confirmation heading" — several fields for one locator.
   equal(what({ labelledInput: "Heading" }), 'css=label:text-is("Heading") ~ input');
   match(what({ labelledTextarea: "Body" }), /label:text-is\("Body"\) ~ textarea or .*div textarea/);
+});
+
+test("exact means the same thing for every way of naming a thing", () => {
+  // A field labelled "Password" also matches a button called "Show password", and the failure lands in
+  // a spec that was specific enough — so `exact` has to reach the label and the placeholder too.
+  equal(what({ label: "Password" }), "label=Password");
+  equal(what({ label: "Password", exact: true }), "label=Password exact");
+  equal(what({ placeholder: "Email", exact: true }), "placeholder=Email exact");
+  equal(what({ text: "Cancelled", exact: true }), "text=Cancelled exact");
 });
 
 test("hasText narrows the matches, nth picks one", () => {

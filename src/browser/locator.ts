@@ -12,7 +12,13 @@ export type LocatorSpec =
   | {
       role?: string;
       name?: string;
-      /** Match the name exactly rather than as a substring. */
+      /**
+       * Match exactly rather than as a substring.
+       *
+       * Applies to whichever of `name`, `label`, `placeholder` and `text` this spec uses: Playwright
+       * matches all of them by substring, which is how a field called "Password" also matches the
+       * button beside it called "Show password".
+       */
       exact?: boolean;
       placeholder?: string;
       testId?: string;
@@ -43,12 +49,16 @@ export function locate(page: Page, spec: LocatorSpec): Locator {
       : page;
 
   const name = spec.name ? (spec.exact ? { name: spec.name, exact: true } : { name: new RegExp(spec.name) }) : {};
+  // `exact` means the same thing for every way of naming a thing. Playwright matches a label, a
+  // placeholder and a text by SUBSTRING unless told otherwise, so "Password" also finds a button called
+  // "Show password" — and the failure is a strict-mode violation in a spec that was specific enough.
+  const exact = spec.exact ? { exact: true } : {};
   let found: Locator;
   if (spec.role) found = (root as Page).getByRole(spec.role as Parameters<Page["getByRole"]>[0], name);
-  else if (spec.placeholder) found = (root as Page).getByPlaceholder(spec.placeholder);
+  else if (spec.placeholder) found = (root as Page).getByPlaceholder(spec.placeholder, exact);
   else if (spec.testId) found = (root as Page).getByTestId(spec.testId);
-  else if (spec.label) found = (root as Page).getByLabel(spec.label);
-  else if (spec.text) found = (root as Page).getByText(spec.text, spec.exact ? { exact: true } : {});
+  else if (spec.label) found = (root as Page).getByLabel(spec.label, exact);
+  else if (spec.text) found = (root as Page).getByText(spec.text, exact);
   // Labels rendered without `htmlFor`: reach the field from its label's sibling. `text-is`, not
   // `has-text`, because the latter is a substring match and "Heading" would also take "Confirmation
   // heading" — several fields for one locator.
