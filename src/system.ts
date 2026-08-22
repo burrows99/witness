@@ -117,6 +117,9 @@ export class System {
         return (target as unknown as Record<string, { url: (p: Params) => string }>)[route].url(params);
       },
       evidence: () => this.evidence(),
+      // So an action can sign in without the caller typing a password on the command line — which is
+      // the whole reason `secrets` exists, and was unreachable from a description until now.
+      secret: (name: string) => this.secret(name),
     });
 
     this.apps = {};

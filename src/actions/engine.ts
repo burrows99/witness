@@ -35,6 +35,8 @@ export class Actions {
   private readonly config: Record<string, ActionConfig>;
   private readonly appUrl: (app: string, route: string, params: Params) => string;
   private readonly evidence: () => Evidence;
+  /** A declared credential, resolved when a step actually asks for one. */
+  private readonly secret: (name: string) => string;
   /** Something the last step got away with that a reader should know about. */
   private warning?: string;
 
@@ -45,6 +47,8 @@ export class Actions {
     actions: Record<string, ActionConfig>;
     url: (app: string, route: string, params: Params) => string;
     evidence: () => Evidence;
+    /** Optional: without it, `{secret.x}` says the config declares no secrets. */
+    secret?: (name: string) => string;
   }) {
     this.operations = opts.operations;
     this.queries = opts.queries;
@@ -52,6 +56,23 @@ export class Actions {
     this.config = opts.actions;
     this.appUrl = opts.url;
     this.evidence = opts.evidence;
+    this.secret = opts.secret ?? ((name: string) => {
+      throw new Error(`{secret.${name}} — this system was built without any way to resolve secrets`);
+    });
+  }
+
+  /**
+   * The values a template is filled from: what the run gathered, plus `secret.<name>`.
+   *
+   * A credential must reach a `type` step without ever becoming a stored VALUE: `values` is returned
+   * to the caller and printed as JSON by the command line, so a secret kept there is a password on
+   * somebody's terminal. This is resolved at the moment a template asks for it and kept nowhere.
+   *
+   * Lazily, through a proxy, because a config declares secrets it does not always use — and reading
+   * one means an exec into a running container, which fails when that container is not the point.
+   */
+  private bag(values: Params): Params {
+    return { ...values, secret: new Proxy({}, { get: (_, name) => (typeof name === "string" ? this.secret(name) : undefined) }) };
   }
 
   get names(): string[] {
@@ -166,7 +187,7 @@ export class Actions {
   /** One step. Every branch is a verb a config can use; there is deliberately no escape into code. */
   private async step(step: StepConfig, page: Page, values: Params, defaultApp?: string): Promise<void> {
     const at = (spec: LocatorSpec): ReturnType<typeof locate> => locate(page, this.resolve(spec, values) as LocatorSpec);
-    const text = (s?: string): string => (s === undefined ? "" : fill(s, values));
+    const text = (s?: string): string => (s === undefined ? "" : fill(s, this.bag(values)));
 
     if (step.goto) {
       const { app, route, url, params } = step.goto;
@@ -291,7 +312,7 @@ export class Actions {
     // The claim one layer makes against another: what the API answered against what the screen shows,
     // what a list holds against what was counted. `expect` can only see the screen, so this was the
     // last thing a description could not say and a program had to.
-    if (step.check) Actions.assert(step.check, values);
+    if (step.check) Actions.assert(step.check, this.bag(values));
     // A still worth keeping on its own, beside the automatic one per step: the frames a person is
     // actually shown, named for what they show rather than for the verb that happened to take them.
     if (step.frame) await this.evidence().frame(page, text(step.frame), { fullPage: step.fullPage });
@@ -420,7 +441,7 @@ export class Actions {
     if (typeof value === "string") {
       const whole = value.match(/^\{(\w+)\}$/);
       if (whole && values[whole[1]] !== undefined) return values[whole[1]];
-      return fill(value, values);
+      return fill(value, this.bag(values));
     }
     if (Array.isArray(value)) return value.map(v => this.resolve(v, values));
     if (value && typeof value === "object") {

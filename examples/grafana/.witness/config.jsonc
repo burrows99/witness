@@ -4,8 +4,7 @@
 //
 //   npx witness stack status
 //   npx witness dashboards list
-//   npx witness action run grafana.signIn grafana.tour username=admin password=admin
-//   npx witness test                      # the narrated tour, recorded
+//   npx witness action run grafana.theWholeProduct     # the narrated tour, recorded
 {
   "name": "grafana",
 
@@ -21,11 +20,13 @@
     }
   },
 
-  // Where the credentials come from. A fresh Grafana is admin/admin; a real one would name a container's
-  // environment or a gitignored file here, and the value would never be in this repository.
+  // Where the credentials come from — read out of the RUNNING container, which is the provider to
+  // prefer: a container keeps the values it was created with, so a file on disk and the process
+  // serving requests can disagree, and the process is the one telling the truth. Nothing secret is in
+  // this repository; `docker-compose.yml` beside this file is what puts them in the container.
   "secrets": {
-    "adminUser": { "env": "GRAFANA_USER" },
-    "adminPassword": { "env": "GRAFANA_PASSWORD" }
+    "adminUser": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
+    "adminPassword": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
   },
 
   "cast": {
@@ -40,7 +41,11 @@
     "service": "grafana",
     "auth": {
       // Grafana takes a username and a password on its API. `basic` is a provider like any other.
-      "admin": { "provider": "basic", "username": { "env": "GRAFANA_USER" }, "from": { "env": "GRAFANA_PASSWORD" } }
+      "admin": {
+        "provider": "basic",
+        "username": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
+        "from": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
+      }
     },
     "operations": {
       "health": { "path": "/api/health", "summary": "is it up, and is its database reachable" },
@@ -111,11 +116,10 @@
     "grafana.signIn": {
       "summary": "sign in the way a first-time admin does, and get past the password prompt",
       "app": "grafana",
-      "inputs": ["username", "password"],
       "steps": [
         { "goto": { "route": "login" } },
-        { "type": { "on": { "placeholder": "email or username" }, "value": "{username}" } },
-        { "type": { "on": { "placeholder": "password" }, "value": "{password}" }, "note": "typed, not filled: this gets recorded" },
+        { "type": { "on": { "placeholder": "email or username" }, "value": "{secret.adminUser}" } },
+        { "type": { "on": { "placeholder": "password" }, "value": "{secret.adminPassword}" }, "note": "the declared secret, read out of the running container — never typed on a command line, never stored as a value" },
         { "click": { "role": "button", "name": "Log in" } },
         { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
         { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
@@ -193,7 +197,6 @@
     "grafana.theWholeProduct": {
       "summary": "the whole of a fresh Grafana, walked once, and checked against its own API as it goes",
       "app": "grafana",
-      "inputs": ["username", "password"],
       "steps": [
         {
           "slide": {
@@ -205,7 +208,7 @@
             ]
           }
         },
-        { "run": { "action": "grafana.signIn", "with": { "username": "{username}", "password": "{password}" } } },
+        { "run": "grafana.signIn" },
         { "frame": "signed in" },
 
         { "api": { "operation": "stats", "as": "stats" }, "note": "what the instance says about itself, before looking at a single screen" },
@@ -250,7 +253,7 @@
       ],
       "verify": {
         "title": "What a fresh Grafana is",
-        "subject": { "instance": "http://localhost:3010", "account": "{username}", "dashboards": "{stats.dashboards}", "users": "{stats.users}" },
+        "subject": { "instance": "http://localhost:3010", "account": "{secret.adminUser}", "dashboards": "{stats.dashboards}", "users": "{stats.users}" },
         "signIn": ["docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana", "open http://localhost:3010 — admin / admin"],
         "notes": [
           "The API reported {stats.dashboards} dashboards, {stats.datasources} data sources and {stats.users} user.",

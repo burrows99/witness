@@ -182,3 +182,18 @@ test("a stylesheet that 404s is still worth reading — a failure is a failure",
   emit("response", response(req, { status: () => 404, headers: () => ({ "content-type": "text/css" }), text: async () => "not found" }));
   equal((await inspector.stop()).requests[0].responseBody, "not found");
 });
+
+test("a recorded body does not publish a password", () => {
+  // A sign-in POSTs its credentials, and a debug story is written to be pasted into a pull request —
+  // which is how one becomes the place a password gets published.
+  equal(Inspector.redact('{"user":"admin","password":"admin"}'), '{"user":"admin","password":"«redacted»"}');
+  equal(Inspector.redact("user=admin&password=s3cr3t&next=/home"), "user=admin&password=«redacted»&next=/home");
+  equal(Inspector.redact('{"apiKey":"abc","Authorization":"Bearer x"}'), '{"apiKey":"«redacted»","Authorization":"«redacted»"}');
+});
+
+test("redaction is by field name, not by value", () => {
+  // The tool cannot know which strings are secret — here the password is also the username — and
+  // redacting a known value would mangle every other body it appears in.
+  equal(Inspector.redact('{"id":"admin","role":"Admin"}'), '{"id":"admin","role":"Admin"}');
+  equal(Inspector.redact('{"name":"password rules"}'), '{"name":"password rules"}');
+});

@@ -475,3 +475,45 @@ test("an action with no verify writes no note", when, async () => {
   await actions.run("a", page);
   equal(wrote, false);
 });
+
+test("a step can use a declared secret without the caller typing one", when, async () => {
+  const { page, did } = fakePage();
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: { signIn: { steps: [{ type: { on: { placeholder: "password" }, value: "{secret.adminPassword}" } }] } } as never,
+    url: () => "http://app/",
+    evidence: () => ({ actionFrame: async () => "f.png" }) as unknown as Evidence,
+    secret: (name: string) => (name === "adminPassword" ? "hunter2" : ""),
+  });
+  const result = await actions.run("signIn", page);
+  ok(did.includes('type placeholder=password "hunter2"'));
+  // …and it is nowhere in what comes back. `values` is returned to the caller and printed as JSON by
+  // the command line, so a secret kept there is a password on somebody's terminal.
+  ok(!JSON.stringify(result).includes("hunter2"), "a credential must not survive into the result");
+});
+
+test("a secret is only read when a step actually asks for one", when, async () => {
+  // A config declares secrets it does not always use, and reading one means an exec into a running
+  // container — which fails when that container is not what the run is about.
+  const asked: string[] = [];
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: { a: { steps: [{ press: "Enter" }] } } as never,
+    url: () => "http://app/",
+    evidence: () => ({ actionFrame: async () => "f.png" }) as unknown as Evidence,
+    secret: (name: string) => (asked.push(name), "x"),
+  });
+  await actions.run("a", fakePage().page);
+  deepEqual(asked, []);
+});
+
+test("a system with no way to resolve secrets says so", when, async () => {
+  await rejects(
+    () => engine({ a: { steps: [{ fill: { on: "input", value: "{secret.token}" } }] } }).run("a", fakePage().page),
+    /\{secret\.token\} — this system was built without any way to resolve secrets/,
+  );
+});
