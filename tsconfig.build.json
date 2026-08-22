@@ -1,0 +1,18 @@
+{
+  "//": "The published build. The sources import each other with explicit .ts extensions so one set of files runs under Node, under a test runner, and from a package — `rewriteRelativeImportExtensions` is what makes the last one possible.",
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "rewriteRelativeImportExtensions": true,
+    "strict": true,
+    "declaration": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "bin/**/*.ts"],
+  "exclude": ["**/*.test.ts", "dist", "node_modules"]
+}

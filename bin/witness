@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# The command line for a described system.
+#
+# Node 22 runs TypeScript directly; every module imports with an explicit .ts extension so the SAME
+# files load under both Node (here) and the test runner (the specs). The disabled warning is Node noting
+# the root package.json has no "type" — adding one would change how the runner loads its config.
+exec node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "$(dirname "$0")/cli.ts" "$@"

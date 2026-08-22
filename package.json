@@ -1,0 +1,71 @@
+{
+  "name": "@burrows99/witness",
+  "version": "0.1.0",
+  "description": "Drive a running system from one config file, and come back with evidence rather than a pass/fail.",
+  "keywords": [
+    "e2e",
+    "testing",
+    "evidence",
+    "playwright",
+    "docker",
+    "harness",
+    "config-driven",
+    "screenshots",
+    "video",
+    "agents"
+  ],
+  "license": "MIT",
+  "author": "burrows99",
+  "type": "module",
+  "engines": {
+    "node": ">=22.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/burrows99/witness.git"
+  },
+  "homepage": "https://github.com/burrows99/witness#readme",
+  "bugs": {
+    "url": "https://github.com/burrows99/witness/issues"
+  },
+  "bin": {
+    "witness": "dist/bin/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"src/**/*.test.ts\" \"bin/**/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "witness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON bin/cli.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

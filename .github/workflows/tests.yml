@@ -1,0 +1,25 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # There is no package.json on purpose — this is a source directory a product drops beside its own
+      # code, and it takes its Playwright from that product. The suite skips the browser half when it is
+      # absent, so it is installed here to make sure nothing is skipped in CI.
+      - run: npm init -y && npm install --no-save @playwright/test@^1
+
+      - run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.ts" "bin/**/*.test.ts"
+
+      - name: the template must still describe the schema
+        run: bin/witness config template > /dev/null

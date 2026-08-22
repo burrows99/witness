@@ -1,0 +1,220 @@
+import { spawnSync } from "node:child_process";
+
+import type { Stack } from "../environment/stack.ts";
+import type { Trace } from "../diagnostics/trace.ts";
+
+/**
+ * A git-style command line over a system: `<tool> <noun> <verb> [args]`.
+ *
+ * Why a system needs one at all: everything it can do to the running app — sign someone in, move their
+ * state on, ask the API a question, read a row — is useful OUTSIDE a test. Without a command line, an
+ * agent (or a person) has to write a spec to do any of it, which is why so much poking at local stacks
+ * ends up as throwaway curl and psql that nobody can rerun.
+ *
+ * The generic verbs are here (`stack status`, `api`, `db`, `test`, `video`); a project registers its own
+ * vocabulary on top. Exit codes are the POSIX ones a caller can branch on:
+ *   0 it worked · 1 it ran and failed · 2 you asked for something that does not exist.
+ */
+export class Cli {
+  readonly name: string;
+
+  private readonly nouns = new Map<string, Noun>();
+  private readonly stack: Stack;
+  private readonly trace?: Trace;
+
+  constructor(opts: { name: string; stack: Stack; trace?: Trace }) {
+    this.name = opts.name;
+    this.stack = opts.stack;
+    this.trace = opts.trace;
+  }
+
+  /** Register a noun and its verbs. Returns `this`, so registrations chain. */
+  command(noun: string, spec: Noun): this {
+    this.nouns.set(noun, spec);
+    return this;
+  }
+
+  /**
+   * The generic half: where the stack is, the escape hatches into it, and running the suite.
+   *
+   * `test` re-exports the stack's own resolution into the environment before handing over to the test
+   * runner, which is what lets a second checkout (a worktree with its own ports) run without a wrapper
+   * script per scenario.
+   */
+  withDefaults(opts: {
+    test?: { command: string; args: string[]; cwd?: string };
+    /** Rendering happens here, not in a subprocess. */
+    renderVideos?: () => string[];
+    api?: (method: string, path: string, body?: unknown) => Promise<unknown>;
+    sql?: (query: string) => string;
+    env?: () => Record<string, string>;
+  }): this {
+    this.command("stack", {
+      summary: "what is up, on which ports, from which checkout",
+      verbs: {
+        status: {
+          summary: "reachability of every service, and whether its container is up",
+          run: async () => {
+            const rows = await this.stack.status();
+            const width = Math.max(...rows.map(r => r.name.length));
+            return [
+              `stack ${this.stack.suffix || "(primary)"} — resolved from ${this.stack.root}/.env`,
+              ...rows.map(r => {
+                const state = r.answering ? "NOT OURS" : r.reachable ? "up" : "DOWN";
+                // A declared container that is not running, on a service that IS answering, means somebody
+                // runs it on the host — normal. On one that is NOT answering it means exactly what it says.
+                const where = r.answering
+                  ? r.answering
+                  : r.containerUp
+                    ? r.container
+                    : r.container
+                      ? r.reachable
+                        ? "served from the host"
+                        : `${r.container} is not running`
+                      : "";
+                return `  ${r.name.padEnd(width)}  ${r.url.padEnd(24)} ${state.padEnd(8)} ${where}`;
+              }),
+            ].join("\n");
+          },
+        },
+      },
+    });
+
+    if (opts.api) {
+      const call = opts.api;
+      this.command("api", {
+        summary: "any route on the API, authenticated",
+        verbs: Object.fromEntries(
+          ["get", "post", "patch", "delete"].map(method => [
+            method,
+            {
+              summary: `${method.toUpperCase()} <path> [json]`,
+              run: (args: string[]) => call(method.toUpperCase(), Cli.need(args[0], "path"), args[1] ? JSON.parse(args[1]) : undefined),
+            },
+          ]),
+        ),
+      });
+    }
+
+    if (opts.sql) {
+      const sql = opts.sql;
+      this.command("db", {
+        summary: "the stack's database",
+        verbs: { sql: { summary: "run a query", run: (args: string[]) => sql(Cli.need(args[0], "query")) } },
+      });
+    }
+
+    if (opts.renderVideos) {
+      const render = opts.renderVideos;
+      this.command("video", {
+        summary: "rebuild the MP4s from the last run's recordings",
+        passthrough: () => {
+          const written = render();
+          process.stdout.write(`${written.length} video${written.length === 1 ? "" : "s"}\n`);
+        },
+      });
+    }
+
+    for (const [noun, spec] of [["test", opts.test]] as const) {
+      if (!spec) continue;
+      this.command(noun, {
+        summary: noun === "test" ? "run the suite against THIS checkout's stack" : "rebuild the recordings",
+        passthrough: (args: string[]) => {
+          // `--before` / `--after` name the cut being recorded; everything else goes to the runner.
+          const cut = args.find(a => a === "--before" || a === "--after");
+          const child = spawnSync(spec.command, [...spec.args, ...args.filter(a => a !== cut)], {
+            cwd: spec.cwd ?? this.stack.root,
+            stdio: "inherit",
+            env: { ...process.env, ...(opts.env?.() ?? {}), ...(cut ? { EVIDENCE: cut.slice(2) } : {}) },
+          });
+          process.exit(child.status ?? 1);
+        },
+      });
+    }
+
+    return this;
+  }
+
+  async run(argv: string[]): Promise<void> {
+    const [noun, verb, ...rest] = argv;
+    if (!noun || noun === "help" || noun === "-h" || noun === "--help") {
+      process.stdout.write(this.usage());
+      return;
+    }
+    const spec = this.nouns.get(noun);
+    if (!spec) return Cli.die(`unknown command: ${noun}`, 2);
+    if (spec.passthrough) return spec.passthrough([verb, ...rest].filter((a): a is string => a !== undefined));
+    // Verbs are lowercase, but `api GET /v1/config` is how anyone who has used curl will type it.
+    const handler = verb ? (spec.verbs?.[verb] ?? spec.verbs?.[verb.toLowerCase()]) : undefined;
+    if (!handler) return Cli.die(`unknown: ${noun} ${verb ?? ""}`.trim(), 2);
+
+    // Flags are not positional arguments: `api get /x --quiet` has one argument, not two.
+    const flags = rest.filter(a => a.startsWith("--"));
+    const positional = rest.filter(a => !a.startsWith("--"));
+
+    const before = this.trace?.mark() ?? 0;
+    const result = await handler.run(positional);
+
+    // `--quiet` prints the answer alone. By default the whole exchange comes back — the request, the
+    // response, the statement, the timing — because the caller is usually an agent that cannot open a
+    // network tab, and "it returned nothing" is not a diagnosis.
+    //
+    // A verb marked `raw` is the exception: what it prints IS the artefact — a config file to redirect
+    // into place, an answer about this tool rather than about the product — and wrapping that in a
+    // record of a request nobody made only makes it something to unwrap again.
+    if (flags.includes("--quiet") || handler.raw || !this.trace) {
+      if (result !== undefined) {
+        process.stdout.write(typeof result === "string" ? `${result}\n` : `${JSON.stringify(result, null, 2)}\n`);
+      }
+      return;
+    }
+    process.stdout.write(
+      `${JSON.stringify({ command: `${noun} ${verb}`, result, did: this.trace.since(before) }, null, 2)}\n`,
+    );
+  }
+
+  /** The verbs already registered under a noun, so a caller can add to them rather than replace them. */
+  verbs(noun: string): Record<string, Verb> | undefined {
+    return this.nouns.get(noun)?.verbs;
+  }
+
+  usage(): string {
+    const rows: string[] = [`${this.name} — drive the local stack`, "", `usage: ${this.name} <command> [args]`, ""];
+    for (const [noun, spec] of this.nouns) {
+      rows.push(`  ${noun.padEnd(10)} ${spec.summary}`);
+      for (const [verb, h] of Object.entries(spec.verbs ?? {})) {
+        rows.push(`    ${verb.padEnd(14)} ${h.summary}`);
+      }
+    }
+    rows.push("", "Every command reports what it did — the request, the response, the timing.", "Add --quiet for the bare answer. Exit codes: 0 ok · 1 failed · 2 no such command.", "");
+    return rows.join("\n");
+  }
+
+  /** A required positional argument, or exit 2 saying which one is missing. */
+  static need(value: string | undefined, what: string): string {
+    return value ?? Cli.die(`missing <${what}>`, 2);
+  }
+
+  static die(message: string, code = 1): never {
+    process.stderr.write(`${message}\n`);
+    process.exit(code);
+  }
+
+  /** Wire up `main`: run, and turn a thrown error into exit 1 with its message. */
+  static main(cli: Cli, argv: string[] = process.argv.slice(2)): void {
+    cli.run(argv).catch((err: unknown) => Cli.die(err instanceof Error ? err.message : String(err)));
+  }
+}
+
+export type Verb = {
+  summary: string;
+  run: (args: string[]) => unknown;
+  /** Print the answer alone: this verb's output IS the thing wanted, not a report of a call. */
+  raw?: boolean;
+};
+export type Noun = {
+  summary: string;
+  verbs?: Record<string, Verb>;
+  /** Takes the rest of the line itself (a wrapper around another command). */
+  passthrough?: (args: string[]) => void;
+};

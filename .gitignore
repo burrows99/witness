@@ -1,0 +1,11 @@
+# Nothing here is built or installed — the sources run directly under Node 22 and under a test runner.
+# These are the things that appear anyway when someone consumes this from a checkout.
+node_modules/
+*.tsbuildinfo
+.DS_Store
+
+# A run's output belongs to whoever configured the run, not to this repository.
+artifacts/
+
+# Built for publishing; the sources are what this repository is.
+dist/
