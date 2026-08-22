@@ -1,0 +1,88 @@
+// Grafana, described for witness. Nothing in here is Grafana-specific machinery — it is the same
+// vocabulary any product is described in: where it runs, what its API can be asked, what a person sees,
+// and what they can do.
+{
+  "name": "grafana",
+
+  "services": {
+    // The container this compose/`docker run` starts. `stack status` compares the port's real publisher
+    // against this name, so another project's container answering here reads as NOT OURS.
+    "grafana": {
+      "kind": "in-house",
+      "port": 3010,
+      "portVar": "GRAFANA_PORT",
+      "container": "witness-example-grafana",
+      "probe": { "path": "/api/health", "contains": "database" }
+    }
+  },
+
+  // Grafana's own HTTP API. `witness api get /api/health` returns the whole exchange, not just the body.
+  "api": {
+    "service": "grafana",
+    "auth": {
+      "admin": { "provider": "bearer", "from": { "env": "GRAFANA_TOKEN" } }
+    },
+    "operations": {
+      "health": { "path": "/api/health", "summary": "is it up, and is its database reachable" },
+      "search": { "path": "/api/search", "auth": "admin", "summary": "every dashboard and folder" },
+      "orgs.current": { "path": "/api/org", "auth": "admin", "summary": "the org the caller is in" }
+    }
+  },
+
+  "apps": {
+    "grafana": {
+      "service": "grafana",
+      "routes": {
+        "home": "/",
+        "login": "/login",
+        "dashboards": "/dashboards",
+        "newDashboard": "/dashboard/new",
+        "profile": "/profile"
+      },
+      "locators": {
+        "username": { "placeholder": "email or username" },
+        "password": { "placeholder": "password" },
+        "signIn": { "role": "button", "name": "Log in" },
+        "skipPasswordChange": { "role": "button", "name": "Skip", "exact": true },
+        "welcome": { "text": "Welcome to Grafana" },
+        "newButton": { "role": "button", "name": "New" }
+      }
+    }
+  },
+
+  // What a person can DO, as data. Each of these is runnable on its own from a shell.
+  "actions": {
+    "grafana.signIn": {
+      "summary": "sign in the way a first-time admin does, and get past the password prompt",
+      "app": "grafana",
+      "inputs": ["username", "password"],
+      "steps": [
+        { "goto": { "route": "login" } },
+        { "type": { "on": { "placeholder": "email or username" }, "value": "{username}" } },
+        { "type": { "on": { "placeholder": "password" }, "value": "{password}" }, "note": "typed, not filled: this gets recorded" },
+        { "click": { "role": "button", "name": "Log in" } },
+        { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
+        { "waitForUrl": { "url": "localhost:3010/(\\\\?.*)?$", "timeout": 15000 } },
+        { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin — under a heading that changes with the time of day, which is why the assertion is on this line and not on that one" } }
+      ]
+    },
+    "grafana.openDashboards": {
+      "summary": "open the dashboards list — what a new install has, which is nothing",
+      "app": "grafana",
+      "steps": [
+        { "caption": { "text": "Dashboards", "sub": "A fresh install has none, and says so." } },
+        { "goto": { "route": "dashboards" } },
+        { "expect": { "on": { "role": "button", "name": "New" }, "because": "an admin can always start one" } }
+      ]
+    }
+  },
+
+  "evidence": { "links": ["- Grafana: {grafana}"] },
+  "video": { "provider": "ffmpeg" },
+  "cli": {
+    "dashboards": {
+      "summary": "what this Grafana holds",
+      "verbs": { "list": { "operation": "search", "summary": "every dashboard and folder" } }
+    }
+  }
+}
