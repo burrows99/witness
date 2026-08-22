@@ -408,7 +408,14 @@ actions, each of which still runs on its own:
     { "check": { "that": "{offered.length}", "atLeast": 1, "because": "searching the catalogue for prometheus should offer something" } },
     { "frame": "the connection catalogue" }
     // …explore, data sources, users, profile
-  ]
+  ],
+  // The note a person re-walks it by. Every value is a template, so it says what THIS run saw.
+  "verify": {
+    "title": "What a fresh Grafana is",
+    "subject": { "instance": "http://localhost:3010", "account": "{username}", "dashboards": "{stats.dashboards}" },
+    "signIn": ["docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana"],
+    "notes": ["The catalogue offered {offered.length} matches for \"prometheus\" — see the frame."]
+  }
 }
 ```
 
@@ -451,6 +458,7 @@ The two `check` steps are the part that used to need a program: `expect` can onl
   actions/grafana-thewholeproduct/debug.json    the same thing for a program to read
   actions/grafana-signin/…                      one directory per action it composed
   actions/grafana-browseconnections/…
+  manual-verification.md                        what the action's `verify` said, filled in
 ```
 
 [`debug.md`](docs/example/debug.md), in full — generated, not written:
@@ -523,6 +531,8 @@ These are not the tool's rules — they are what makes the output worth anything
   `slide` before each section cost one line each and are the difference between a video and a artefact.
 - **Say why in the claim.** `because` on an `expect` or a `check` becomes the failure message, which is
   the only sentence anyone reads when it breaks.
+- **Leave the note.** An action's `verify` writes `manual-verification.md` — filled with what this run
+  saw — which turns "it passed" into something a reviewer can check themselves.
 
 ## Tests
 

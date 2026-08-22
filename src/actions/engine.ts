@@ -158,6 +158,7 @@ export class Actions {
     // Written whether it passed or failed, because the run that passed is the one somebody compares
     // against when the next one does not.
     result.debug = this.tell(result);
+    this.note(action, values);
     if (error) throw Object.assign(new Error(`action "${name}" failed at step ${steps.length}: ${error}`), { result });
     return result;
   }
@@ -460,6 +461,37 @@ export class Actions {
   }
 
   /**
+   * The note a person needs to re-walk this by hand, when the action asks for one.
+   *
+   * The instructions recommended `evidence.manualVerification()` — an API you can only reach by
+   * writing code, in a tool whose whole claim is that there is no file to write. So it is a field:
+   * the same note, from the description, filled with what the run gathered.
+   */
+  private note(action: ActionConfig, values: Params): void {
+    if (!action.verify) return;
+    const { title, subject = {}, signIn = [], notes = [] } = action.verify;
+    // Best-effort, and after the story: a note is a courtesy, and a template in it that names
+    // something no step stored must not turn a run that worked into a failure.
+    const text = (value: string): string | undefined => {
+      try {
+        return fill(value, values);
+      } catch {
+        return undefined;
+      }
+    };
+    try {
+      this.evidence().manualVerification({
+        title: text(title) ?? title,
+        subject: Object.fromEntries(Object.entries(subject).map(([key, value]) => [key, text(value)])),
+        signIn: signIn.map(text).filter((line): line is string => line !== undefined),
+        notes: notes.map(text).filter((line): line is string => line !== undefined),
+      });
+    } catch {
+      // Nowhere to write it, or nothing to write it about.
+    }
+  }
+
+  /**
    * A frame per step: what the screen looked like at that moment, for whoever reads the result.
    *
    * Filed with the TEST that ran the action, not in a pile of action names — the same action run by two
@@ -577,6 +609,21 @@ export type StepConfig = {
 
 export type ActionConfig = {
   summary?: string;
+  /**
+   * The note a person needs to re-walk this by hand — `manual-verification.md`, beside the frames.
+   *
+   * Every value is a template, so it says what THIS run saw: `{orderId}`, `{stats.users}`, whatever
+   * a step stored. Written whether the run passed or failed, because a failure is when someone looks.
+   */
+  verify?: {
+    title: string;
+    /** Who or what the run was about: an account, a tenant, a record. */
+    subject?: Record<string, string>;
+    /** How to become them — the commands that mint a session, say. */
+    signIn?: string[];
+    /** What the run saw, in a reader's words rather than the step list's. */
+    notes?: string[];
+  };
   /** Which app's routes `goto` steps resolve against, when they do not name one. */
   app?: string;
   inputs?: string[];

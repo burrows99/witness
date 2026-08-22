@@ -418,3 +418,60 @@ test("the string form of run still means the same thing", when, async () => {
   await engine({ inner: { steps: [{ press: "Enter" }] }, outer: { steps: [{ run: "inner" }] } }).run("outer", page);
   deepEqual(did, ["press Enter"]);
 });
+
+test("an action can leave the note a person re-walks it by", when, async () => {
+  // The instructions recommended `evidence.manualVerification()` — an API reachable only by writing
+  // code, in a tool whose whole claim is that there is no file to write.
+  const written: Record<string, string> = {};
+  const { page } = fakePage({ text: "Tuesday, 3pm" });
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: {
+      a: {
+        steps: [{ store: { from: { testId: "slot" }, as: "slot" } }],
+        verify: {
+          title: "The booking",
+          subject: { slot: "{slot}", missing: "{nothing.stored}" },
+          signIn: ["open http://localhost:3000"],
+          notes: ["they picked {slot}"],
+        },
+      },
+    } as never,
+    url: () => "http://app/",
+    evidence: () =>
+      ({
+        actionFrame: async () => "frames/01.png",
+        manualVerification: (opts: { title: string; subject?: Record<string, string | undefined>; notes?: string[] }) => {
+          written.title = opts.title;
+          written.slot = opts.subject?.slot ?? "";
+          written.notes = (opts.notes ?? []).join("|");
+          // A subject naming something no step stored is dropped, not an error: a note is a courtesy.
+          written.missing = String(opts.subject?.missing);
+          return "manual-verification.md";
+        },
+      }) as unknown as Evidence,
+  });
+  const result = await actions.run("a", page);
+  ok(result.ok);
+  equal(written.title, "The booking");
+  equal(written.slot, "Tuesday, 3pm");
+  equal(written.notes, "they picked Tuesday, 3pm");
+  equal(written.missing, "undefined");
+});
+
+test("an action with no verify writes no note", when, async () => {
+  let wrote = false;
+  const { page } = fakePage();
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: { a: { steps: [{ press: "Enter" }] } } as never,
+    url: () => "http://app/",
+    evidence: () => ({ actionFrame: async () => "f.png", manualVerification: () => ((wrote = true), "x") }) as unknown as Evidence,
+  });
+  await actions.run("a", page);
+  equal(wrote, false);
+});

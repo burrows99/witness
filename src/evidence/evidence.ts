@@ -142,7 +142,7 @@ export class Evidence {
     const lines = [
       `# ${title} — manual verification (${this.mode}${this.keep ? " · KEEP=1" : ""})`,
       "",
-      `Spec: \`${this.context.spec}\` · test: \`${this.context.test}\``,
+      `Run: \`${this.context.test}\` (${this.context.source})`,
       "",
       // Witness tears NOTHING down. Saying otherwise in the one file whose job is to be trustworthy is
       // the worst sentence it could contain — and it was two lines above an instruction to go and read

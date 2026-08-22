@@ -34,7 +34,7 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   // The runner's directory in a test run; here, ours — the video provider reads the manifest in it to
   // file the recording with the rest of this run's evidence.
   const outputDir = system.workspace.resolve(path.join("artifacts", "test-results", `cli-${label}`));
-  const context: EvidenceContext = { spec: "cli", test: label, cut, group, outputDir };
+  const context: EvidenceContext = { source: "cli", test: label, cut, group, outputDir };
 
   const browser = await launch();
   const browserContext = await browser.newContext({
