@@ -66,6 +66,17 @@ export class Actions {
     const action = this.config[name];
     if (!action) throw new Error(`no such action "${name}" — see the config's actions`);
 
+    // Checked before anything is launched: an action that declares what it needs should say so at the
+    // start, not fail on an unfilled `{placeholder}` three steps in, after a browser has opened and a
+    // page has loaded. The message is the same whether a spec or a shell asked.
+    const missing = (action.inputs ?? []).filter(input => inputs[input] === undefined);
+    if (missing.length) {
+      throw new Error(
+        `action "${name}" needs ${missing.map(m => `\`${m}\``).join(", ")}` +
+          `${Object.keys(inputs).length ? ` — given ${Object.keys(inputs).map(k => `\`${k}\``).join(", ")}` : " — given nothing"}`,
+      );
+    }
+
     const started = Date.now();
     const mark = this.trace.mark();
     const values: Params = { ...inputs };

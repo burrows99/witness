@@ -286,3 +286,19 @@ test("a step's detail never carries the value it typed", when, async () => {
   equal(result.steps[0].detail, "label=Password");
   ok(!JSON.stringify(result.steps).includes("hunter2"));
 });
+
+test("an action that declares what it needs says so before it starts", when, async () => {
+  // Otherwise it opens a browser, loads a page and dies three steps in on an unfilled `{placeholder}`.
+  const { page, did } = fakePage();
+  const actions = engine({
+    open: { app: "ops", inputs: ["memberId"], steps: [{ goto: { route: "member", params: { memberId: "{memberId}" } } }] },
+  });
+
+  await rejects(() => actions.run("open", page), /action "open" needs `memberId` — given nothing/);
+  await rejects(() => actions.run("open", page, { other: 1 }), /needs `memberId` — given `other`/);
+  deepEqual(did, [], "nothing should have been driven");
+
+  // …and with it, the action runs.
+  const ok = await actions.run("open", page, { memberId: "m-1" });
+  equal(ok.ok, true);
+});
