@@ -179,6 +179,9 @@ export class Actions {
       await field.pressSequentially(text(step.type.value), { delay: step.type.delay ?? 45 });
     }
     if (step.press) await page.keyboard.press(step.press);
+    // The claim "it is still there after a reload" is one of the commonest there is, and going to the
+    // same route again is a different thing: a fresh document, not the same one told to come back.
+    if (step.reload) await page.reload();
     // A whole set of labelled fields at once — the shape of every "author this thing" form, where the
     // labels differ per type and the spec is the only thing that knows them.
     if (step.fillFields) {
@@ -288,6 +291,7 @@ export class Actions {
    */
   private static about(step: StepConfig): string | undefined {
     if (step.note) return step.note;
+    if (step.reload) return "the same page, fresh";
     if (step.goto) return step.goto.url ?? step.goto.route ?? step.goto.app;
     if (step.run) return step.run;
     if (step.api) return step.api.operation;
@@ -400,6 +404,8 @@ export type StepConfig = {
   type?: { on: LocatorSpec; value: string; delay?: number };
   /** A key, on the keyboard — `Enter`, `Escape`, `Control+A`. */
   press?: string;
+  /** Reload the page — for "and it is still there afterwards", which `goto` does not say. */
+  reload?: boolean;
   /** Fill a set of labelled fields: `{ "Heading": "…", "Body": "…" }`. */
   fillFields?: unknown;
   /** Scope for `fillFields` — usually the dialog the form is in. */

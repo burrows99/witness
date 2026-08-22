@@ -30,6 +30,8 @@ export class Evidence {
   private readonly pinned?: EvidenceContext;
   /** Frames are numbered per test, not per object: specs build one of these at module load. */
   private readonly counters = new Map<string, number>();
+  /** Directories already emptied this run, so it happens once rather than per frame. */
+  private readonly cleared = new Set<string>();
 
   constructor(opts: { root: string; base?: string; links?: () => string[]; context?: EvidenceContext }) {
     this.root = opts.root;
@@ -62,13 +64,28 @@ export class Evidence {
    * `fullPage` captures below the fold — right for a long screen whose point is further down, wrong for
    * anything where the viewport IS the claim (a ticket that names a device size, a sticky element).
    */
+  /**
+   * Empty a directory the first time this run writes to it.
+   *
+   * Same-named files were overwritten and everything else stayed: renumber a step list and the frame
+   * from the run before sits in the evidence, three minutes stale and indistinguishable from a real
+   * one. In a directory whose entire purpose is being believed, that is the worst possible bug.
+   */
+  private prepare(dir: string): string {
+    if (!this.cleared.has(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      this.cleared.add(dir);
+    }
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
   async frame(page: Page, name: string, opts: { fullPage?: boolean } = {}): Promise<string> {
     const context = this.context;
     this.writeManifest(context);
     const next = (this.counters.get(context.group) ?? 0) + 1;
     this.counters.set(context.group, next);
-    const file = path.join(this.dir, "frames", `${String(next).padStart(2, "0")}-${slug(name)}.png`);
-    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const file = path.join(this.prepare(path.join(this.dir, "frames")), `${String(next).padStart(2, "0")}-${slug(name)}.png`);
     await page.screenshot({ path: file, fullPage: opts.fullPage ?? false });
     return file;
   }
@@ -76,8 +93,8 @@ export class Evidence {
   /** A frame belonging to an action, kept with the action that took it. */
   async actionFrame(page: Page, action: string, index: number, name: string): Promise<string> {
     this.writeManifest();
-    const file = path.join(this.dir, "actions", slug(action, 64), `${String(index).padStart(2, "0")}-${slug(name)}.png`);
-    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const dir = this.prepare(path.join(this.dir, "actions", slug(action, 64)));
+    const file = path.join(dir, `${String(index).padStart(2, "0")}-${slug(name)}.png`);
     await page.screenshot({ path: file });
     return file;
   }
@@ -113,13 +130,16 @@ export class Evidence {
   }): string {
     const { title, subject = {}, signIn = [], sections = [], notes = [] } = opts;
     const lines = [
-      `# ${title} — manual verification (${this.mode}${this.keep ? ", data kept" : ", data torn down"})`,
+      `# ${title} — manual verification (${this.mode}${this.keep ? " · KEEP=1" : ""})`,
       "",
       `Spec: \`${this.context.spec}\` · test: \`${this.context.test}\``,
       "",
+      // Witness tears NOTHING down. Saying otherwise in the one file whose job is to be trustworthy is
+      // the worst sentence it could contain — and it was two lines above an instruction to go and read
+      // the row it claimed was gone.
       this.keep
-        ? "The run left everything in place. The links below are live."
-        : "The run tore its data down (`KEEP=1` keeps it). The links are recorded so a kept run can be compared.",
+        ? "`KEEP=1` was set, so anything this spec cleans up conditionally was asked to stay."
+        : "Whether what this run made is still there depends on what the spec did with it — nothing here removes it. `KEEP=1` tells a spec that cleans up to leave it alone.",
       "",
       ...(Object.keys(subject).length
         ? ["## Who", "", ...Object.entries(subject).filter(([, v]) => v).map(([k, v]) => `- ${k}: \`${v}\``), ""]

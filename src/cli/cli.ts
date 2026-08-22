@@ -146,7 +146,18 @@ export class Cli {
     if (spec.passthrough) return spec.passthrough([verb, ...rest].filter((a): a is string => a !== undefined));
     // Verbs are lowercase, but `api GET /v1/config` is how anyone who has used curl will type it.
     const handler = verb ? (spec.verbs?.[verb] ?? spec.verbs?.[verb.toLowerCase()]) : undefined;
-    if (!handler) return Cli.die(`unknown: ${noun} ${verb ?? ""}`.trim(), 2);
+    if (!handler) {
+      // A noun with no verb is a question, not a mistake: answer it. `unknown: chat` for a command the
+      // tool's own help documents is the least useful thing it could say.
+      const verbs = Object.entries(spec.verbs ?? {});
+      if (!verb && verbs.length) {
+        process.stdout.write(
+          [`${noun} — ${spec.summary}`, "", ...verbs.map(([name, h]) => `  ${name.padEnd(14)} ${h.summary}`), ""].join("\n"),
+        );
+        return;
+      }
+      return Cli.die(`unknown: ${noun} ${verb ?? ""}`.trim(), 2);
+    }
 
     // Flags are not positional arguments: `api get /x --quiet` has one argument, not two.
     const flags = rest.filter(a => a.startsWith("--"));
