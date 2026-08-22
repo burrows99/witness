@@ -1,0 +1,14 @@
+# Grafana's own published default credential is not a secret.
+#
+# `examples/grafana/docker-compose.yml` creates a throwaway container that exists only to be driven by
+# the example, and sets `GF_SECURITY_ADMIN_USER`/`GF_SECURITY_ADMIN_PASSWORD` to admin/admin — the
+# values Grafana documents and uses when neither is set. They are in the compose file rather than left
+# implicit so the description beside it can read them back out of the running container, which is the
+# habit worth teaching: a container keeps what it was created with, and the process serving requests is
+# the one telling the truth.
+#
+# Nothing else in this repository is excluded, and nothing here is a credential to anything real.
+version: 2
+secret:
+  ignored_paths:
+    - "examples/*/docker-compose.yml"
