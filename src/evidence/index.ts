@@ -2,3 +2,4 @@
 export { Evidence } from "./evidence.ts";
 export { renderVideos, teardownFor } from "./render.ts";
 export { finishRecording } from "./recording.ts";
+export { default as WitnessReporter } from "./reporter.ts";

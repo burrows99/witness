@@ -36,7 +36,11 @@
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./reporter": {
+      "types": "./dist/src/evidence/reporter.d.ts",
+      "default": "./dist/src/evidence/reporter.js"
+    }
   },
   "files": [
     "dist",
