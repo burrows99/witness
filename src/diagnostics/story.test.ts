@@ -210,3 +210,13 @@ test("paths are said relative to the evidence directory", () => {
   // Outside the evidence directory it stays absolute, because that is what you would have to type.
   match(out, /show-trace \/checkout\/out\/trace\.zip/);
 });
+
+test("a failure whose body could not be read says so where the body would be", () => {
+  const out = story({
+    recording: recording({
+      requests: [request({ status: 500, bodyUnavailable: "the response had no body" })],
+    }),
+  }).markdown();
+  match(out, /### The ones that failed/);
+  match(out, /Came back with no readable body: _the response had no body_/);
+});

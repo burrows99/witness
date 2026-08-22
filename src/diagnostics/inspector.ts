@@ -141,11 +141,13 @@ export class Inspector {
   private static async readBody(response: Response, record: RequestRecord): Promise<void> {
     try {
       const body = await response.text();
-      record.responseBody = Inspector.clip(body);
-    } catch {
-      // A redirect, a body already consumed, a context that closed first: no body is a fact about the
-      // response, not a failure of the run.
-      record.responseBody = undefined;
+      if (body) record.responseBody = Inspector.clip(body);
+      else record.bodyUnavailable = "the response had no body";
+    } catch (err) {
+      // A redirect, a body already consumed, a context that closed first. Recorded rather than dropped:
+      // a 500 printed as "→ 500" and nothing else is a dead end, and "why is there nothing here" is the
+      // next question every single time.
+      record.bodyUnavailable = String(err instanceof Error ? err.message : err).slice(0, 160);
     }
   }
 
@@ -170,6 +172,8 @@ export type RequestRecord = {
   responseBody?: string;
   /** Set when the request never got a response — `net::ERR_CONNECTION_REFUSED` and friends. */
   failure?: string;
+  /** Why there is no `responseBody`, when there is none and there should have been. */
+  bodyUnavailable?: string;
 };
 
 export type ConsoleRecord = {
