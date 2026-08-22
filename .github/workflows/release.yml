@@ -1,0 +1,57 @@
+name: Auto Release
+
+# Every merge to main publishes a GitHub Release with auto-generated notes. Releases surface in
+# followers' feeds and notify watchers. Put "[skip release]" in the commit SUBJECT to skip one.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip if commit subject says so
+        id: gate
+        run: |
+          subject="$(git log -1 --pretty=%s)"
+          if printf '%s' "$subject" | grep -qiF '[skip release]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next version (patch bump)
+        if: steps.gate.outputs.skip != 'true'
+        id: ver
+        run: |
+          latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)"
+          if [ -z "$latest" ]; then
+            next="v0.1.0"
+          else
+            v="${latest#v}"
+            major="${v%%.*}"; rest="${v#*.}"; minor="${rest%%.*}"; patch="${rest##*.}"
+            next="v${major}.${minor}.$((patch + 1))"
+          fi
+          echo "tag=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "${{ steps.ver.outputs.tag }}" \
+            --generate-notes
