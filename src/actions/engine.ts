@@ -83,7 +83,7 @@ export class Actions {
     try {
       for (const [index, step] of action.steps.entries()) {
         const at = Date.now();
-        const label = Object.keys(step).find(k => k !== "as" && k !== "store" && k !== "note") ?? "step";
+        const label = Actions.verb(step);
         inspector.mark(label, index);
         try {
           await this.step(step, page, values, action.app);
@@ -92,12 +92,12 @@ export class Actions {
         }
         const shot = await this.frame(page, name, index, label);
         if (shot) screenshots.push(shot);
-        steps.push({ step: label, detail: step.note ?? describe(this.target(step) ?? ""), ms: Date.now() - at, error, screenshot: shot });
+        steps.push({ step: label, detail: Actions.about(step), ms: Date.now() - at, error, screenshot: shot });
         this.trace.add({
           kind: "step",
           action: name,
           step: label,
-          detail: step.note,
+          detail: Actions.about(step),
           ms: Date.now() - at,
           screenshot: shot,
           error,
@@ -256,8 +256,45 @@ export class Actions {
     }
   }
 
+  /** Keys that modify a step rather than being what it does. Everything else names the verb. */
+  private static readonly MODIFIERS = ["as", "note", "within"];
+
+  /**
+   * What the step IS — `goto`, `click`, `store`.
+   *
+   * `store` used to be excluded along with the modifiers, so a step that only stores was labelled
+   * "step": anonymous in the one section of the story a person reads first.
+   */
+  private static verb(step: StepConfig): string {
+    return Object.keys(step).find(key => !Actions.MODIFIERS.includes(key)) ?? "step";
+  }
+
+  /**
+   * What the step is ABOUT, in a few words.
+   *
+   * Never a value: a `fill` step's value is a password as often as not, and a story is a file people
+   * paste into pull requests. The locator says which field; the value is nobody's business.
+   */
+  private static about(step: StepConfig): string | undefined {
+    if (step.note) return step.note;
+    if (step.goto) return step.goto.url ?? step.goto.route ?? step.goto.app;
+    if (step.run) return step.run;
+    if (step.api) return step.api.operation;
+    if (step.query) return step.query.name;
+    if (step.capture) return step.capture.url;
+    if (step.select) return `${step.select.from} where ${JSON.stringify(step.select.where)}`;
+    if (step.press) return step.press;
+    if (step.wait) return `${step.wait}ms`;
+    if (step.waitForUrl) return typeof step.waitForUrl === "string" ? step.waitForUrl : step.waitForUrl.url;
+    if (step.caption) return step.caption.text;
+    if (step.slide) return step.slide.title;
+    if (step.fillFields) return "a set of labelled fields";
+    const target = Actions.target(step);
+    return target ? describe(target) : undefined;
+  }
+
   /** The locator a step is about, for the trace line. */
-  private target(step: StepConfig): LocatorSpec | undefined {
+  private static target(step: StepConfig): LocatorSpec | undefined {
     return step.click ?? step.fill?.on ?? step.type?.on ?? step.expect?.on ?? step.store?.from;
   }
 
