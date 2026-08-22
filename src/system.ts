@@ -8,7 +8,7 @@ import { locate } from "./browser/locator.ts";
 import { resolveSecret } from "./providers/secrets.ts";
 import { Evidence } from "./evidence/evidence.ts";
 import type { EvidenceContext } from "./evidence/paths.ts";
-import { identityCookies } from "./browser/fixture.ts";
+import { identityCookies } from "./browser/identities.ts";
 import { parseRunArgs, runActions } from "./actions/run.ts";
 import { HttpApi } from "./http/client.ts";
 import { Operations } from "./http/operations.ts";
@@ -167,7 +167,7 @@ export class System {
    * The system THIS project describes — the nearest `.witness/` above the working directory.
    *
    * What a product's entry point is: `export const app = System.find()`. No path to repeat, and the
-   * answer does not depend on which directory a spec, a runner or a shell happened to start in.
+   * answer does not depend on which directory a run or a shell happened to start in.
    */
   static find(opts: { from?: string } = {}): System {
     return System.of(Workspace.find(opts));
@@ -202,7 +202,7 @@ export class System {
   /**
    * Start a declared stub, or hand back the one already running.
    *
-   * Idempotent because more than one spec in a run may need the same stand-in, and starting it twice
+   * Idempotent because more than one action in a run may need the same stand-in, and starting it twice
    * would take a port the first one is answering on.
    */
   async stub(name: string): Promise<StubServer> {
@@ -226,7 +226,7 @@ export class System {
   }
 
   /**
-   * Take back down everything every client created — a spec's `finally`, once.
+   * Take back down everything every client created — the end of a run, once.
    *
    * What gets reversed is declared on the operations that create things (`undo`), so this needs no list
    * of its own and cannot drift from one.
@@ -254,7 +254,7 @@ export class System {
   /**
    * The cast: a fixture the config pins a scenario to.
    *
-   * Real rows in a real database, named so a spec can say who it is about. The config carries the
+   * Real rows in a real database, named so an action can say who it is about. The config carries the
    * reasoning with them — which member has a linked patient record, whose name is unique in a shared
    * sandbox — because those are the facts that make a fixture the right one.
    */
@@ -333,7 +333,7 @@ export class System {
   /**
    * Evidence for whatever is running — `app.evidence().frame(page, "her dashboard")`.
    *
-   * It takes no name: the spec, the test and the cut already identify the run, and deriving the path
+   * It takes no name: what was run and which cut it was already identify it, and deriving the path
    * from them is what makes two runs of the same thing land in the same place, and two different things
    * never collide.
    */
@@ -370,15 +370,12 @@ export class System {
    * `addCommands` added. Every operation and query stays reachable through `api` / `db` regardless.
    */
   cli(): Cli {
-    const runner = this.config.runner ?? {};
     const cli = new Cli({ name: this.config.name, stack: this.stack, trace: this.trace }).withDefaults({
-      test: runner.test,
       // Rendering is the system's own job, done in this process. Shelling out to a script that calls
       // back into it is a loop nobody should have to read.
       renderVideos: () => this.renderVideos(),
       api: this.http ? (method, path, body) => this.callByPath(method, path, body) : undefined,
       sql: this.postgres ? (query: string) => this.db.sql(query) : undefined,
-      env: () => Object.fromEntries(Object.entries(runner.env ?? {}).map(([k, v]) => [k, this.expand(v)])),
     });
 
     for (const [noun, group] of Object.entries(this.config.cli ?? {})) {

@@ -44,6 +44,10 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   // What the config says the system can BE. The same cookies a spec gets, for the same reason.
   const cookies = request.cookies ?? [];
   if (cookies.length) await browserContext.addCookies(cookies);
+  // Playwright's trace: the DOM at every action, the network with bodies, the sources. It is a better
+  // debugger for a PERSON than anything written here, and it used to arrive only through the runner —
+  // so removing the runner would have quietly taken it away.
+  await browserContext.tracing.start({ screenshots: true, snapshots: true, sources: true }).catch(() => undefined);
   const page = await browserContext.newPage();
 
   system.pinEvidence(context);
@@ -65,6 +69,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
     const attached = (failure as { result?: ActionResult }).result;
     if (attached) results.push(attached);
   } finally {
+    // Where the story already says it will be, and written before the context closes: after that there
+    // is nothing left to write it from.
+    await browserContext.tracing.stop({ path: path.join(outputDir, "trace.zip") }).catch(() => undefined);
     // The video is written when the CONTEXT closes, so this happens before anything reads for it.
     await browserContext.close();
     if (!keep) await browser.close();

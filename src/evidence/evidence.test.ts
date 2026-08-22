@@ -1,4 +1,4 @@
-import { equal, match, ok } from "node:assert/strict";
+import { deepEqual, equal, match, ok } from "node:assert/strict";
 import { after, test } from "node:test";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -82,4 +82,17 @@ test("stories are every write-up the run produced, however deep", () => {
 test("a test that drove nothing has no stories rather than an error", () => {
   const { evidence } = workspace();
   equal(evidence("never/written/run").stories().length, 0);
+});
+
+test("frames are numbered across the whole run, not per object", async () => {
+  const { evidence } = workspace();
+  const page = { screenshot: async ({ path: file }: { path: string }) => fs.writeFileSync(file, "") } as never;
+  // A system builds a NEW Evidence for every call. Counting per-instance named eight stills taken in
+  // order `01-` — a directory where everything claims to be first is worse than one with no numbers.
+  const files = [];
+  for (const name of ["signed in", "dashboards", "explore"]) files.push(await evidence().frame(page, name));
+  deepEqual(
+    files.map(file => path.basename(file)),
+    ["01-signed-in.png", "02-dashboards.png", "03-explore.png"],
+  );
 });

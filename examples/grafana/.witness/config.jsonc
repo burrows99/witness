@@ -178,7 +178,7 @@
         { "caption": { "text": "Users", "sub": "One account on a fresh install: the admin you just were." } },
         { "goto": { "route": "users" } },
         { "expect": { "on": { "role": "table" }, "because": "the admin user list is a table" } },
-        { "store": { "from": { "role": "row" }, "as": "userRows", "all": true } }
+        { "store": { "from": { "css": "tbody tr" }, "as": "userRows", "all": true }, "note": "the body's rows: `role=row` also matches the header, which is not an account" }
       ]
     },
     "grafana.openProfile": {
@@ -190,16 +190,63 @@
         { "wait": 600 }
       ]
     },
-    "grafana.tour": {
-      "summary": "the whole product, once: dashboards, a new one, explore, connections, users, profile",
+    "grafana.theWholeProduct": {
+      "summary": "the whole of a fresh Grafana, walked once, and checked against its own API as it goes",
       "app": "grafana",
+      "inputs": ["username", "password"],
       "steps": [
+        {
+          "slide": {
+            "title": "Grafana, described",
+            "lines": [
+              "One config file: services, API operations, routes, locators, actions.",
+              "The order, the narration and the cross-checks are steps in it too.",
+              "There is no test file. This IS the description."
+            ]
+          }
+        },
+        { "run": { "action": "grafana.signIn", "with": { "username": "{username}", "password": "{password}" } } },
+        { "frame": "signed in" },
+
+        { "api": { "operation": "stats", "as": "stats" }, "note": "what the instance says about itself, before looking at a single screen" },
+        {
+          "slide": {
+            "title": "What it says it holds",
+            "lines": ["{stats.dashboards} dashboards · {stats.datasources} data sources · {stats.users} user", "Every screen after this should agree with that."]
+          }
+        },
+
         { "run": "grafana.openDashboards" },
+        { "frame": "dashboards, empty" },
+        { "api": { "operation": "search", "as": "listed" } },
+        { "check": { "that": "{listed.length}", "equals": "{stats.dashboards}", "because": "the API and the screen should agree about how many dashboards there are" } },
+
         { "run": "grafana.startADashboard" },
+        { "frame": "a new dashboard, unsaved" },
+
+        {
+          "slide": {
+            "title": "Nothing to query yet",
+            "lines": ["Explore and Connections are the two halves of that:", "one asks questions, the other is where the answers come from."]
+          }
+        },
         { "run": "grafana.openExplore" },
+        { "frame": "explore" },
         { "run": "grafana.openDataSources" },
+        { "frame": "no data sources" },
+
+        { "caption": { "text": "What it could connect to", "sub": "Searching the catalogue the way a person would." } },
+        { "run": { "action": "grafana.browseConnections", "with": { "search": "prometheus" } } },
+        { "check": { "that": "{offered.length}", "atLeast": 1, "because": "searching the catalogue for prometheus should offer something" } },
+        { "frame": "the connection catalogue" },
+
+        { "slide": { "title": "Who can get in", "lines": ["The API says {stats.users}. The screen should say the same."] } },
         { "run": "grafana.openUsers" },
-        { "run": "grafana.openProfile" }
+        { "frame": "one account" },
+        { "check": { "that": "{userRows.length}", "equals": "{stats.users}", "because": "the user table should hold the accounts the API counted" } },
+
+        { "run": "grafana.openProfile" },
+        { "frame": "the admin's own page" }
       ]
     }
   },

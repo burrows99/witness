@@ -10,7 +10,7 @@ import { currentContext, type EvidenceContext, slug } from "./paths.ts";
  *
  * Everything about one test lands in ONE directory, named for the test rather than by hand:
  *
- *     artifacts/<spec>/<test>/<cut>/
+ *     artifacts/cli/<what was run>/<cut>/
  *       video.mp4                       the recording, put here by the video provider
  *       frames/01-her-dashboard.png     stills, numbered in the order they were taken
  *       actions/<action>/01-click.png   a frame per step of each action the test ran
@@ -18,10 +18,18 @@ import { currentContext, type EvidenceContext, slug } from "./paths.ts";
  *
  * `cut` is `EVIDENCE=before|after` (or `run`), so the two halves of a before/after cannot overwrite
  * each other and sit side by side for comparison. Frames are numbered here rather than in the caller,
- * because hand-numbering is how a spec ends up with two `2-` and one of them lost.
+ * because hand-numbering is how a run ends up with two `2-` and one of them lost.
  */
 /** Frame directories emptied by THIS process, so a run clears each one once and only once. */
 const cleared = new Set<string>();
+/**
+ * How many frames each run has taken, across every Evidence handed out for it.
+ *
+ * Per-instance, this counted to one and stopped: a system builds a NEW Evidence for every call, so
+ * eight stills taken in order were all named `01-`. Numbering exists to say what came first — a
+ * directory where everything claims to be first is worse than one with no numbers at all.
+ */
+const counters = new Map<string, number>();
 
 export class Evidence {
   readonly mode: string;
@@ -31,9 +39,6 @@ export class Evidence {
   private readonly base: string;
   private readonly links: () => string[];
   private readonly pinned?: EvidenceContext;
-  /** Frames are numbered per test, not per object: specs build one of these at module load. */
-  private readonly counters = new Map<string, number>();
-
 
   constructor(opts: { root: string; base?: string; links?: () => string[]; context?: EvidenceContext }) {
     this.root = opts.root;
@@ -88,8 +93,8 @@ export class Evidence {
   async frame(page: Page, name: string, opts: { fullPage?: boolean } = {}): Promise<string> {
     const context = this.context;
     this.writeManifest(context);
-    const next = (this.counters.get(context.group) ?? 0) + 1;
-    this.counters.set(context.group, next);
+    const next = (counters.get(context.group) ?? 0) + 1;
+    counters.set(context.group, next);
     const file = path.join(this.prepare(path.join(this.dir, "frames")), `${String(next).padStart(2, "0")}-${slug(name)}.png`);
     await page.screenshot({ path: file, fullPage: opts.fullPage ?? false });
     return file;
@@ -104,7 +109,7 @@ export class Evidence {
     return file;
   }
 
-  /** Any other artefact — a payload, a log, a note the spec wrote as it went. */
+  /** Any other artefact — a payload, a log, a note written as the run went. */
   write(name: string, contents: string): string {
     this.writeManifest();
     // Each segment slugged on its own: slugging the whole thing turns `actions/x/debug.md` into one
@@ -143,8 +148,8 @@ export class Evidence {
       // the worst sentence it could contain — and it was two lines above an instruction to go and read
       // the row it claimed was gone.
       this.keep
-        ? "`KEEP=1` was set, so anything this spec cleans up conditionally was asked to stay."
-        : "Whether what this run made is still there depends on what the spec did with it — nothing here removes it. `KEEP=1` tells a spec that cleans up to leave it alone.",
+        ? "`KEEP=1` was set, so anything this run cleans up conditionally was asked to stay."
+        : "Whether what this run made is still there depends on what it did — nothing here removes it. `KEEP=1` asks anything that cleans up to leave it alone.",
       "",
       ...(Object.keys(subject).length
         ? ["## Who", "", ...Object.entries(subject).filter(([, v]) => v).map(([k, v]) => `- ${k}: \`${v}\``), ""]
@@ -187,7 +192,7 @@ export class Evidence {
   artefacts(): { video?: string; frames?: string; trace?: string; har?: string } {
     const output = this.context.outputDir;
     // Where each of these LANDS, not whether it is there yet: the video is rendered after the run, the
-    // trace when the test ends, and the frames by whatever the spec does next. Every one of them would
+    // trace when the run ends, and the frames by whatever the run does next. Every one of them would
     // be missing from a story written in the middle, which is when a story is written.
     return {
       video: path.join(this.dir, "video.mp4"),

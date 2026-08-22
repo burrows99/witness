@@ -37,10 +37,6 @@
       "default": "./dist/src/index.js"
     },
     "./package.json": "./package.json",
-    "./reporter": {
-      "types": "./dist/src/evidence/reporter.d.ts",
-      "default": "./dist/src/evidence/reporter.js"
-    },
     "./skill": {
       "types": "./dist/src/skill/skill.d.ts",
       "default": "./dist/src/skill/skill.js"

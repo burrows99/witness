@@ -47,3 +47,21 @@ test("loadConfig reads a file with comments in it", () => {
   equal(loadConfig(file).name, "acme");
   match(loadConfig(file).root!.join(), /x/);
 });
+
+test("a dotted name reaches into what a step stored", () => {
+  // Comparing one layer against another was the last thing a description could not say: the API's
+  // answer is an object and what the screen gave back is a list, and neither has a flat name.
+  equal(fill("{stats.dashboards}", { stats: { dashboards: 3 } }), "3");
+  equal(fill("{rows.length}", { rows: ["a", "b"] }), "2");
+  equal(fill("{a.b.c}", { a: { b: { c: "deep" } } }), "deep");
+});
+
+test("a JSON string a step kept whole is looked inside, not treated as opaque", () => {
+  // An `api` step stores what it got back, which is text. The reason to keep it was to look in it.
+  equal(fill("{answer.users}", { answer: '{"users":1}' }), "1");
+});
+
+test("a dotted name that leads nowhere is the same error as a missing one", () => {
+  throws(() => fill("{stats.dashboards}", { stats: { users: 1 } }), /missing \{stats\.dashboards\}/);
+  throws(() => fill("{nope.deep}", {}), /missing \{nope\.deep\}/);
+});

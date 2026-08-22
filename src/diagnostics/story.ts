@@ -230,8 +230,8 @@ export class Story {
     if (artefacts.frames) lines.push(`- the frames: \`${this.short(artefacts.frames)}\``);
     if (artefacts.trace) {
       // Playwright's own trace viewer: the DOM at every action, the network with bodies, the sources.
-      // Written when the TEST ends, so this names where it lands rather than promising it is there.
-      lines.push(`- everything, in the trace viewer (when the runner records one — \`use: { trace: "on" }\`):`);
+      // Written when the RUN ends, so this names where it lands rather than promising it is there yet.
+      lines.push(`- everything, in the trace viewer:`);
       lines.push(`  \`npx playwright show-trace ${artefacts.trace}\``);
     }
     if (artefacts.har) lines.push(`- the network as a HAR: \`${this.short(artefacts.har)}\``);

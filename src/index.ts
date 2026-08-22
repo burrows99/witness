@@ -12,7 +12,6 @@ export type {
   DatabaseConfig,
   SystemConfig,
   IdentityConfig,
-  RunnerConfig,
   SignInConfig,
 } from "./config/index.ts";
 export * from "./environment/index.ts";
@@ -26,5 +25,5 @@ export * from "./cli/index.ts";
 export * from "./providers/index.ts";
 
 // NOT the skill or the config template. Both find witness's own sources through `import.meta`, which a
-// test runner that transpiles to CommonJS cannot parse — and this barrel is what every spec imports.
+// bundler that transpiles to CommonJS cannot parse — and this barrel is what an importer pulls in.
 // They are command-line concerns: `@burrows99/witness/skill`, or `src/skill/skill.ts` from a checkout.

@@ -53,11 +53,42 @@ export function withoutComments(source: string): string {
   return out;
 }
 
-/** Fill `{name}` placeholders from a bag of values. Anything left unfilled is an error, not a blank. */
+/**
+ * Fill `{name}` placeholders from a bag of values. Anything left unfilled is an error, not a blank.
+ *
+ * A dotted name reaches into what a step stored: `{stats.dashboards}` after an `api` step kept the
+ * whole answer, `{offered.length}` for how many things a `store` read off the screen. Without that,
+ * comparing one layer against another meant a program, which is the one thing a description is for
+ * avoiding.
+ */
 export function fill(template: string, params: Record<string, unknown> = {}): string {
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => {
-    const value = params[key];
+  return template.replace(/\{([\w.]+)\}/g, (_, key: string) => {
+    const value = reach(params, key);
     if (value === undefined) throw new Error(`missing {${key}} for "${template}"`);
     return String(value);
   });
+}
+
+/**
+ * One value out of a bag, by a dotted path.
+ *
+ * `length` on an array is a real property, so `{rows.length}` needs no special case. A JSON string
+ * that a step stored whole is parsed on the way through: what the API answered is usually text, and
+ * the reason to keep it was to look inside it.
+ */
+export function reach(params: Record<string, unknown>, key: string): unknown {
+  const [head, ...rest] = key.split(".");
+  let at: unknown = params[head];
+  for (const step of rest) {
+    if (typeof at === "string") {
+      try {
+        at = JSON.parse(at);
+      } catch {
+        // Not JSON, so there is nothing further in: `{name.length}` on a plain string still works.
+      }
+    }
+    if (at === null || at === undefined) return undefined;
+    at = (at as Record<string, unknown>)[step];
+  }
+  return at;
 }
