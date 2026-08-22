@@ -301,6 +301,7 @@ export class Actions {
       const evidence = this.evidence();
       const story = new Story({
         name: result.action,
+        root: evidence.dir,
         ok: result.ok,
         ms: result.ms,
         steps: result.steps,

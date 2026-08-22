@@ -155,3 +155,58 @@ test("the same thing as data, for whatever reads it as data", () => {
   equal(json.network.requests[0].responseBody, undefined);
   equal(JSON.parse(JSON.stringify(json)).name, "customer.cancelOrder");
 });
+
+test("what the app said is in the table; what the page loaded is counted under it", () => {
+  // A single navigation in a dev server pulls forty chunks. Listing them next to the two requests the
+  // product made buries the ones somebody opened this file for.
+  const out = story({
+    recording: recording({
+      requests: [
+        request({ resourceType: "document", url: "http://localhost:3000/login" }),
+        request({ resourceType: "fetch", url: "http://localhost:3000/api/session" }),
+        ...Array.from({ length: 30 }, (_, i) => request({ resourceType: "script", url: `http://localhost:3000/_next/chunk-${i}.js`, ms: 20 })),
+      ],
+    }),
+  }).markdown();
+  match(out, /\/api\/session/);
+  match(out, /…and 30 static assets \(scripts, styles, fonts, images\) — all under 400, slowest 20ms/);
+  ok(!/chunk-12\.js/.test(out), "a chunk that did nothing wrong should not be in the table");
+});
+
+test("an asset that failed or crawled is traffic, whatever its type", () => {
+  const out = story({
+    recording: recording({
+      requests: [
+        request({ resourceType: "script", url: "http://localhost:3000/_next/broken.js", status: 404 }),
+        request({ resourceType: "image", url: "http://localhost:3000/huge.png", status: 200, ms: 3000 }),
+        request({ resourceType: "script", url: "http://localhost:3000/_next/fine.js", ms: 12 }),
+      ],
+    }),
+  }).markdown();
+  match(out, /broken\.js/);
+  match(out, /huge\.png/);
+  ok(!/fine\.js/.test(out));
+});
+
+test("a console message the size of a component tree is clipped, not pasted", () => {
+  const huge = `A tree hydrated but some attributes did not match. ${"<div>".repeat(400)}`;
+  const out = story({ recording: recording({ console: [{ step: "goto", stepIndex: 0, at: 1, type: "error", text: huge }] }) }).markdown();
+  ok(out.length < 2000, "the story should not become the component tree");
+  match(out, /A tree hydrated but some attributes did not match/);
+  match(out, /…/);
+  // …and the whole thing is still there for whatever reads the data.
+  const json = story({ recording: recording({ console: [{ step: "goto", stepIndex: 0, at: 1, type: "error", text: huge }] }) }).json();
+  equal(json.console[0].text, huge);
+});
+
+test("paths are said relative to the evidence directory", () => {
+  const out = story({
+    root: "/checkout/.witness/artifacts/spec/test/run",
+    steps: [{ step: "goto", ms: 5, screenshot: "/checkout/.witness/artifacts/spec/test/run/actions/a/01-goto.png" }],
+    artefacts: { video: "/checkout/.witness/artifacts/spec/test/run/video.mp4", trace: "/checkout/out/trace.zip" },
+  }).markdown();
+  match(out, /· actions\/a\/01-goto\.png/);
+  match(out, /the recording: `video\.mp4`/);
+  // Outside the evidence directory it stays absolute, because that is what you would have to type.
+  match(out, /show-trace \/checkout\/out\/trace\.zip/);
+});
