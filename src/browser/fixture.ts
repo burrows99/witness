@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 import type { BrowserContext, test as base } from "@playwright/test";
 
 import { requirePlaywright } from "./playwright.ts";
@@ -43,9 +45,18 @@ export function testFor(system: System): typeof base {
      * for the video.
      */
     evidenceManifest: [
-      async ({}, use: (v: void) => Promise<void>) => {
-        system.evidence().writeManifest();
+      async ({}, use: (v: void) => Promise<void>, testInfo: { attach: (name: string, opts: { path: string; contentType: string }) => Promise<void> }) => {
+        const evidence = system.evidence();
+        evidence.writeManifest();
         await use();
+
+        // Whatever the run wrote up, handed to the runner's own reporters. `testInfo.attach` is how an
+        // artefact reaches an HTML report or a CI annotation, and a story nobody can find from the
+        // report is a story written for a directory listing.
+        for (const file of evidence.stories()) {
+          const contentType = file.endsWith(".json") ? "application/json" : "text/markdown";
+          await testInfo.attach(path.relative(evidence.dir, file), { path: file, contentType }).catch(() => undefined);
+        }
       },
       { auto: true },
     ],

@@ -274,6 +274,56 @@ and sit side by side for comparison. Several recordings from one test are stitch
 frame — two or three side by side, four or more into a grid — and slides a spec marked are spliced into
 the timeline as full-frame cards, so the video opens on what it means to show.
 
+### The debug story
+
+Every action also writes `actions/<action>/debug.md` and `debug.json` — what happened, told once, in the
+order someone debugging would want it:
+
+```md
+# customer.cancelOrder — failed at step 3 of 5 (8.4s)
+
+## What it was doing
+1. ✓ `goto` /orders/1 — 412ms · actions/customer.cancelOrder/01-goto.png
+2. ✓ `click` role=button name=Cancel — 180ms · …
+3. ✗ `expect` text=Cancelled — 30.0s · …
+
+## Where it broke
+**During that step:** 3 requests, **1 of them failed** · the console said 1 thing worth reading
+**POST /api/orders/1/cancel** → 500 (412ms) during `click Cancel`
+  Sent:       {"reason":null}
+  Came back:  {"message":"reason is required"}
+> `error` Cannot read properties of undefined (reading 'id') — app.js:12
+
+## Network (17 requests · 1 failed · 2 over a second)  …table…
+## Console · ## Uncaught in the page · ## What the harness itself did
+## Where to look
+- everything, in the trace viewer: `npx playwright show-trace …/trace.zip`
+```
+
+The point is the **correlation**: every request, log and exception is tagged with the step that was
+running when it happened. "A 500 came back" is not a diagnosis; "the 500 came back during `click Cancel`,
+and the console error a tick later says the reducer got undefined" is one — and that is the join a person
+does by hand across three panes, which an agent reading a filesystem cannot do at all.
+
+**This does not reimplement the tools.** Playwright's trace is a better debugger than anything here could
+be, and the story points at it rather than replacing it:
+
+```ts
+// .witness/playwright.config.ts
+use: { trace: "on", video: { mode: "on" } }        // trace.zip and video, per test
+```
+
+The story is what a *program* reads; the trace is what a *person* opens. Both are named in it, and
+`debug.md`/`debug.json` are attached to the run through `testInfo.attach`, so they show up in
+Playwright's own HTML report too.
+
+For a HAR, create the context yourself with Playwright's `recordHar` — `recordHar` in
+`testOptions.contextOptions` [is documented as unsupported](https://playwright.dev/docs/api/class-testoptions):
+
+```ts
+const context = await browser.newContext({ recordHar: { path: ".witness/artifacts/network.har" } });
+```
+
 ## The conventions worth keeping
 
 These are not the tool's rules — they are what makes the output worth anything.
@@ -319,6 +369,8 @@ runs in a bare checkout too.
 | `SignIn` | Magic-link sign-in, described: mint → land → exchange → optional post-inject queries. |
 | `Evidence` | Frames, files and notes, filed under `<spec>/<test>/<cut>` — derived, never named by hand. |
 | `Trace` | Everything the harness sent and ran, with bodies. What a caller gets back instead of a boolean. |
+| `Inspector` | The network, the console and the uncaught errors — each tagged with the step it happened during. |
+| `Story` | All of that written up as `debug.md` / `debug.json`, pointing at the trace and the video. |
 | `StubServer` | A declared stand-in for a third party the app calls server-side, with its state and its request log. |
 | `Cli` | A git-style command line (`<tool> <noun> <verb>`) with `stack`/`api`/`db`/`test`/`video` built in. |
 
