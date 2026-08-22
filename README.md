@@ -34,6 +34,7 @@ name is taken on npmjs.com.
 - [Usage](#usage)
 - [Evidence](#evidence)
 - [A worked example: Grafana, from nothing](#a-worked-example-grafana-from-nothing)
+- [Where a description comes from](#where-a-description-comes-from)
 - [The conventions worth keeping](#the-conventions-worth-keeping)
 - [Tests](#tests)
 - [API](#api)
@@ -536,6 +537,31 @@ $ npx witness api get /api/health --quiet
 { "database": "ok", "version": "13.2.0", "commit": "f681b1359f6a0b8ecb9f2c49a88ac72b75bde73b" }
 ```
 
+## Where a description comes from
+
+Driving a product is the solved half. Describing one is a practice, not a command: a description is
+built by whoever is shipping, **one change at a time**. If your change touches a screen, the same
+change describes it — the route it added, the locator it needs, the action a person now performs. A
+description written that way is never out of date, because it was never written separately from the
+thing it describes.
+
+The judgment half is which flows matter, what to call them and what is worth claiming. The half that
+needs no judgment is what a screen actually renders — and that is not read out of the app's source:
+
+```bash
+witness action list                     # what is already described — reuse before adding
+#   … write the action for what you changed …
+witness action run yours                # it will fail on a locator; that is the point
+#   … open the frame the story names, fix it, run again …
+EVIDENCE=before witness action run yours   # then make the change, then EVIDENCE=after
+```
+
+**A locator you have not run is a guess.** In the Grafana example above, five of nine actions named
+something that did not exist on the page — `Skip` was a `button` styled as a link, a placeholder read
+"Search Grafana plugins" and not "Search all", a card's test id had the plugin's name appended, and a
+table's header is a `row` like any other. None of that was visible in Grafana's source. All of it was
+in the frame from the step that failed.
+
 ## The conventions worth keeping
 
 These are not the tool's rules — they are what makes the output worth anything.
@@ -553,6 +579,9 @@ These are not the tool's rules — they are what makes the output worth anything
   the only sentence anyone reads when it breaks.
 - **Leave the note.** An action's `verify` writes `manual-verification.md` — filled with what this run
   saw — which turns "it passed" into something a reviewer can check themselves.
+- **Describe it in the change that makes it.** A route, a locator or an action added a week later is a
+  week of runs that could not see it — and by then the frame that would have told you what it is
+  called is gone.
 
 ## Tests
 

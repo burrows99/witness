@@ -164,3 +164,12 @@ test("what a reader types is read off how the tool was run, not guessed", () => 
   // `npx witness skill` sets it to `npx`, which produced a file telling its reader to type `npm run npx --`.
   equal(Skill.invocation({ npm_lifecycle_event: "npx" }), "npx witness");
 });
+
+test("it says where a description comes from, which nothing generated can", () => {
+  // The vocabulary is generated; the practice cannot be. An agent opening an undescribed product asks
+  // "where do the words come from" first, and every list in this file answers a different question.
+  const out = Skill.for().render();
+  match(out, /## Describing what you ship/);
+  match(out, /\*\*A locator you have not run is a guess\.\*\*/);
+  match(out, /five of nine/);
+});
