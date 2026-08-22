@@ -47,6 +47,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build --if-present",
     "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"src/**/*.test.ts\" \"bin/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.build.json --noEmit",
     "witness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON bin/cli.ts",
