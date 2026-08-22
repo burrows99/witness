@@ -26,6 +26,8 @@ export class Skill {
   private readonly commands: { noun: string; summary: string; verbs: { verb: string; summary: string }[] }[];
   private readonly types: TypeSource;
   private readonly providers: Map<string, string[]>;
+  /** What a reader has to type — not what the tool calls itself. */
+  private readonly run: string;
   /** Where this file belongs for THIS project — which is not `.witness/` for a project that has none. */
   private readonly at: string;
   /** Named parts of the product, when a config was given: what THIS system can be asked to do. */
@@ -46,8 +48,11 @@ export class Skill {
     product?: Skill["product"];
     /** Where this file lives, for the line that tells the reader to rewrite it. */
     at?: string;
+    /** What a reader types to run it. Defaults to whatever npm says about how this was invoked. */
+    run?: string;
   }) {
     this.name = opts.name ?? "witness";
+    this.run = opts.run ?? Skill.invocation();
     this.at = opts.at ?? ".witness/SKILL.md";
     this.commands = opts.commands;
     this.types = opts.types;
@@ -62,6 +67,20 @@ export class Skill {
    * config it just wrote is a template with placeholders in it. Run `witness skill` afterwards and the
    * product's own apps, actions and verbs are in it.
    */
+  /**
+   * How this project actually runs the tool.
+   *
+   * `npx witness` is right for a dependency and wrong for a vendored checkout, and a config's `name` is
+   * what its own help prints — often not a command at all (`npm run hesta --`, `aix`). npm answers it
+   * outright: a package script sets `npm_lifecycle_event` to its own name, so an invocation through one
+   * is `npm run <that> --`, which is exactly what the reader has to type.
+   */
+  static invocation(env: Record<string, string | undefined> = process.env): string {
+    const script = env.npm_lifecycle_event;
+    // `npm test` and `npm start` take no `--`, and neither is how this gets driven.
+    return script && !["test", "start", "install", "prepare"].includes(script) ? `npm run ${script} --` : "npx witness";
+  }
+
   static for(opts: { system?: SystemLike; sourceDir?: string } = {}): Skill {
     const types = TypeSource.fromDirectory(opts.sourceDir ?? Template.sourceDir());
     const system = opts.system;
@@ -94,10 +113,9 @@ export class Skill {
   }
 
   render(): string {
-    // What the command line is CALLED and what a skill may be NAMED are two different things: a project
-    // whose config says `npm run acme --` — so that its help text reads correctly — cannot carry that as
-    // a name. Examples use the invocation; the name is slugged from it.
-    const tool = this.name;
+    // Three different things, and conflating any two of them misleads: what the tool is CALLED in its
+    // own help (`this.name`), what a skill may be NAMED (a slug), and what a reader has to TYPE.
+    const tool = this.run;
     return [
       "---",
       `name: ${slug(this.name, 48) || "witness"}`,
@@ -140,14 +158,10 @@ export class Skill {
     return [
       "## Running it",
       "",
-      "It is a dependency, not something on your PATH:",
+      `In this project: \`${this.run} <command>\` — which is how it was run to generate this file.`,
       "",
-      "```bash",
-      "npx witness <command>       # or: pnpm exec witness, ./node_modules/.bin/witness",
-      "```",
-      "",
-      `This project's help calls it \`${this.name}\` — that is the name in its usage line, not a command you`,
-      "can type. The examples below are written the short way.",
+      `Its own help calls it \`${this.name}\`; that is the usage line, not necessarily something you can`,
+      "type. Every example below is written the way that works here.",
       "",
       "## The shape of it",
       "",
@@ -202,7 +216,7 @@ export class Skill {
   private commandSection(): string[] {
     const lines = ["## Commands", ""];
     for (const command of this.commands) {
-      lines.push(`- \`${this.name} ${command.noun}\` — ${command.summary}`);
+      lines.push(`- \`${this.run} ${command.noun}\` — ${command.summary}`);
       for (const verb of command.verbs) lines.push(`  - \`${command.noun} ${verb.verb}\` — ${verb.summary}`);
     }
     lines.push(
@@ -221,7 +235,7 @@ export class Skill {
         "## This project",
         "",
         "The config is a template until you cut it down to what your product has. Once it describes",
-        `something, run \`${this.name} skill\` again and this section lists that product's own apps, actions,`,
+        `something, run \`${this.run} skill\` again and this section lists that product's own apps, actions,`,
         "operations and queries.",
         "",
       ];
@@ -244,7 +258,7 @@ export class Skill {
           " — `app.secret(\"name\")`; the config says where each comes from",
       );
     }
-    lines.push("", `\`${this.name} action show <name>\` prints the steps of any of them, as declared.`, "");
+    lines.push("", `\`${this.run} action show <name>\` prints the steps of any of them, as declared.`, "");
     return lines;
   }
 
@@ -323,7 +337,7 @@ export class Skill {
       "- When a run fails, the LAST line it prints is where the story is — that is the reporter in",
       "  `playwright.config.ts` (`[\"@burrows99/witness/reporter\"]`), which exists because a runner's own",
       "  output buries it under a wall of attachment paths.",
-      `- Everything after \`test\` goes to the runner: \`${this.name} test chat-persists\` runs one spec,`,
+      `- Everything after \`test\` goes to the runner: \`${this.run} test chat-persists\` runs one spec,`,
       "  `--headed` watches it, `KEEP=1` tells a spec that cleans up to leave its data alone.",
       "",
     ];
@@ -342,7 +356,7 @@ export class Skill {
       "  manual-verification.md             how to re-walk it by hand",
       "```",
       "",
-      `\`<cut>\` is \`before\`, \`after\` or \`run\` — \`EVIDENCE=before ${this.name} test\`, or \`${this.name} test --before\`.`,
+      `\`<cut>\` is \`before\`, \`after\` or \`run\` — \`EVIDENCE=before ${this.run} test\`, or \`${this.run} test --before\`.`,
       "The two halves sit side by side and a re-run overwrites rather than accumulates. Nothing is named",
       "by hand: the path comes from the spec, the test and the cut.",
       "",
@@ -357,7 +371,7 @@ export class Skill {
         lines.push(`- \`${field.name}\`${field.optional ? "" : " (required)"}${field.doc ? ` — ${Skill.sentence(field.doc)}` : ""}`);
       }
     }
-    lines.push("", `\`${this.name} config template\` prints every field with its full documentation.`, "");
+    lines.push("", `\`${this.run} config template\` prints every field with its full documentation.`, "");
     if (this.providers.size) {
       lines.push("Anything that meets the outside world is a provider picked by name:", "");
       for (const [kind, names] of this.providers) lines.push(`- **${kind}**: ${names.map(n => `\`${n}\``).join(", ")}`);

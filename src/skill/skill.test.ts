@@ -25,6 +25,8 @@ const skill = (over: Partial<ConstructorParameters<typeof Skill>[0]> = {}): stri
   new Skill({
     commands: [{ noun: "stack", summary: "what is up", verbs: [{ verb: "status", summary: "reachability of every service" }] }],
     types: types(),
+    // What a reader types, pinned: the default is read off npm and this is not a test about npm.
+    run: "npx witness",
     ...over,
   }).render();
 
@@ -41,9 +43,9 @@ test("the commands are the command line's own, not a list somebody kept", () => 
       { noun: "order", summary: "orders", verbs: [{ verb: "show", summary: "<orderId>" }] },
     ],
   });
-  match(out, /- `witness stack` — what is up/);
+  match(out, /- `npx witness stack` — what is up/);
   match(out, /  - `stack status` — reachability/);
-  match(out, /- `witness order` — orders/);
+  match(out, /- `npx witness order` — orders/);
   match(out, /  - `order show` — <orderId>/);
 });
 
@@ -81,6 +83,7 @@ test("without a description it says how to get one; with one it names what the p
 
   const described = new Skill({
     name: "acme",
+    run: "npx witness",
     commands: [],
     types: types(),
     product: {
@@ -119,7 +122,7 @@ test("the part that cannot be generated is the part worth reading", () => {
 test("witness's own features describe themselves", () => {
   // The guarantee: no list in here is written twice.
   const out = Skill.for().render();
-  match(out, /- `witness stack` /);
+  match(out, /- `npx witness stack` /);
   match(out, /- `goto` — Go to one of an app's declared routes/);
   match(out, /- \*\*video\*\*: `ffmpeg`/);
   match(out, /\.witness\/artifacts\/<spec>\/<test>\/<cut>\//);
@@ -131,6 +134,7 @@ test("what the command line is CALLED and what a skill may be NAMED are differen
   // carry that as a skill name, and its examples cannot say `witness`.
   const out = new Skill({
     name: "npm run acme --",
+    run: "npm run acme --",
     commands: [
       { noun: "stack", summary: "what is up", verbs: [{ verb: "status", summary: "reachability" }] },
       { noun: "api", summary: "the api", verbs: [] },
@@ -143,4 +147,13 @@ test("what the command line is CALLED and what a skill may be NAMED are differen
   match(out, /- `npm run acme -- stack` — what is up/);
   match(out, /`EVIDENCE=before npm run acme -- test`/);
   ok(!/`witness stack`/.test(out), "the examples must be what this project actually types");
+});
+
+test("what a reader types is read off how the tool was run, not guessed", () => {
+  // `npx witness` is right for a dependency and wrong for a vendored checkout; a config's `name` is what
+  // the help prints and is often not a command (`npm run hesta --`, `aix`). npm knows which it was.
+  equal(Skill.invocation({ npm_lifecycle_event: "hesta" }), "npm run hesta --");
+  equal(Skill.invocation({}), "npx witness");
+  // `npm test` runs the suite; nobody drives this through it, and it takes no `--`.
+  equal(Skill.invocation({ npm_lifecycle_event: "test" }), "npx witness");
 });
