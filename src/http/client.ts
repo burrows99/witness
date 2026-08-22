@@ -64,7 +64,21 @@ export class HttpApi {
     });
 
     if (!res.ok) throw new Error(`${init.method ?? "GET"} ${path} → ${res.status}: ${text.slice(0, 500)}`);
-    return (text ? JSON.parse(text) : undefined) as T;
+    if (!text) return undefined as T;
+
+    // Most of what an app answers is JSON, and none of it has to be: a readiness probe that says
+    // `pong` is a working endpoint, and `Unexpected token 'p'` is a worse answer than `pong`.
+    try {
+      return JSON.parse(text) as T;
+    } catch (err) {
+      if (/json/i.test(res.headers.get("content-type") ?? "")) {
+        throw new Error(
+          `${init.method ?? "GET"} ${path} → ${res.status} said it was JSON and was not: ` +
+            `${String(err).slice(0, 120)} — body began ${text.slice(0, 120)}`,
+        );
+      }
+      return text as T;
+    }
   }
 
   get<T>(path: string): Promise<T> {

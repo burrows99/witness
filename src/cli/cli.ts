@@ -153,7 +153,18 @@ export class Cli {
     const positional = rest.filter(a => !a.startsWith("--"));
 
     const before = this.trace?.mark() ?? 0;
-    const result = await handler.run(positional);
+    let result: unknown;
+    try {
+      result = await handler.run(positional);
+    } catch (err) {
+      // What it sent and what came back, on the way out. "GET /x → 401" is the headline; the request
+      // that produced it is the thing nobody can reconstruct afterwards.
+      const did = this.trace?.since(before) ?? [];
+      if (!flags.includes("--quiet") && did.length) {
+        process.stderr.write(`${JSON.stringify({ command: `${noun} ${verb}`, did }, null, 2)}\n`);
+      }
+      throw err;
+    }
 
     // `--quiet` prints the answer alone. By default the whole exchange comes back — the request, the
     // response, the statement, the timing — because the caller is usually an agent that cannot open a
