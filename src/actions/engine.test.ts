@@ -232,3 +232,57 @@ test("waiting for a URL can say how long to wait", when, async () => {
   }).run("a", withWait);
   deepEqual(waits, [60_000, 2000]);
 });
+
+test("every step is named by what it does, and says what it is about", when, async () => {
+  // The first section of a story is the one people read, and half of it used to say nothing: a step
+  // that only stored was labelled "step", and `run`, `api`, `query` and `goto` carried no detail at all.
+  const { page } = fakePage({ text: "Tuesday" });
+  const result = await engine(
+    {
+      nested: { steps: [{ wait: 1 }] },
+      a: {
+        steps: [
+          { goto: { url: "http://localhost:3000/login" } },
+          { store: { from: { testId: "slot" }, as: "slot" } },
+          { run: "nested" },
+          { api: { operation: "orders.show", as: "order" } },
+          { query: { name: "order.status", as: "status" } },
+          { press: "Enter" },
+          { wait: 250 },
+          { waitForUrl: { url: "/chat", timeout: 10 } },
+          { click: { role: "button", name: "Cancel" }, note: "the one in the dialog" },
+        ],
+      },
+    },
+    { api: () => ({}), sql: () => "cancelled" },
+  ).run("a", {
+    ...(fakePage().page as unknown as Record<string, unknown>),
+    waitForURL: async () => undefined,
+    textContent: async () => "Tuesday",
+  } as never);
+
+  deepEqual(
+    result.steps.map(s => [s.step, s.detail]),
+    [
+      ["goto", "http://localhost:3000/login"],
+      ["store", "testId=slot"],
+      ["run", "nested"],
+      ["api", "orders.show"],
+      ["query", "order.status"],
+      ["press", "Enter"],
+      ["wait", "250ms"],
+      ["waitForUrl", "/chat"],
+      // A note is the human explanation, and it wins over the locator.
+      ["click", "the one in the dialog"],
+    ],
+  );
+  ok(page);
+});
+
+test("a step's detail never carries the value it typed", when, async () => {
+  // Stories get pasted into pull requests, and half the `fill` steps in any product are passwords.
+  const { page } = fakePage();
+  const result = await engine({ a: { steps: [{ fill: { on: { label: "Password" }, value: "hunter2" } }] } }).run("a", page);
+  equal(result.steps[0].detail, "label=Password");
+  ok(!JSON.stringify(result.steps).includes("hunter2"));
+});
