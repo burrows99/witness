@@ -156,7 +156,28 @@ export class Inspector {
   }
 
   private static clip(value: string | undefined): string | undefined {
-    return value === undefined ? undefined : (Trace.clip(value, 4000) as string);
+    return value === undefined ? undefined : (Trace.clip(Inspector.redact(value), 4000) as string);
+  }
+
+  /**
+   * Take the credentials out of a recorded body.
+   *
+   * A sign-in POSTs `{"user":"ada","password":"…"}`, and this file is written to be pasted into a pull
+   * request — which is how a debug story becomes the place a password is published. Nothing else here
+   * defends against that: headers are not recorded, but bodies are, verbatim.
+   *
+   * By FIELD NAME rather than by value: the tool cannot know which strings are secret (the password
+   * here is also the username), and redacting a known value would mangle every other body it appears
+   * in. A field called `password` is a password whether or not the config declared it.
+   */
+  static redact(body: string): string {
+    return (
+      body
+        // JSON: "password": "…"
+        .replace(/("(?:\w*(?:password|passwd|secret|token|apikey|api_key|authorization|credential)\w*)"\s*:\s*)"(?:[^"\\]|\\.)*"/gi, '$1"«redacted»"')
+        // Form-encoded: password=…
+        .replace(/\b(\w*(?:password|passwd|secret|token|apikey|api_key|authorization|credential)\w*)=[^&\s]+/gi, "$1=«redacted»")
+    );
   }
 }
 

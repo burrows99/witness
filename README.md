@@ -271,7 +271,11 @@ An action is the sequence, its narration and its claims — all of it data:
 ```
 
 `witness action run customer.refundAnOrder orderId=1234` drives it and comes back with a frame per
-step, the network with bodies, the console, a debug story and an MP4. `run` composes the small actions
+step, the network with bodies, the console, a debug story and an MP4. A credential reaches a step as
+`{secret.<name>}` — resolved from the config's `secrets` at the moment it is asked for, never typed on
+a command line and never kept as a stored value. Recorded request bodies have their `password`,
+`token` and `authorization` fields redacted, because a debug story is a file people paste into pull
+requests. `run` composes the small actions
 into big ones without making either less usable on its own; `expect` is about the screen and `check` is
 about the values, which is what makes the cross-layer claim expressible without a program.
 
@@ -367,12 +371,14 @@ Everything below is real and reproducible — the repo is [`examples/grafana/`](
 is somebody else's software, chosen because neither this tool nor its author has any say over it.
 
 ```bash
-docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana
+cd examples/grafana && docker compose up -d        # the Grafana this describes, shipped beside it
 npx witness init                                   # writes .witness/{config.jsonc, SKILL.md, .gitignore}
 #   …describe the product: services, api, routes, locators, actions — one file, below…
-GRAFANA_USER=admin GRAFANA_PASSWORD=admin \
-  npx witness action run grafana.theWholeProduct username=admin password=admin
+npx witness action run grafana.theWholeProduct
 ```
+
+No arguments and no environment variables: the credentials are declared as `containerEnv` and read back
+out of the running container, which is where a real one would come from too.
 
 <video src="https://github.com/burrows99/witness/raw/main/docs/example/grafana.mp4" controls width="760"></video>
 
@@ -389,10 +395,9 @@ actions, each of which still runs on its own:
 "grafana.theWholeProduct": {
   "summary": "the whole of a fresh Grafana, walked once, and checked against its own API as it goes",
   "app": "grafana",
-  "inputs": ["username", "password"],
   "steps": [
     { "slide": { "title": "Grafana, described", "lines": ["One config file: services, API operations, routes, locators, actions.", "There is no test file. This IS the description."] } },
-    { "run": { "action": "grafana.signIn", "with": { "username": "{username}", "password": "{password}" } } },
+    { "run": "grafana.signIn" },
     { "frame": "signed in" },
 
     { "api": { "operation": "stats", "as": "stats" }, "note": "what the instance says about itself, before looking at a single screen" },
@@ -412,7 +417,7 @@ actions, each of which still runs on its own:
   // The note a person re-walks it by. Every value is a template, so it says what THIS run saw.
   "verify": {
     "title": "What a fresh Grafana is",
-    "subject": { "instance": "http://localhost:3010", "account": "{username}", "dashboards": "{stats.dashboards}" },
+    "subject": { "instance": "http://localhost:3010", "account": "{secret.adminUser}", "dashboards": "{stats.dashboards}" },
     "signIn": ["docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana"],
     "notes": ["The catalogue offered {offered.length} matches for \"prometheus\" — see the frame."]
   }
@@ -425,11 +430,10 @@ and one of the seven it is built from:
 "grafana.signIn": {
   "summary": "sign in the way a first-time admin does, and get past the password prompt",
   "app": "grafana",
-  "inputs": ["username", "password"],
   "steps": [
     { "goto": { "route": "login" } },
-    { "type": { "on": { "placeholder": "email or username" }, "value": "{username}" } },
-    { "type": { "on": { "placeholder": "password" }, "value": "{password}" }, "note": "typed, not filled: this gets recorded" },
+    { "type": { "on": { "placeholder": "email or username" }, "value": "{secret.adminUser}" } },
+    { "type": { "on": { "placeholder": "password" }, "value": "{secret.adminPassword}" }, "note": "the declared secret — never typed on a command line, and never stored as a value" },
     { "click": { "role": "button", "name": "Log in" } },
     { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
     { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
@@ -459,6 +463,22 @@ The two `check` steps are the part that used to need a program: `expect` can onl
   actions/grafana-signin/…                      one directory per action it composed
   actions/grafana-browseconnections/…
   manual-verification.md                        what the action's `verify` said, filled in
+```
+
+[`manual-verification.md`](docs/example/manual-verification.md), from the same run — the note a
+reviewer re-walks it by, filled with what this run saw:
+
+```md
+## Who
+- instance: `http://localhost:3010`
+- account: `admin`
+- dashboards: `0`
+- users: `1`
+
+## What the run saw
+- The API reported 0 dashboards, 0 data sources and 1 user.
+- The catalogue offered 8 matches for "prometheus" — see the frame.
+- Nothing was saved: the new dashboard was opened and abandoned.
 ```
 
 [`debug.md`](docs/example/debug.md), in full — generated, not written:
