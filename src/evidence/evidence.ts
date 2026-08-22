@@ -130,6 +130,42 @@ export class Evidence {
     return this.write("manual-verification.md", lines.join("\n"));
   }
 
+  /** Every write-up this test produced, for a reporter to attach. */
+  stories(): string[] {
+    const found: string[] = [];
+    const walk = (at: string): void => {
+      for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
+        const file = path.join(at, entry.name);
+        if (entry.isDirectory()) walk(file);
+        else if (/^debug\.(md|json)$/.test(entry.name)) found.push(file);
+      }
+    };
+    try {
+      walk(this.dir);
+    } catch {
+      // Nothing written is not a failure: a test can pass without driving a single action.
+    }
+    return found.sort();
+  }
+
+  /**
+   * The files a person opens, for a story to point at rather than replace.
+   *
+   * Playwright's own artefacts — the trace and the video — are better than anything written here could
+   * be, and they are already on disk. What is missing is a reader that knows where they are.
+   */
+  artefacts(): { video?: string; frames?: string; trace?: string; har?: string } {
+    const output = this.context.outputDir;
+    const found = (at: string | undefined): string | undefined => (at && fs.existsSync(at) ? at : undefined);
+    return {
+      video: found(path.join(this.dir, "video.mp4")),
+      frames: found(path.join(this.dir, "frames")),
+      // The runner writes these beside the recording it made, under whatever name it chose.
+      trace: output ? found(path.join(output, "trace.zip")) : undefined,
+      har: output ? found(path.join(output, "network.har")) : undefined,
+    };
+  }
+
   /**
    * Tell the video provider where this test's recording belongs.
    *

@@ -11,6 +11,8 @@ import { describe, type LocatorSpec, locate } from "../browser/locator.ts";
 import { caption as drawCaption, slide as drawSlide } from "../browser/narration.ts";
 import type { Operations } from "../http/operations.ts";
 import type { Queries } from "../database/queries.ts";
+import { Inspector, type Recording } from "../diagnostics/inspector.ts";
+import { Story } from "../diagnostics/story.ts";
 import { Trace, type TraceEntry } from "../diagnostics/trace.ts";
 
 /**
@@ -71,24 +73,18 @@ export class Actions {
     const screenshots: string[] = [];
     const network: NetworkRecord[] = [];
     const logs: { type: string; text: string }[] = [];
+    let recording: Recording = { requests: [], console: [], errors: [], dropped: 0 };
 
-    const onRequest = (req: import("@playwright/test").Request): void => void req;
-    const onResponse = (res: import("@playwright/test").Response): void => {
-      const req = res.request();
-      network.push({ method: req.method(), url: res.url(), status: res.status(), resourceType: req.resourceType() });
-    };
-    const onConsole = (msg: import("@playwright/test").ConsoleMessage): void => {
-      logs.push({ type: msg.type(), text: msg.text() });
-    };
-    page.on("request", onRequest);
-    page.on("response", onResponse);
-    page.on("console", onConsole);
+    // The network tab, the console tab and the exceptions — recorded through Playwright's own page
+    // events, and tagged with the step that was running when each one happened.
+    const inspector = new Inspector(page);
 
     let error: string | undefined;
     try {
       for (const [index, step] of action.steps.entries()) {
         const at = Date.now();
         const label = Object.keys(step).find(k => k !== "as" && k !== "store" && k !== "note") ?? "step";
+        inspector.mark(label, index);
         try {
           await this.step(step, page, values, action.app);
         } catch (err) {
@@ -110,9 +106,11 @@ export class Actions {
         if (error) break;
       }
     } finally {
-      page.off("request", onRequest);
-      page.off("response", onResponse);
-      page.off("console", onConsole);
+      recording = await inspector.stop();
+      network.push(
+        ...recording.requests.map(r => ({ method: r.method, url: r.url, status: r.status ?? 0, resourceType: r.resourceType })),
+      );
+      logs.push(...recording.console.map(c => ({ type: c.type, text: c.text })));
     }
 
     // Only ask for the declared return if the steps got that far: a failed action reporting "missing
@@ -134,9 +132,15 @@ export class Actions {
       // Everything the BROWSER asked for during the action, alongside everything the system itself did.
       network,
       console: logs,
+      /** The same traffic with bodies, timings, failures and the step each one belongs to. */
+      recording,
       trace: this.trace.since(mark),
       error,
     };
+
+    // Written whether it passed or failed, because the run that passed is the one somebody compares
+    // against when the next one does not.
+    result.debug = this.tell(result);
     if (error) throw Object.assign(new Error(`action "${name}" failed at step ${steps.length}: ${error}`), { result });
     return result;
   }
@@ -288,6 +292,32 @@ export class Actions {
   }
 
   /**
+   * The run, told once and written down: `debug.md` for whoever reads it, `debug.json` for whatever does.
+   *
+   * Best-effort — a story that cannot be written must not fail the action it is about.
+   */
+  private tell(result: ActionResult): { markdown?: string; json?: string } {
+    try {
+      const evidence = this.evidence();
+      const story = new Story({
+        name: result.action,
+        ok: result.ok,
+        ms: result.ms,
+        steps: result.steps,
+        recording: result.recording,
+        trace: result.trace,
+        artefacts: evidence.artefacts(),
+      });
+      return {
+        markdown: evidence.write(`actions/${result.action}/debug.md`, story.markdown()),
+        json: evidence.write(`actions/${result.action}/debug.json`, JSON.stringify(story.json(), null, 2)),
+      };
+    } catch {
+      return {};
+    }
+  }
+
+  /**
    * A frame per step: what the screen looked like at that moment, for whoever reads the result.
    *
    * Filed with the TEST that ran the action, not in a pile of action names — the same action run by two
@@ -368,7 +398,11 @@ export type ActionResult<T = unknown> = {
   /** Every request the BROWSER made while the action ran — the network tab, as data. */
   network: NetworkRecord[];
   console: { type: string; text: string }[];
+  /** The same traffic with bodies, timings, failures, and the step each one belongs to. */
+  recording: Recording;
   /** Every request and statement the HARNESS made, with bodies. */
   trace: TraceEntry[];
+  /** Where the written-up version of all of this landed. */
+  debug?: { markdown?: string; json?: string };
   error?: string;
 };
