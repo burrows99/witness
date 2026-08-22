@@ -72,12 +72,25 @@ export class Story {
       "",
     );
 
+    const warned = steps.filter(step => step.warning);
+    if (warned.length) {
+      lines.push(
+        `## ${warned.length} step${warned.length === 1 ? "" : "s"} passed in a way worth knowing about`,
+        "",
+        ...warned.map(step => `- \`${step.step}\` — ${step.warning}`),
+        "",
+      );
+    }
+
     lines.push("## What it was doing", "");
     steps.forEach((step, index) => {
       const mark = step.error ? "✗" : "✓";
       const detail = step.detail ? ` ${step.detail}` : "";
       const shot = this.short(step.screenshot);
       lines.push(`${index + 1}. ${mark} \`${step.step}\`${detail} — ${Story.duration(step.ms)}${shot ? ` · ${shot}` : ""}`);
+      // A step that passed in a way worth knowing about. Indented under it, because the reader is
+      // scanning for the ✗ and would otherwise never look at a ✓ again.
+      if (step.warning) lines.push(`   ⚠ ${step.warning}`);
     });
     lines.push("");
 
@@ -280,7 +293,15 @@ export class Story {
   }
 }
 
-export type StoryStep = { step: string; detail?: string; ms: number; error?: string; screenshot?: string };
+export type StoryStep = {
+  step: string;
+  detail?: string;
+  ms: number;
+  error?: string;
+  /** It passed, and something about HOW it passed is worth saying — an assertion matched off-screen. */
+  warning?: string;
+  screenshot?: string;
+};
 
 /** The files a human should open, which this deliberately does not try to replace. */
 export type Artefacts = { video?: string; frames?: string; trace?: string; har?: string };
