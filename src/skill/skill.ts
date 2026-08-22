@@ -1,3 +1,5 @@
+import * as path from "node:path";
+
 import { Cli } from "../cli/cli.ts";
 import { slug } from "../evidence/paths.ts";
 import { Stack } from "../environment/stack.ts";
@@ -24,6 +26,8 @@ export class Skill {
   private readonly commands: { noun: string; summary: string; verbs: { verb: string; summary: string }[] }[];
   private readonly types: TypeSource;
   private readonly providers: Map<string, string[]>;
+  /** Where this file belongs for THIS project — which is not `.witness/` for a project that has none. */
+  private readonly at: string;
   /** Named parts of the product, when a config was given: what THIS system can be asked to do. */
   private readonly product?: {
     apps: string[];
@@ -40,8 +44,11 @@ export class Skill {
     types: TypeSource;
     providers?: Map<string, string[]>;
     product?: Skill["product"];
+    /** Where this file lives, for the line that tells the reader to rewrite it. */
+    at?: string;
   }) {
     this.name = opts.name ?? "witness";
+    this.at = opts.at ?? ".witness/SKILL.md";
     this.commands = opts.commands;
     this.types = opts.types;
     this.providers = opts.providers ?? new Map();
@@ -71,6 +78,7 @@ export class Skill {
     }
     return new Skill({
       name: system.config.name,
+      at: system.workspace ? path.join(path.relative(process.cwd(), system.workspace.dir) || ".", "SKILL.md") : undefined,
       commands: system.cli().commands,
       types,
       providers: Template.providers(),
@@ -111,7 +119,7 @@ export class Skill {
       ...Skill.aligned([
         [`${tool} --help`, "every command this project actually has"],
         [`${tool} action list`, "every action, with what it is for"],
-        [`${tool} skill > .witness/SKILL.md`, "rewrite this file from what is true now"],
+        [`${tool} skill > ${this.at}`, "rewrite this file from what is true now"],
       ]),
       "```",
       "",
@@ -383,6 +391,7 @@ export class Skill {
 
 /** Just enough of a system to describe it, so this file does not depend on the composite root. */
 type SystemLike = {
+  workspace?: { dir: string };
   config: {
     name: string;
     apps?: Record<string, unknown>;
