@@ -45,7 +45,15 @@ export function testFor(system: System): typeof base {
      * for the video.
      */
     evidenceManifest: [
-      async ({}, use: (v: void) => Promise<void>, testInfo: { attach: (name: string, opts: { path: string; contentType: string }) => Promise<void> }) => {
+      async (
+        {},
+        use: (v: void) => Promise<void>,
+        testInfo: {
+          attach: (name: string, opts: { path: string; contentType: string }) => Promise<void>;
+          status?: string;
+          expectedStatus?: string;
+        },
+      ) => {
         const evidence = system.evidence();
         evidence.writeManifest();
         await use();
@@ -53,9 +61,22 @@ export function testFor(system: System): typeof base {
         // Whatever the run wrote up, handed to the runner's own reporters. `testInfo.attach` is how an
         // artefact reaches an HTML report or a CI annotation, and a story nobody can find from the
         // report is a story written for a directory listing.
-        for (const file of evidence.stories()) {
+        const stories = evidence.stories();
+        for (const file of stories) {
           const contentType = file.endsWith(".json") ? "application/json" : "text/markdown";
           await testInfo.attach(path.relative(evidence.dir, file), { path: file, contentType }).catch(() => undefined);
+        }
+
+        // On a failure the runner prints its own attachment paths — hashed copies in its output
+        // directory — and the story a person was told to read goes unmentioned at the one moment it is
+        // worth reading. Say where it is, last, after the wall.
+        if (testInfo.status && testInfo.expectedStatus && testInfo.status !== testInfo.expectedStatus) {
+          const written = stories.filter(file => file.endsWith(".md"));
+          process.stderr.write(
+            written.length
+              ? `\n  what happened, step by step:\n${written.map(file => `    ${file}`).join("\n")}\n`
+              : `\n  the frames and the note for this test: ${evidence.dir}\n`,
+          );
         }
       },
       { auto: true },

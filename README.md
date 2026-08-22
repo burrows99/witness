@@ -95,7 +95,7 @@ once — `.npmrc`, beside your `package.json`:
 
 ```bash
 npm install --save-dev @burrows99/witness      # or pnpm add -D / yarn add -D
-npx witness init                               # writes .witness/{config.jsonc, SKILL.md, app.ts, .gitignore}
+npx witness init                               # writes .witness/ — a config, a runner, a skill, an entry point
 ```
 
 **GitHub Packages asks for a token even when the package is public** — that is the npm registry's
@@ -146,6 +146,8 @@ your-project/
   .witness/
     config.jsonc              the description of this product
     SKILL.md                  how to use this, generated — `witness skill` rewrites it
+    playwright.config.ts      the runner: where specs are, where recordings go, what says where to look
+    teardown.ts               turns the recordings into MP4s when the run ends
     app.ts                    `export const app = System.find()` — what specs import
     specs/                    what it can prove
     stubs/                    pages the declared stand-ins serve

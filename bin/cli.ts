@@ -88,17 +88,20 @@ const skill: Parameters<Cli["command"]>[1] = {
 };
 
 /** With a description, the instructions name that product's own apps, actions, operations and queries. */
-function describe(): string {
+function describe(opts: { quiet?: boolean } = {}): string {
   try {
     return Skill.for({ system: System.fromConfig(Workspace.find({ config: configFile }).configFile) }).render();
   } catch (err) {
     // Falling back is right — the instructions are useful before a description exists. Falling back
     // SILENTLY is not: the generic version names commands this project does not have, and the reader
     // has no way to know they are reading the wrong thing.
-    process.stderr.write(
-      `[skill] describing the tool generically: this project's own config could not be read — ` +
-        `${err instanceof Error ? err.message : String(err)}\n`,
-    );
+    // `init` is the one caller for which having no description yet is the normal case.
+    if (!opts.quiet) {
+      process.stderr.write(
+        `[skill] describing the tool generically: this project's own config could not be read — ` +
+          `${err instanceof Error ? err.message : String(err)}\n`,
+      );
+    }
     return Skill.for().render();
   }
 }
@@ -114,11 +117,48 @@ const init: Parameters<Cli["command"]>[1] = {
       "config.jsonc": Template.forWitness().render(),
       // How to use this, generated from what this copy can actually do — so an agent that opens the
       // directory finds instructions rather than having to infer the tool from its own source.
-      "SKILL.md": describe(),
+      "SKILL.md": describe({ quiet: true }),
       // Everything a run leaves behind lands here, and none of it belongs in a commit. Kept beside the
       // output rather than in the project's own .gitignore: this directory brings its own rules with it.
       ".gitignore": "# What runs leave behind. The description beside it is worth committing; this is not.\nartifacts/\n",
       "app.ts": `import { System } from "${entry}";\n\n/** The product this project describes. Specs import this. */\nexport const app = System.find();\n`,
+      // A runner, so a spec can be written on the first day rather than after inventing a config: what
+      // to run, where recordings go, the teardown that renders them, and the reporter that says where
+      // to read what happened.
+      "playwright.config.ts": [
+        'import { defineConfig, devices } from "@playwright/test";',
+        "",
+        "/**",
+        " * The runner for the specs in this directory. Everything it writes lands under `artifacts/`,",
+        " * which is where the video provider looks and what the .gitignore beside it ignores.",
+        " */",
+        "export default defineConfig({",
+        '  testDir: "./specs",',
+        '  outputDir: "./artifacts/test-results",',
+        '  globalTeardown: "./teardown.ts",',
+        "  fullyParallel: false,",
+        "  workers: 1,",
+        "  timeout: 120_000,",
+        "  // The list reporter says what passed; the other says where to read what happened when it did not.",
+        '  reporter: [["list"], ["@burrows99/witness/reporter"]],',
+        "  use: {",
+        '    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",',
+        '    ...devices["Desktop Chrome"],',
+        "    viewport: { width: 1280, height: 900 },",
+        '    video: { mode: "on", size: { width: 1280, height: 900 } },',
+        "    // Playwright's own trace: the DOM at every action, the network with bodies, the sources.",
+        '    trace: "on",',
+        "  },",
+        "});",
+        "",
+      ].join("\n"),
+      "teardown.ts": [
+        `import { teardownFor } from "${entry.replace(/\/index\.ts$/, "/index.ts")}";`,
+        "",
+        "/** After the run: turn the recordings into MP4s, filed with the rest of each test's evidence. */",
+        "export default teardownFor();",
+        "",
+      ].join("\n"),
     });
     process.stdout.write(
       written.length
