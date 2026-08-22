@@ -20,6 +20,8 @@ import * as path from "node:path";
  */
 export default class WitnessReporter {
   private readonly failures: string[] = [];
+  /** Stories from a failing test where no single action broke: the run, not the breakage. */
+  private readonly context: string[] = [];
 
   onTestEnd(test: { title: string }, result: { status?: string; outputDir?: string; attachments?: { path?: string }[] }): void {
     if (result.status === "passed" || result.status === "skipped") return;
@@ -28,15 +30,30 @@ export default class WitnessReporter {
     const from = result.outputDir ?? WitnessReporter.outputDirOf(result.attachments ?? []);
     const dir = from ? WitnessReporter.evidenceDir(from) : undefined;
     if (!dir) return;
-    for (const story of WitnessReporter.stories(path.join(dir, "actions"))) this.failures.push(story);
-    if (!this.failures.length) this.failures.push(path.join(dir, "frames"));
+    const stories = WitnessReporter.stories(path.join(dir, "actions"));
+    // A run of six actions where one broke printed all six, under a heading promising the failing
+    // ones — so the story that mattered was one of six paths and nothing said which. The story
+    // itself knows: it recorded whether it finished.
+    const broke = stories.filter(story => story.ok === false).map(story => story.file);
+    if (broke.length) for (const file of broke) this.failures.push(file);
+    // Nothing broke inside an action, so the assertion was in the spec: the whole run IS the context.
+    else if (stories.length) for (const story of stories) this.context.push(story.file);
+    else this.context.push(path.join(dir, "frames"));
   }
 
   onEnd(): void {
-    if (!this.failures.length) return;
+    const lines = (files: string[]): string => [...new Set(files)].map(file => `  ${file}`).join("\n");
+    if (this.failures.length) {
+      process.stdout.write(
+        `\nwhat broke, step by step — the network and console of the action that failed, tied to the step:\n` +
+          `${lines(this.failures)}\n`,
+      );
+      return;
+    }
+    if (!this.context.length) return;
+    // Every action ran; the test still failed. Say that, rather than pointing at these as breakages.
     process.stdout.write(
-      `\nwhat happened, step by step — each failing run's network and console, tied to the step:\n` +
-        `${[...new Set(this.failures)].map(file => `  ${file}`).join("\n")}\n`,
+      `\nevery action finished — the failure was in the spec. What the run saw:\n${lines(this.context)}\n`,
     );
   }
 
@@ -57,15 +74,24 @@ export default class WitnessReporter {
     return undefined;
   }
 
-  private static stories(at: string): string[] {
+  private static stories(at: string): { file: string; ok?: boolean }[] {
     try {
       return fs
         .readdirSync(at, { withFileTypes: true })
         .filter(entry => entry.isDirectory())
-        .map(entry => path.join(at, entry.name, "debug.md"))
-        .filter(file => fs.existsSync(file));
+        .map(entry => ({ file: path.join(at, entry.name, "debug.md"), ok: WitnessReporter.finished(path.join(at, entry.name, "debug.json")) }))
+        .filter(story => fs.existsSync(story.file));
     } catch {
       return [];
+    }
+  }
+
+  /** Whether that action ran to the end, per the story it wrote beside itself. */
+  private static finished(manifest: string): boolean | undefined {
+    try {
+      return (JSON.parse(fs.readFileSync(manifest, "utf8")) as { ok?: boolean }).ok;
+    } catch {
+      return undefined;
     }
   }
 }

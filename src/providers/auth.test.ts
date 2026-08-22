@@ -83,7 +83,7 @@ test("login without a login block says so rather than throwing about undefined",
 
 test("an unknown provider names the ones that exist", () => {
   // Thrown where the config is read rather than where the request is made: this is a typo, not a failure.
-  throws(() => authHeaders({ provider: "mtls" }, context()), /no auth provider "mtls" — registered: apiKey, bearer, cookie, login/);
+  throws(() => authHeaders({ provider: "mtls" }, context()), /no auth provider "mtls" — registered: apiKey, bearer, basic, cookie, login/);
 });
 
 test("a login body can itself come from a secret", async () => {
@@ -98,4 +98,24 @@ test("a login body can itself come from a secret", async () => {
     },
     context(),
   );
+});
+
+test("basic auth, the way half the world's admin APIs still want it", async () => {
+  // Grafana, Elasticsearch, anything behind htpasswd. The username is as likely to live in a container's
+  // environment as the password, so it is a secret source too.
+  deepEqual(await authHeaders({ provider: "basic", username: "admin", from: "admin" }, context()), {
+    Authorization: `Basic ${Buffer.from("admin:admin").toString("base64")}`,
+  });
+  deepEqual(
+    await authHeaders(
+      { provider: "basic", username: { containerEnv: { service: "api", key: "USER" } }, from: { containerEnv: { service: "api", key: "PASS" } } },
+      context(),
+    ),
+    { Authorization: `Basic ${Buffer.from("api-USER-value:api-PASS-value").toString("base64")}` },
+  );
+});
+
+test("basic auth says which half is missing", async () => {
+  await rejects(() => authHeaders({ provider: "basic", from: "secret" }, context()), /needs a username and a password \(got no username\)/);
+  await rejects(() => authHeaders({ provider: "basic", username: "admin" }, context()), /got no password/);
 });

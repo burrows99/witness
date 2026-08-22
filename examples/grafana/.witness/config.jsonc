@@ -1,12 +1,17 @@
-// Grafana, described for witness. Nothing in here is Grafana-specific machinery — it is the same
-// vocabulary any product is described in: where it runs, what its API can be asked, what a person sees,
-// and what they can do.
+// Grafana, described in full. Nothing here is Grafana-specific machinery: it is the same vocabulary any
+// product is described in — where it runs, what its API can be asked, what a person sees, what they can
+// do, and what a command line should be able to answer without opening a browser.
+//
+//   npx witness stack status
+//   npx witness dashboards list
+//   npx witness action run grafana.signIn grafana.tour username=admin password=admin
+//   npx witness test                      # the narrated tour, recorded
 {
   "name": "grafana",
 
   "services": {
-    // The container this compose/`docker run` starts. `stack status` compares the port's real publisher
-    // against this name, so another project's container answering here reads as NOT OURS.
+    // `stack status` compares the port's real publisher against this name, so another project's
+    // container answering on 3010 reads as NOT OURS rather than as a healthy Grafana.
     "grafana": {
       "kind": "in-house",
       "port": 3010,
@@ -16,16 +21,46 @@
     }
   },
 
-  // Grafana's own HTTP API. `witness api get /api/health` returns the whole exchange, not just the body.
+  // Where the credentials come from. A fresh Grafana is admin/admin; a real one would name a container's
+  // environment or a gitignored file here, and the value would never be in this repository.
+  "secrets": {
+    "adminUser": { "env": "GRAFANA_USER" },
+    "adminPassword": { "env": "GRAFANA_PASSWORD" }
+  },
+
+  "cast": {
+    "admin": {
+      "username": "admin",
+      "why": "a fresh Grafana has exactly one account, and it is an admin — which is what makes the whole surface reachable"
+    }
+  },
+
+  // Grafana's HTTP API, by name. Every one of these answers `witness api …` with the whole exchange.
   "api": {
     "service": "grafana",
     "auth": {
-      "admin": { "provider": "bearer", "from": { "env": "GRAFANA_TOKEN" } }
+      // Grafana takes a username and a password on its API. `basic` is a provider like any other.
+      "admin": { "provider": "basic", "username": { "env": "GRAFANA_USER" }, "from": { "env": "GRAFANA_PASSWORD" } }
     },
     "operations": {
       "health": { "path": "/api/health", "summary": "is it up, and is its database reachable" },
+      "stats": { "path": "/api/admin/stats", "auth": "admin", "summary": "what this instance holds, counted" },
+      "org": { "path": "/api/org", "auth": "admin", "summary": "the organisation the caller is in" },
+      "org.users": { "path": "/api/org/users", "auth": "admin", "pick": "0", "summary": "who is in it" },
+      "users": { "path": "/api/users", "auth": "admin", "summary": "every account on the instance" },
+      "users.count": { "path": "/api/admin/stats", "auth": "admin", "pick": "users", "summary": "how many there are" },
       "search": { "path": "/api/search", "auth": "admin", "summary": "every dashboard and folder" },
-      "orgs.current": { "path": "/api/org", "auth": "admin", "summary": "the org the caller is in" }
+      "folders": { "path": "/api/folders", "auth": "admin", "summary": "folders a dashboard can live in" },
+      "datasources": { "path": "/api/datasources", "auth": "admin", "summary": "what it can query" },
+      "plugins": {
+        "path": "/api/plugins",
+        "auth": "admin",
+        "where": { "type": "datasource" },
+        "map": { "id": "id", "name": "name", "enabled": "enabled" },
+        "summary": "the data source plugins it ships with — narrowed and reshaped here, because the raw answer is 60 fields per plugin"
+      },
+      "annotations": { "path": "/api/annotations", "auth": "admin", "summary": "notes pinned to a moment in time" },
+      "permissions": { "path": "/api/access-control/user/permissions", "auth": "admin", "summary": "what the caller is allowed to do" }
     }
   },
 
@@ -37,20 +72,41 @@
         "login": "/login",
         "dashboards": "/dashboards",
         "newDashboard": "/dashboard/new",
-        "profile": "/profile"
+        "explore": "/explore",
+        "dataSources": "/connections/datasources",
+        "addConnection": "/connections/add-new-connection",
+        "alerts": "/alerting/list",
+        "users": "/admin/users",
+        "settings": "/admin/settings",
+        "profile": "/profile",
+        "plugins": "/plugins"
+      },
+      "forms": {
+        "credentials": { "username": "email or username", "password": "password" }
       },
       "locators": {
         "username": { "placeholder": "email or username" },
         "password": { "placeholder": "password" },
-        "signIn": { "role": "button", "name": "Log in" },
+        "logIn": { "role": "button", "name": "Log in" },
         "skipPasswordChange": { "role": "button", "name": "Skip", "exact": true },
         "welcome": { "text": "Welcome to Grafana" },
-        "newButton": { "testId": "data-testid CreateNewButton New button" }
+        "search": { "role": "button", "name": "Search or jump to..." },
+        "newButton": { "testId": "data-testid CreateNewButton New button" },
+        "sideMenu": { "testId": "data-testid navigation mega-menu" },
+        "megaMenuToggle": { "testId": "data-testid Toggle menu" },
+        "dashboardsEmpty": { "text": "Start your journey by creating a dashboard" },
+        "addVisualization": { "text": "Add a panel to visualize your data" },
+        "exploreHeading": { "role": "heading", "name": "Explore" },
+        "dataSourcesEmpty": { "text": "Data source connections" },
+        "connectionCard": { "css": "[data-testid^=\"data-testid Connections plugin card\"]" },
+        "usersTable": { "role": "table" },
+        "profileHeading": { "text": "Profile" },
+        "themePicker": { "text": "Interface theme" }
       }
     }
   },
 
-  // What a person can DO, as data. Each of these is runnable on its own from a shell.
+  // What a person can DO. Each of these runs on its own from a shell, and they chain.
   "actions": {
     "grafana.signIn": {
       "summary": "sign in the way a first-time admin does, and get past the password prompt",
@@ -62,27 +118,130 @@
         { "type": { "on": { "placeholder": "password" }, "value": "{password}" }, "note": "typed, not filled: this gets recorded" },
         { "click": { "role": "button", "name": "Log in" } },
         { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
-        { "waitForUrl": { "url": "localhost:3010/(\\\\?.*)?$", "timeout": 15000 } },
-        { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin — under a heading that changes with the time of day, which is why the assertion is on this line and not on that one" } }
+        { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
+        { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin — under a heading that changes with the time of day, which is why the assertion is on this line and not that one" } }
       ]
     },
     "grafana.openDashboards": {
-      "summary": "open the dashboards list — what a new install has, which is nothing",
+      "summary": "the dashboards list — what a new install has, which is nothing",
       "app": "grafana",
       "steps": [
         { "caption": { "text": "Dashboards", "sub": "A fresh install has none, and says so." } },
         { "goto": { "route": "dashboards" } },
-        { "expect": { "on": { "testId": "data-testid CreateNewButton New button" }, "because": "an admin can always start one — named by test id because two buttons on this screen are called New" } }
+        { "expect": { "on": { "testId": "data-testid CreateNewButton New button" }, "because": "an admin can always start one — by test id, because two buttons on this screen are called New" } },
+        { "store": { "from": { "role": "row" }, "as": "dashboardRows", "all": true }, "note": "every row the list is offering, as data" }
+      ]
+    },
+    "grafana.startADashboard": {
+      "summary": "open the blank dashboard editor, without saving anything",
+      "app": "grafana",
+      "steps": [
+        { "caption": { "text": "A new dashboard", "sub": "Opened, and deliberately not saved." } },
+        { "goto": { "route": "newDashboard" } },
+        { "expect": { "on": { "text": "Add a panel to visualize your data" }, "because": "an empty dashboard says what to do next — the wording is 13.2's, and the frame is how I know" } }
+      ]
+    },
+    "grafana.openExplore": {
+      "summary": "the ad-hoc query screen, which is empty until something is connected",
+      "app": "grafana",
+      "steps": [
+        { "caption": { "text": "Explore", "sub": "Ad-hoc queries — once there is something to query." } },
+        { "goto": { "route": "explore" } },
+        { "wait": 800, "note": "the query editor mounts after the route" }
+      ]
+    },
+    "grafana.openDataSources": {
+      "summary": "what this Grafana can query — nothing yet, on a fresh install",
+      "app": "grafana",
+      "steps": [
+        { "caption": { "text": "Connections", "sub": "What it can query. Nothing, so far." } },
+        { "goto": { "route": "dataSources" } },
+        { "wait": 600 }
+      ]
+    },
+    "grafana.browseConnections": {
+      "summary": "the catalogue of things it could connect to, and how many there are",
+      "app": "grafana",
+      "inputs": ["search"],
+      "steps": [
+        { "goto": { "route": "addConnection" } },
+        { "wait": 800 },
+        { "type": { "on": { "placeholder": "Search Grafana plugins" }, "value": "{search}" }, "note": "the catalogue is long; searching is what a person does" },
+        { "wait": 600 },
+        { "store": { "from": { "css": "[data-testid^=\"data-testid Connections plugin card\"]" }, "as": "offered", "all": true }, "note": "what the catalogue is offering for that search, as data" }
+      ]
+    },
+    "grafana.openUsers": {
+      "summary": "who can sign in — one account, on a fresh install",
+      "app": "grafana",
+      "steps": [
+        { "caption": { "text": "Users", "sub": "One account on a fresh install: the admin you just were." } },
+        { "goto": { "route": "users" } },
+        { "expect": { "on": { "role": "table" }, "because": "the admin user list is a table" } },
+        { "store": { "from": { "role": "row" }, "as": "userRows", "all": true } }
+      ]
+    },
+    "grafana.openProfile": {
+      "summary": "the signed-in account's own page",
+      "app": "grafana",
+      "steps": [
+        { "caption": { "text": "Profile", "sub": "The account you are signed in as." } },
+        { "goto": { "route": "profile" } },
+        { "wait": 600 }
+      ]
+    },
+    "grafana.tour": {
+      "summary": "the whole product, once: dashboards, a new one, explore, connections, users, profile",
+      "app": "grafana",
+      "steps": [
+        { "run": "grafana.openDashboards" },
+        { "run": "grafana.startADashboard" },
+        { "run": "grafana.openExplore" },
+        { "run": "grafana.openDataSources" },
+        { "run": "grafana.openUsers" },
+        { "run": "grafana.openProfile" }
       ]
     }
   },
 
-  "evidence": { "links": ["- Grafana: {grafana}"] },
-  "video": { "provider": "ffmpeg" },
+  // The command line this description gives you, in Grafana's own vocabulary.
   "cli": {
     "dashboards": {
       "summary": "what this Grafana holds",
-      "verbs": { "list": { "operation": "search", "summary": "every dashboard and folder" } }
+      "verbs": {
+        "list": { "operation": "search", "summary": "every dashboard and folder" },
+        "folders": { "operation": "folders", "summary": "the folders they can live in" }
+      }
+    },
+    "instance": {
+      "summary": "the instance itself",
+      "verbs": {
+        "health": { "operation": "health", "summary": "up, and is its database reachable" },
+        "stats": { "operation": "stats", "summary": "what it holds, counted" },
+        "org": { "operation": "org", "summary": "the organisation" },
+        "settings": { "operation": "permissions", "summary": "what the caller is allowed to do" }
+      }
+    },
+    "users": {
+      "summary": "who can sign in",
+      "verbs": {
+        "list": { "operation": "users", "summary": "every account" },
+        "count": { "operation": "users.count", "summary": "how many" }
+      }
+    },
+    "connections": {
+      "summary": "what it can query",
+      "verbs": {
+        "sources": { "operation": "datasources", "summary": "configured data sources" },
+        "available": { "operation": "plugins", "summary": "data source plugins it ships with" }
+      }
     }
+  },
+
+  "evidence": { "links": ["- Grafana: {grafana}", "- sign in with the cast's admin account"] },
+  "video": { "provider": "ffmpeg" },
+  "runner": {
+    "test": { "command": "npx", "args": ["playwright", "test", "--config", ".witness/playwright.config.ts"] },
+    "env": { "PLAYWRIGHT_BASE_URL": "{grafana}" }
   }
 }
