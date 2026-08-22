@@ -119,3 +119,22 @@ test("witness's own features describe themselves", () => {
   match(out, /\.witness\/artifacts\/<spec>\/<test>\/<cut>\//);
   equal(out.includes("undefined"), false);
 });
+
+test("what the command line is CALLED and what a skill may be NAMED are different things", () => {
+  // A project whose config says `npm run acme --` — so its own help text reads correctly — cannot
+  // carry that as a skill name, and its examples cannot say `witness`.
+  const out = new Skill({
+    name: "npm run acme --",
+    commands: [
+      { noun: "stack", summary: "what is up", verbs: [{ verb: "status", summary: "reachability" }] },
+      { noun: "api", summary: "the api", verbs: [] },
+    ],
+    types: types(),
+  }).render();
+
+  match(out, /^---\nname: npm-run-acme\n/);
+  match(out, /npm run acme -- stack status\s+# is it up/);
+  match(out, /- `npm run acme -- stack` — what is up/);
+  match(out, /`EVIDENCE=before npm run acme -- test`/);
+  ok(!/`witness stack`/.test(out), "the examples must be what this project actually types");
+});
