@@ -256,7 +256,12 @@ export class Story {
 
   /** Something the app did, or something that went wrong — as opposed to the page loading itself. */
   private static isTraffic(request: RequestRecord): boolean {
-    return Story.TRAFFIC.includes(request.resourceType) || Story.isFailure(request) || (request.ms ?? 0) > 1000;
+    if (Story.isFailure(request) || (request.ms ?? 0) > 1000) return true;
+    // What came back decides, not how it was asked for: an app that fetches its icons through `fetch`
+    // gets them typed as `xhr`, and forty SVGs then sit in the table as if they were the product
+    // talking to its API.
+    if (/^(image|font|audio|video)\/|css|javascript/.test(request.contentType ?? "")) return false;
+    return Story.TRAFFIC.includes(request.resourceType);
   }
 
   private static isFailure(request: RequestRecord): boolean {

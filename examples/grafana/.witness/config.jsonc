@@ -45,7 +45,7 @@
         "signIn": { "role": "button", "name": "Log in" },
         "skipPasswordChange": { "role": "button", "name": "Skip", "exact": true },
         "welcome": { "text": "Welcome to Grafana" },
-        "newButton": { "role": "button", "name": "New" }
+        "newButton": { "testId": "data-testid CreateNewButton New button" }
       }
     }
   },
@@ -72,7 +72,7 @@
       "steps": [
         { "caption": { "text": "Dashboards", "sub": "A fresh install has none, and says so." } },
         { "goto": { "route": "dashboards" } },
-        { "expect": { "on": { "role": "button", "name": "New" }, "because": "an admin can always start one" } }
+        { "expect": { "on": { "testId": "data-testid CreateNewButton New button" }, "because": "an admin can always start one — named by test id because two buttons on this screen are called New" } }
       ]
     }
   },

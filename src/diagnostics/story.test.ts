@@ -235,3 +235,19 @@ test("a step that passed in a way worth knowing about is not buried under a tick
   // …and again where the step is, so it reads in order too.
   match(out, /2\. ✓ `expect`.*\n   ⚠ matched a node outside the viewport/);
 });
+
+test("what came back decides what is an asset, not how it was asked for", () => {
+  // An app that fetches its icons through `fetch` gets them typed `xhr`, and forty SVGs then sit in the
+  // table as if they were the product talking to its API.
+  const out = story({
+    recording: recording({
+      requests: [
+        request({ resourceType: "xhr", url: "http://localhost:3010/icons/eye.svg", contentType: "image/svg+xml" }),
+        request({ resourceType: "fetch", url: "http://localhost:3010/api/user", contentType: "application/json" }),
+      ],
+    }),
+  }).markdown();
+  match(out, /\/api\/user/);
+  ok(!/eye\.svg/.test(out), "an icon is an icon however it was fetched");
+  match(out, /…and 1 static asset/);
+});
