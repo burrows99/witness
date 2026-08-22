@@ -7,6 +7,8 @@ import { fill, type SystemConfig, loadConfig } from "./config/index.ts";
 import { locate } from "./browser/locator.ts";
 import { resolveSecret } from "./providers/secrets.ts";
 import { Evidence } from "./evidence/evidence.ts";
+import type { EvidenceContext } from "./evidence/paths.ts";
+import { parseRunArgs, runActions } from "./actions/run.ts";
 import { HttpApi } from "./http/client.ts";
 import { Operations } from "./http/operations.ts";
 import { Postgres } from "./database/postgres.ts";
@@ -58,6 +60,8 @@ export class System {
   private readonly commands: Record<string, Noun> = {};
   /** Where the description was read from — `video` re-reads it rather than holding a stale copy. */
   private configFile?: string;
+  /** Set while something outside a test is driving: the frames belong with ITS recording, not `cli/adhoc`. */
+  private pinned?: EvidenceContext;
   private readonly clients = new Map<string, Operations>();
   private readonly running = new Map<string, StubServer>();
 
@@ -309,6 +313,16 @@ export class System {
     (this as Record<string, unknown>)[name] = value;
   }
 
+  /** Turn this run's recordings into MP4s. What the `video` command does, callable. */
+  renderVideos(): string[] {
+    try {
+      return renderVideos(this.workspace);
+    } catch (err) {
+      process.stderr.write(`[video] ${String(err).slice(0, 160)}\n`);
+      return [];
+    }
+  }
+
   /** Command-line nouns beyond the ones the config generates. */
   addCommands(commands: Record<string, Noun>): this {
     Object.assign(this.commands, commands);
@@ -328,7 +342,18 @@ export class System {
       root: this.workspace.dir,
       base: spec.dir,
       links: () => (spec.links ?? []).map(l => this.expand(l)),
+      context: this.pinned,
     });
+  }
+
+  /**
+   * Say which run the evidence belongs to, for a driver that is not a test.
+   *
+   * Inside a test the runner already knows; from a shell nothing does, and every frame would otherwise
+   * be filed under `cli/adhoc` — beside the frames of every other thing anyone ran from a shell.
+   */
+  pinEvidence(context: EvidenceContext | undefined): void {
+    this.pinned = context;
   }
 
   /** `{service}` → that service's URL; `@service` → its container name. */
@@ -349,7 +374,7 @@ export class System {
       test: runner.test,
       // Rendering is the system's own job, done in this process. Shelling out to a script that calls
       // back into it is a loop nobody should have to read.
-      renderVideos: () => renderVideos(this.workspace),
+      renderVideos: () => this.renderVideos(),
       api: this.http ? (method, path, body) => this.callByPath(method, path, body) : undefined,
       sql: this.postgres ? (query: string) => this.db.sql(query) : undefined,
       env: () => Object.fromEntries(Object.entries(runner.env ?? {}).map(([k, v]) => [k, this.expand(v)])),
@@ -413,6 +438,14 @@ export class System {
           show: {
             summary: "<action> — its steps, as declared",
             run: (args: string[]) => this.config.actions?.[Cli.need(args[0], "action")],
+          },
+          run: {
+            summary: "<action…> [key=value…] — drive them in a browser and report everything they did",
+            run: async (args: string[]) => {
+              const { names, inputs } = parseRunArgs(args);
+              if (!names.length) Cli.die("missing <action> — `action list` says which", 2);
+              return runActions(this as never, { names, inputs, headed: process.env.HEADED === "1" });
+            },
           },
         },
       });

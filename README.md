@@ -48,9 +48,11 @@ Two surfaces, and knowing which one you are on is most of the value:
   running. Every command reports the whole exchange (request, response, statement, timing), because the
   caller usually cannot open a network tab. Most questions — *why is this empty*, *did that save* — are
   one command, and writing a test to answer them is how an afternoon disappears.
-- **A spec is for behaviour** — a sequence someone performs, with assertions and narration, recorded.
-  That is a program, so it lives in a file, and it is what produces the video, the frames and the note a
-  reviewer reads.
+- **A spec is for behaviour** — a sequence someone performs, with assertions, branching and narration.
+  That is a program, so it lives in a file.
+- **A declared action is data, so it needs no file** — `witness action run <name> [key=value…]` drives
+  it in a browser and comes back with the frames, the debug story and the video. Chain several and they
+  share one browser, one recording, and whatever each one stored.
 - **The description is data, and it is the point** — routes, requests, queries, sign-in flows and
   actions are declared in `.witness/config.jsonc`, never written twice.
 
@@ -276,6 +278,8 @@ npx witness api get /v1/health         # any route, authenticated the way the co
 npx witness db sql "select 1"          # the stack's database
 npx witness order show 1234            # the verbs the config declares
 npx witness action list                # what the product can DO
+npx witness action run app.signIn email=ada@example.com password=…
+                                       # …and drive it, in a browser, with a video at the end
 npx witness test --before              # the suite, recording a "before" cut
 npx witness video                      # rebuild the MP4s from the last run
 ```
