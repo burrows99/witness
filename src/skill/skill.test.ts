@@ -88,6 +88,8 @@ test("without a description it says how to get one; with one it names what the p
       actions: [{ name: "customer.cancelOrder", summary: "cancel an order" }],
       queries: ["order.status"],
       operations: ["orders.show"],
+      cast: ["regular"],
+      secrets: ["adminKey"],
     },
   }).render();
   match(described, /^---\nname: acme/);
@@ -95,6 +97,10 @@ test("without a description it says how to get one; with one it names what the p
   match(described, /  - `customer\.cancelOrder` — cancel an order/);
   match(described, /- \*\*operations\*\*: `orders\.show`/);
   match(described, /- \*\*queries\*\*: `order\.status`/);
+  // A signed-in run needs these before it needs anything else, and they were findable only by
+  // reading the config.
+  match(described, /- \*\*cast\*\*: `regular`/);
+  match(described, /- \*\*secrets it will ask for\*\*: `adminKey`/);
 });
 
 test("the providers are the registered ones", () => {
