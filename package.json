@@ -1,6 +1,6 @@
 {
   "name": "@burrows99/witness",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Drive a running system from one config file, and come back with evidence rather than a pass/fail.",
   "keywords": [
     "e2e",
