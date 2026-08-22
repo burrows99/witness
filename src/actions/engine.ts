@@ -240,7 +240,12 @@ export class Actions {
     }
     if (step.store) {
       const target = at(step.store.from);
-      values[step.store.as] = (await target.textContent())?.trim() ?? "";
+      // One element, or all of them. "What is this control offering?" is a whole class of claim — every
+      // option in a picker, every row in a list — and without `all` the only answer was a strict-mode
+      // violation that happened to name the count.
+      values[step.store.as] = step.store.all
+        ? (await target.allTextContents()).map(text => text.trim()).filter(Boolean)
+        : ((await target.textContent())?.trim() ?? "");
     }
     if (step.waitForUrl) {
       const wait = typeof step.waitForUrl === "string" ? { url: step.waitForUrl } : step.waitForUrl;
@@ -459,10 +464,18 @@ export type StepConfig = {
     /** Why this must hold — it becomes the failure message. */
     because?: string;
   };
-  /** Read something off the screen and keep it for the steps after this one. */
-  store?: { from: LocatorSpec; as: string };
   /**
-   * Wait until the address matches this pattern — how a flow says "and it took me there".
+   * Read something off the screen and keep it for the steps after this one.
+   *
+   * One element by default. `all` reads every match instead, as an array — what a picker is offering,
+   * what a list contains — which `expect` can then count and `select` can pick from.
+   */
+  store?: { from: LocatorSpec; as: string; all?: boolean };
+  /**
+   * Wait until the address matches this REGULAR EXPRESSION — how a flow says "and it took me there".
+   *
+   * A regex, not a glob: `products/\\d+` works, `**\/products/**` is a syntax error. A bare substring
+   * is a valid regex and the commonest useful form.
    *
    * The object form sets how long. Worth setting whenever the wait is how the step FAILS: a rejected
    * sign-in never navigates, and the default minute is a minute of nothing per attempt.

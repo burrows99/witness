@@ -8,6 +8,7 @@ import { locate } from "./browser/locator.ts";
 import { resolveSecret } from "./providers/secrets.ts";
 import { Evidence } from "./evidence/evidence.ts";
 import type { EvidenceContext } from "./evidence/paths.ts";
+import { identityCookies } from "./browser/fixture.ts";
 import { parseRunArgs, runActions } from "./actions/run.ts";
 import { HttpApi } from "./http/client.ts";
 import { Operations } from "./http/operations.ts";
@@ -444,7 +445,12 @@ export class System {
             run: async (args: string[]) => {
               const { names, inputs } = parseRunArgs(args);
               if (!names.length) Cli.die("missing <action> — `action list` says which", 2);
-              return runActions(this as never, { names, inputs, headed: process.env.HEADED === "1" });
+              return runActions(this as never, {
+                names,
+                inputs,
+                headed: process.env.HEADED === "1",
+                cookies: identityCookies(this.config.identities),
+              });
             },
           },
         },

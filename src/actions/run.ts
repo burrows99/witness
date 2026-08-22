@@ -27,7 +27,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   const launch = deps.launch ?? (() => requirePlaywright("running an action from the command line").chromium.launch({ headless: !headed }));
 
   const cut = process.env.EVIDENCE ?? "run";
-  const label = slug(names.join(" then "), 64);
+  // Truncation made two different chains share a directory, and a failed run's story sat inside a
+  // passing run's bundle. A name that had to be cut carries what it lost.
+  const label = runLabel(names);
   const group = path.join("cli", label, cut);
   // The runner's directory in a test run; here, ours — the video provider reads the manifest in it to
   // file the recording with the rest of this run's evidence.
@@ -39,6 +41,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
     viewport: { width: 1280, height: 900 },
     recordVideo: { dir: outputDir, size: { width: 1280, height: 900 } },
   });
+  // What the config says the system can BE. The same cookies a spec gets, for the same reason.
+  const cookies = request.cookies ?? [];
+  if (cookies.length) await browserContext.addCookies(cookies);
   const page = await browserContext.newPage();
 
   system.pinEvidence(context);
@@ -79,6 +84,23 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   };
 }
 
+/**
+ * A directory name for a chain of actions, unique even when it has to be shortened.
+ *
+ * `slug(…, 64)` turned `a then b then averylongname` into `…-then-ops`, and the next chain that also
+ * shortened to `…-then-ops` wrote its frames and its stories into the same bundle — a failed run's
+ * story sitting inside a passing run's evidence.
+ */
+function runLabel(names: string[]): string {
+  const full = names.join(" then ");
+  const short = slug(full, 56);
+  if (slug(full, 200) === short) return short;
+  // A few characters of the whole name, so what was cut off still tells two runs apart.
+  let hash = 0;
+  for (const character of full) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return `${short}-${hash.toString(36).slice(0, 4)}`;
+}
+
 /** What an action stored is available to the next one, the way steps within an action already are. */
 function lastValues(results: ActionResult[]): Params {
   return results.length ? (results[results.length - 1].values ?? {}) : {};
@@ -98,6 +120,8 @@ export function parseRunArgs(args: string[]): { names: string[]; inputs: Params 
 
 export type RunRequest = {
   names: string[];
+  /** Identity cookies to put in the context — what the config's `identities` declare. */
+  cookies?: { name: string; value: string; domain: string; path: string }[];
   inputs?: Params;
   /** Watch it happen. The recording is the same either way. */
   headed?: boolean;

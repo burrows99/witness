@@ -324,3 +324,29 @@ test("what counts as off-screen, and what does not", when, async () => {
     undefined,
   );
 });
+
+test("store reads one thing, or every one of them", when, async () => {
+  // "What is this control offering?" — every option in a picker — was unprovable from an action: the
+  // only answer was a strict-mode violation that happened to mention the count.
+  const { page } = fakePage();
+  const options = ["What to expect", "Questionnaire", "Booking"];
+  const withOptions = {
+    ...(page as unknown as Record<string, unknown>),
+    getByRole: () => ({
+      textContent: async () => "What to expect",
+      allTextContents: async () => [...options, "  "],
+    }),
+  } as never;
+
+  const result = await engine({
+    a: {
+      steps: [
+        { store: { from: { role: "option" }, as: "first" } },
+        { store: { from: { role: "option" }, as: "offered", all: true } },
+      ],
+    },
+  }).run("a", withOptions);
+
+  equal(result.values.first, "What to expect");
+  deepEqual(result.values.offered, options, "blank matches are not options");
+});
