@@ -351,8 +351,9 @@ export class Skill {
       "- **Read the payload before theorising.** One `api get` beats an afternoon of inference from",
       "  screenshots.",
       "- **Narrate.** A recording nobody can follow is not evidence: caption before each action.",
-      "- **Leave the note.** `evidence.manualVerification()` turns \"it passed\" into something a reviewer",
-      "  can check themselves.",
+      "- **Leave the note.** An action's `verify` writes `manual-verification.md` — every value a",
+      "  template, so it says what THIS run saw. It turns \"it passed\" into something a reviewer can",
+      "  check themselves, and it is written whether the run passed or failed.",
       "",
     ];
   }

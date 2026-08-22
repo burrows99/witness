@@ -35,7 +35,7 @@ test("outside a test it says so rather than inventing a name", when, () => {
   // The CLI drives actions too, and `test.info()` throws there.
   delete process.env.EVIDENCE;
   const context = currentContext();
-  equal(context.spec, "cli");
+  equal(context.source, "cli");
   equal(context.test, "adhoc");
   equal(context.cut, "run");
   equal(context.group, "cli/adhoc/run");

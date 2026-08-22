@@ -126,7 +126,7 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
   },
 });
 
-type Manifest = { spec: string; test: string; cut: string; group: string; dir: string };
+type Manifest = { source: string; test: string; cut: string; group: string; dir: string };
 type SlideMark = { atMs: number; holdMs: number; image: string };
 
 /**

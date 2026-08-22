@@ -3,33 +3,39 @@ import * as path from "node:path";
 import { playwright } from "../browser/playwright.ts";
 
 /**
- * Where a run's artefacts go, decided by the run rather than by whoever typed the spec.
+ * Where a run's artefacts go, decided by the run rather than by whoever typed it.
  *
  * Naming evidence by hand does not survive contact with a repo: slugs drift (`"546"` ends up shared by
- * seven specs, `"474-persistence"` and `"583"` describe the same kind of thing two ways), frames get
+ * seven runs, `"474-persistence"` and `"583"` describe the same kind of thing two ways), frames get
  * hand-numbered until two of them are `2-`, and the video lands in a third place named after whatever
- * the test runner called its output directory.
+ * directory something else happened to choose.
  *
- * So it is derived, from facts that already exist and are already unique: which spec, which test in it,
- * and which cut is being recorded. Same run, same paths — every time, and without anyone choosing.
+ * So it is derived, from facts that already exist and are already unique: how the run was driven, what
+ * was run, and which cut is being recorded. Same run, same paths — every time, without anyone choosing.
  *
- *     <artifacts>/<spec>/<test>/<cut>/
+ *     <artifacts>/cli/<the actions you ran>/<cut>/
  *       video.mp4
  *       frames/01-her-dashboard.png
  *       actions/ops.createModule/01-click.png
+ *       actions/ops.createModule/debug.md
  *       manual-verification.md
- *       trace.json
  */
 export type EvidenceContext = {
-  /** The spec file, without its extension — `back-to-dashboard-583`. */
-  spec: string;
-  /** The test's own title, slugged. */
+  /**
+   * How the run was driven — `cli`, or the file it came from when something imported the library.
+   *
+   * It was called `spec` and, once there were no spec files, it held the literal `"cli"` for every
+   * run there is: a field named after a thing that no longer exists, printed into a note as
+   * "Spec: `cli`", which told a reader nothing and implied something false.
+   */
+  source: string;
+  /** What was run, slugged — the chain of actions, or a test's title when one is driving. */
   test: string;
   /** Which cut this is: `EVIDENCE=before|after`, or `run` for an ordinary run. */
   cut: string;
-  /** `<spec>/<test>/<cut>` — the one directory everything about this test lands in. */
+  /** `<source>/<test>/<cut>` — the one directory everything about this run lands in. */
   group: string;
-  /** Where the runner is writing this test's recordings, if we are inside a test. */
+  /** Where this run's recordings are being written. */
   outputDir?: string;
 };
 
@@ -55,18 +61,19 @@ export function slug(value: string, max = 48): string {
 /**
  * The context of whatever is running now.
  *
- * Inside a test that is the test itself. Outside one — the CLI running an action, say — there is no spec
- * and no title, so it says so rather than inventing a name: `cli/<label>/…`.
+ * The command line pins one before it starts. This is the fallback for the other case — something
+ * importing the library into a runner of its own — and, failing that, it says `cli/adhoc` rather than
+ * inventing a name.
  */
 export function currentContext(fallbackLabel = "cli"): EvidenceContext {
   const info = safeInfo();
   const cut = process.env.EVIDENCE ?? "run";
   if (!info) {
-    return { spec: fallbackLabel, test: "adhoc", cut, group: path.join(fallbackLabel, "adhoc", cut) };
+    return { source: fallbackLabel, test: "adhoc", cut, group: path.join(fallbackLabel, "adhoc", cut) };
   }
-  const spec = slug(path.basename(info.file).replace(/\.(spec|test)\.ts$/, ""), 64);
+  const source = slug(path.basename(info.file).replace(/\.(spec|test)\.ts$/, ""), 64);
   const title = slug(info.titlePath.slice(1).join(" ") || info.title);
-  return { spec, test: title, cut, group: path.join(spec, title, cut), outputDir: info.outputDir };
+  return { source, test: title, cut, group: path.join(source, title, cut), outputDir: info.outputDir };
 }
 
 /** `test.info()` throws outside a test; a system that can also be driven from a shell must cope. */
