@@ -85,7 +85,12 @@ export class Evidence {
   /** Any other artefact — a payload, a log, a note the spec wrote as it went. */
   write(name: string, contents: string): string {
     this.writeManifest();
-    const file = path.join(this.dir, slug(name.replace(/\.\w+$/, ""), 64) + (name.match(/\.\w+$/)?.[0] ?? ""));
+    // Each segment slugged on its own: slugging the whole thing turns `actions/x/debug.md` into one
+    // flat `actions-x-debug.md`, which loses the grouping the name was expressing.
+    const parts = name.split("/").filter(Boolean);
+    const last = parts.pop() ?? "file";
+    const extension = last.match(/\.\w+$/)?.[0] ?? "";
+    const file = path.join(this.dir, ...parts.map(part => slug(part, 64)), slug(last.replace(/\.\w+$/, ""), 64) + extension);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, contents);
     return file;
@@ -160,8 +165,9 @@ export class Evidence {
     return {
       video: found(path.join(this.dir, "video.mp4")),
       frames: found(path.join(this.dir, "frames")),
-      // The runner writes these beside the recording it made, under whatever name it chose.
-      trace: output ? found(path.join(output, "trace.zip")) : undefined,
+      // The runner writes the trace when the TEST ends, which is after every action in it has run — so
+      // this names where it will be rather than checking for a file that cannot exist yet.
+      trace: output ? path.join(output, "trace.zip") : undefined,
       har: output ? found(path.join(output, "network.har")) : undefined,
     };
   }

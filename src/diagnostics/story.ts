@@ -16,10 +16,26 @@ import type { TraceEntry } from "./trace.ts";
  * exception already correlated, and pointers to the tools for the human who comes next.
  */
 export class Story {
+  /**
+   * Which resource types are the app talking, as opposed to the page loading itself.
+   *
+   * A single navigation in a dev server pulls forty chunks, fonts and images. Listing them next to the
+   * two requests the product actually made buries the ones that matter — and the ones that matter are
+   * exactly what someone opens this file for.
+   */
+  private static readonly TRAFFIC = ["document", "xhr", "fetch", "websocket", "eventsource"];
+
   private readonly input: StoryInput;
 
   constructor(input: StoryInput) {
     this.input = input;
+  }
+
+  /** A path under the evidence directory, said the short way. */
+  private short(file: string | undefined): string | undefined {
+    if (!file) return undefined;
+    const root = this.input.root;
+    return root && file.startsWith(root) ? file.slice(root.length).replace(/^\//, "") : file;
   }
 
   /** The whole thing as data, for whatever wants to read it as data. */
@@ -60,14 +76,15 @@ export class Story {
     steps.forEach((step, index) => {
       const mark = step.error ? "✗" : "✓";
       const detail = step.detail ? ` ${step.detail}` : "";
-      lines.push(`${index + 1}. ${mark} \`${step.step}\`${detail} — ${Story.duration(step.ms)}${step.screenshot ? ` · ${step.screenshot}` : ""}`);
+      const shot = this.short(step.screenshot);
+      lines.push(`${index + 1}. ${mark} \`${step.step}\`${detail} — ${Story.duration(step.ms)}${shot ? ` · ${shot}` : ""}`);
     });
     lines.push("");
 
     if (failure) {
       lines.push("## Where it broke", "");
       lines.push(`Step ${failure.step}, \`${failure.label}\`:`, "", "```", failure.error, "```", "");
-      if (failure.screenshot) lines.push(`The screen at that moment: \`${failure.screenshot}\``, "");
+      if (failure.screenshot) lines.push(`The screen at that moment: \`${this.short(failure.screenshot)}\``, "");
 
       // The half of debugging that is otherwise three panes and a stopwatch: what the page was doing
       // while the step that failed was running.
@@ -97,7 +114,7 @@ export class Story {
     lines.push(...this.console());
     lines.push(...this.pageErrors());
     lines.push(...Story.harness(trace));
-    lines.push(...Story.where(artefacts));
+    lines.push(...this.where(artefacts));
     return lines.join("\n");
   }
 
@@ -115,8 +132,13 @@ export class Story {
     if (recording.dropped) {
       lines.push(`_${recording.dropped} more were not recorded: the run passed the limit._`, "");
     }
+    // What the app said, and what the page merely loaded. Anything that failed or crawled is traffic
+    // whatever its type: an asset nobody asked about is noise until the moment it 404s.
+    const traffic = recording.requests.filter(r => Story.isTraffic(r));
+    const assets = recording.requests.filter(r => !Story.isTraffic(r));
+
     lines.push("| at | step | method | status | ms | url |", "|---|---|---|---|---|---|");
-    for (const request of recording.requests) {
+    for (const request of traffic) {
       const status = request.failure ? `**${request.failure}**` : (request.status ?? "—");
       lines.push(
         `| ${Story.duration(request.at)} | ${request.step} | ${request.method} | ${status} |` +
@@ -124,6 +146,15 @@ export class Story {
       );
     }
     lines.push("");
+    if (assets.length) {
+      // Counted, not listed: they are in `debug.json` and in the trace if anyone needs them.
+      const slowest = Math.max(...assets.map(a => a.ms ?? 0));
+      lines.push(
+        `_…and ${assets.length} static asset${assets.length === 1 ? "" : "s"} (scripts, styles, fonts, images) — ` +
+          `all under 400, slowest ${Story.duration(slowest)}. They are in \`debug.json\`._`,
+        "",
+      );
+    }
     if (failed.length) {
       lines.push("### The ones that failed", "");
       for (const request of failed) lines.push(...Story.detail(request));
@@ -139,7 +170,12 @@ export class Story {
     // Errors and warnings first, whole; the rest as one line each, because a run that logs 200 times
     // has already told you everything it is going to.
     for (const message of noisy) {
-      lines.push(`- **${message.type}** during \`${message.step}\` — ${message.text}${message.source ? ` (${message.source})` : ""}`);
+      // Clipped: a React hydration mismatch prints a whole component tree, and a story nobody scrolls
+      // to the end of has hidden the thing after it. The full text is in `debug.json`.
+      lines.push(
+        `- **${message.type}** during \`${message.step}\` — ${Story.shorten(message.text.replace(/\s+/g, " "), 400)}` +
+          `${message.source ? ` (${message.source})` : ""}`,
+      );
     }
     const rest = messages.filter(m => !Story.isNoisy(m)).slice(0, 20);
     for (const message of rest) lines.push(`- ${message.type} during \`${message.step}\` — ${Story.shorten(message.text, 160)}`);
@@ -175,15 +211,17 @@ export class Story {
     return lines;
   }
 
-  private static where(artefacts: Artefacts): string[] {
+  private where(artefacts: Artefacts): string[] {
     const lines = ["## Where to look", ""];
-    if (artefacts.video) lines.push(`- the recording: \`${artefacts.video}\``);
-    if (artefacts.frames) lines.push(`- the frames: \`${artefacts.frames}\``);
+    if (artefacts.video) lines.push(`- the recording: \`${this.short(artefacts.video)}\``);
+    if (artefacts.frames) lines.push(`- the frames: \`${this.short(artefacts.frames)}\``);
     if (artefacts.trace) {
       // Playwright's own trace viewer: the DOM at every action, the network with bodies, the sources.
-      lines.push(`- everything, in the trace viewer: \`npx playwright show-trace ${artefacts.trace}\``);
+      // Written when the TEST ends, so this names where it lands rather than promising it is there.
+      lines.push(`- everything, in the trace viewer (when the runner records one — \`use: { trace: "on" }\`):`);
+      lines.push(`  \`npx playwright show-trace ${artefacts.trace}\``);
     }
-    if (artefacts.har) lines.push(`- the network as a HAR: \`${artefacts.har}\``);
+    if (artefacts.har) lines.push(`- the network as a HAR: \`${this.short(artefacts.har)}\``);
     lines.push("");
     return lines;
   }
@@ -201,6 +239,11 @@ export class Story {
 
   private slow(): RequestRecord[] {
     return this.input.recording.requests.filter(request => (request.ms ?? 0) > 1000);
+  }
+
+  /** Something the app did, or something that went wrong — as opposed to the page loading itself. */
+  private static isTraffic(request: RequestRecord): boolean {
+    return Story.TRAFFIC.includes(request.resourceType) || Story.isFailure(request) || (request.ms ?? 0) > 1000;
   }
 
   private static isFailure(request: RequestRecord): boolean {
@@ -242,6 +285,8 @@ export type Artefacts = { video?: string; frames?: string; trace?: string; har?:
 
 export type StoryInput = {
   name: string;
+  /** The evidence directory, so every path in the story is said relative to it. */
+  root?: string;
   ok: boolean;
   ms: number;
   steps: StoryStep[];
