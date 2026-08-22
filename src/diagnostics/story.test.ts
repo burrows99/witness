@@ -220,3 +220,18 @@ test("a failure whose body could not be read says so where the body would be", (
   match(out, /### The ones that failed/);
   match(out, /Came back with no readable body: _the response had no body_/);
 });
+
+test("a step that passed in a way worth knowing about is not buried under a tick", () => {
+  // The only failure mode that yields a green run AND a wrong deliverable: an assertion satisfied by a
+  // node that is not in the picture beside it.
+  const out = story({
+    steps: [
+      { step: "goto", ms: 10 },
+      { step: "expect", detail: "testId=sidebar", ms: 20, warning: "matched a node outside the viewport (at 0,-400 in 1280×900) — it passed, and the frame does not show it" },
+    ],
+  }).markdown();
+  match(out, /## 1 step passed in a way worth knowing about/);
+  match(out, /- `expect` — matched a node outside the viewport/);
+  // …and again where the step is, so it reads in order too.
+  match(out, /2\. ✓ `expect`.*\n   ⚠ matched a node outside the viewport/);
+});

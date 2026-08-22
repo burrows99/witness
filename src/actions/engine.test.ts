@@ -302,3 +302,25 @@ test("an action that declares what it needs says so before it starts", when, asy
   const ok = await actions.run("open", page, { memberId: "m-1" });
   equal(ok.ok, true);
 });
+
+test("what counts as off-screen, and what does not", when, async () => {
+  // The one failure mode that yields a green run AND a wrong deliverable: an assertion satisfied by a
+  // node that is not in the picture beside it.
+  const { Actions } = await import("./engine.ts");
+  const page = { viewportSize: () => ({ width: 1280, height: 900 }) } as never;
+  const at = (box: { x: number; y: number; width: number; height: number } | null) =>
+    ({ first: () => ({ boundingBox: async () => box }) }) as never;
+
+  equal(await Actions.offScreen(page, at({ x: 20, y: 40, width: 300, height: 200 })), undefined, "in the frame");
+  equal(await Actions.offScreen(page, at({ x: 0, y: 880, width: 300, height: 200 })), undefined, "half in is in");
+  match((await Actions.offScreen(page, at({ x: 0, y: -400, width: 300, height: 200 })))!, /outside the viewport \(at 0,-400 in 1280×900\)/);
+  match((await Actions.offScreen(page, at({ x: 1400, y: 10, width: 100, height: 20 })))!, /outside the viewport/);
+  match((await Actions.offScreen(page, at(null)))!, /no box on the page/);
+
+  // Silent when it cannot tell: this adds a sentence to a story, it never fails a run.
+  equal(await Actions.offScreen({ viewportSize: () => null } as never, at({ x: 0, y: 0, width: 1, height: 1 })), undefined);
+  equal(
+    await Actions.offScreen(page, { first: () => ({ boundingBox: async () => { throw new Error("gone"); } }) } as never),
+    undefined,
+  );
+});

@@ -35,6 +35,8 @@ export class Actions {
   private readonly config: Record<string, ActionConfig>;
   private readonly appUrl: (app: string, route: string, params: Params) => string;
   private readonly evidence: () => Evidence;
+  /** Something the last step got away with that a reader should know about. */
+  private warning?: string;
 
   constructor(opts: {
     operations: Operations;
@@ -103,7 +105,8 @@ export class Actions {
         }
         const shot = await this.frame(page, name, index, label);
         if (shot) screenshots.push(shot);
-        steps.push({ step: label, detail: Actions.about(step), ms: Date.now() - at, error, screenshot: shot });
+        steps.push({ step: label, detail: Actions.about(step), ms: Date.now() - at, error, warning: this.warning, screenshot: shot });
+        this.warning = undefined;
         this.trace.add({
           kind: "step",
           action: name,
@@ -229,6 +232,11 @@ export class Actions {
       else if (step.expect.text) await expect(target, because).toContainText(text(step.expect.text), { timeout });
       else if (step.expect.count !== undefined) await expect(target, because).toHaveCount(step.expect.count, { timeout });
       else await expect(target, because).toBeVisible({ timeout });
+
+      // The one failure mode that produces a GREEN run and a wrong deliverable: a match on a node that
+      // is in the document and not in the picture. The assertion is satisfied, the frame beside it
+      // shows nothing, and the caption above it claims something the evidence disproves.
+      if (step.expect.state !== "hidden") this.warning = await Actions.offScreen(page, target);
     }
     if (step.store) {
       const target = at(step.store.from);
@@ -267,6 +275,31 @@ export class Actions {
     if (step.query) {
       const answer = this.queries.query(step.query.name, { ...values, ...this.resolveParams(step.query.params, values) });
       if (step.query.as) values[step.query.as] = answer;
+    }
+  }
+
+  /**
+   * Whether what an assertion matched is actually in the frame.
+   *
+   * Best-effort and silent when it cannot tell: this exists to add a sentence to a story, never to fail
+   * a run that the assertion itself was happy with.
+   *
+   * Public because it is the piece with the decision in it, and an `expect` step cannot be driven by a
+   * fake — Playwright's own matchers refuse anything that is not a real Locator.
+   */
+  static async offScreen(page: Page, target: ReturnType<typeof locate>): Promise<string | undefined> {
+    try {
+      const viewport = page.viewportSize();
+      if (!viewport) return undefined;
+      const box = await target.first().boundingBox();
+      if (!box) return "matched a node with no box on the page — the frame will not show it";
+      const outside =
+        box.y + box.height <= 0 || box.y >= viewport.height || box.x + box.width <= 0 || box.x >= viewport.width;
+      return outside
+        ? `matched a node outside the viewport (at ${Math.round(box.x)},${Math.round(box.y)} in ${viewport.width}×${viewport.height}) — it passed, and the frame does not show it`
+        : undefined;
+    } catch {
+      return undefined;
     }
   }
 
@@ -458,7 +491,15 @@ export type ActionConfig = {
   returns?: string;
 };
 
-export type StepResult = { step: string; detail?: string; ms: number; error?: string; screenshot?: string };
+export type StepResult = {
+  step: string;
+  detail?: string;
+  ms: number;
+  error?: string;
+  /** It passed, and something about how it passed is worth saying — see `offScreen`. */
+  warning?: string;
+  screenshot?: string;
+};
 export type NetworkRecord = { method: string; url: string; status: number; resourceType: string };
 
 export type ActionResult<T = unknown> = {
