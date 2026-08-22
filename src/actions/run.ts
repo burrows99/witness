@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import type { Page } from "@playwright/test";
+import type { Browser, Page } from "@playwright/test";
 
 import type { ActionResult, Params } from "./engine.ts";
 import type { EvidenceContext } from "../evidence/paths.ts";
@@ -20,9 +20,11 @@ import { slug } from "../evidence/paths.ts";
  *
  * A spec is still the place for assertions, branching and narration. This is for the sequence itself.
  */
-export async function runActions(system: RunnableSystem, request: RunRequest): Promise<RunResult> {
-  const { chromium } = requirePlaywright("running an action from the command line");
+export async function runActions(system: RunnableSystem, request: RunRequest, deps: RunDeps = {}): Promise<RunResult> {
   const { names, inputs = {}, headed = false, keep = false } = request;
+  // Injectable so this can be tested without downloading a browser: a unit test that pulls Chromium is
+  // not a unit test, and a CI job that fails for want of one stops publishing without stopping merging.
+  const launch = deps.launch ?? (() => requirePlaywright("running an action from the command line").chromium.launch({ headless: !headed }));
 
   const cut = process.env.EVIDENCE ?? "run";
   const label = slug(names.join(" then "), 64);
@@ -32,7 +34,7 @@ export async function runActions(system: RunnableSystem, request: RunRequest): P
   const outputDir = system.workspace.resolve(path.join("artifacts", "test-results", `cli-${label}`));
   const context: EvidenceContext = { spec: "cli", test: label, cut, group, outputDir };
 
-  const browser = await chromium.launch({ headless: !headed });
+  const browser = await launch();
   const browserContext = await browser.newContext({
     viewport: { width: 1280, height: 900 },
     recordVideo: { dir: outputDir, size: { width: 1280, height: 900 } },
@@ -104,6 +106,9 @@ export type RunRequest = {
   /** Turn the recording into an MP4. On by default: that is the point of recording it. */
   render?: boolean;
 };
+
+/** What the runner needs from the outside world, handed in so a test can hand in something else. */
+export type RunDeps = { launch?: () => Promise<Browser> };
 
 export type RunResult = {
   ok: boolean;

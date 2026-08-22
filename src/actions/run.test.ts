@@ -21,15 +21,24 @@ test("no arguments is no names, for the caller to refuse", () => {
   deepEqual(parseRunArgs([]), { names: [], inputs: {} });
 });
 
-/** The runner drives a browser, so the rest is exercised where a browser exists — see below. */
-const havePlaywright = await import("@playwright/test").then(
-  () => true,
-  () => false,
-);
-const when = { skip: havePlaywright ? false : "needs @playwright/test" };
+/** A browser that records nothing and goes nowhere: the runner's job is the sequencing, not the driving. */
+const fakeBrowser = (): { launch: () => Promise<never>; closed: string[] } => {
+  const closed: string[] = [];
+  const page = {};
+  const context = {
+    newPage: async () => page,
+    close: async () => void closed.push("context"),
+  };
+  const browser = {
+    newContext: async () => context,
+    close: async () => void closed.push("browser"),
+  };
+  return { launch: async () => browser as never, closed };
+};
 
-test("it runs each action in turn, passing what one stored to the next", when, async () => {
+test("it runs each action in turn, passing what one stored to the next", async () => {
   const { runActions } = await import("./run.ts");
+  const browser = fakeBrowser();
   const ran: { name: string; inputs: Record<string, unknown> }[] = [];
   let pinned: unknown;
 
@@ -46,7 +55,7 @@ test("it runs each action in turn, passing what one stored to the next", when, a
     renderVideos: () => ["/tmp/witness-run-test/video.mp4"],
   };
 
-  const result = await runActions(system as never, { names: ["first", "second"], inputs: { email: "ada@example.com" } });
+  const result = await runActions(system as never, { names: ["first", "second"], inputs: { email: "ada@example.com" } }, { launch: browser.launch });
 
   deepEqual(ran.map(r => r.name), ["first", "second"]);
   // The first action's inputs are the caller's; the second also gets what the first stored.
@@ -56,10 +65,13 @@ test("it runs each action in turn, passing what one stored to the next", when, a
   deepEqual(result.evidence.videos, ["/tmp/witness-run-test/video.mp4"]);
   // Unpinned afterwards: the next thing to ask for evidence is not part of this run.
   equal(pinned, undefined);
+  // The recording is written when the context closes, so it closes before anything looks for it.
+  deepEqual(browser.closed, ["context", "browser"]);
 });
 
-test("a failing action comes back with its own evidence rather than a stack trace", when, async () => {
+test("a failing action comes back with its own evidence rather than a stack trace", async () => {
   const { runActions } = await import("./run.ts");
+  const browser = fakeBrowser();
   const attached = { action: "second", ok: false, ms: 3, inputs: {}, value: {}, values: {}, steps: [{ step: "click", ms: 2, error: "no such button" }], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [], error: "no such button" };
 
   const system = {
@@ -73,7 +85,7 @@ test("a failing action comes back with its own evidence rather than a stack trac
     renderVideos: () => [],
   };
 
-  const result = await runActions(system as never, { names: ["first", "second", "third"], render: false });
+  const result = await runActions(system as never, { names: ["first", "second", "third"], render: false }, { launch: browser.launch });
   equal(result.ok, false);
   match(result.error!, /action "second" failed at step 1: no such button/);
   // The one that broke is in there, with its steps — and `third` never ran.
