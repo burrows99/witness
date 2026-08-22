@@ -20,6 +20,9 @@ import { currentContext, type EvidenceContext, slug } from "./paths.ts";
  * each other and sit side by side for comparison. Frames are numbered here rather than in the caller,
  * because hand-numbering is how a spec ends up with two `2-` and one of them lost.
  */
+/** Frame directories emptied by THIS process, so a run clears each one once and only once. */
+const cleared = new Set<string>();
+
 export class Evidence {
   readonly mode: string;
   readonly keep: boolean;
@@ -30,8 +33,7 @@ export class Evidence {
   private readonly pinned?: EvidenceContext;
   /** Frames are numbered per test, not per object: specs build one of these at module load. */
   private readonly counters = new Map<string, number>();
-  /** Directories already emptied this run, so it happens once rather than per frame. */
-  private readonly cleared = new Set<string>();
+
 
   constructor(opts: { root: string; base?: string; links?: () => string[]; context?: EvidenceContext }) {
     this.root = opts.root;
@@ -72,9 +74,12 @@ export class Evidence {
    * one. In a directory whose entire purpose is being believed, that is the worst possible bug.
    */
   private prepare(dir: string): string {
-    if (!this.cleared.has(dir)) {
+    // Shared across instances, because a system hands out a NEW Evidence for every call: per-instance
+    // this cleared the directory before every single frame and left only the last one. A tool that
+    // deletes the evidence it just took is worse than one that leaves a stale frame in place.
+    if (!cleared.has(dir)) {
       fs.rmSync(dir, { recursive: true, force: true });
-      this.cleared.add(dir);
+      cleared.add(dir);
     }
     fs.mkdirSync(dir, { recursive: true });
     return dir;
