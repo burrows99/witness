@@ -175,3 +175,62 @@ test("a verb whose output IS the artefact is printed alone", async () => {
   });
   equal(await run(cli, ["config", "template"]), '{\n  "name": "acme"\n}\n');
 });
+
+test("a command that fails still reports what it sent and what came back", async () => {
+  // "GET /x → 401" is the headline; the exchange that produced it is what nobody can reconstruct after.
+  const trace = new Trace();
+  const cli = new Cli({ name: "acme", stack, trace }).command("api", {
+    summary: "the api",
+    verbs: {
+      get: {
+        summary: "GET",
+        run: () => {
+          trace.add({ kind: "http", method: "GET", url: "/v1/workspaces", status: 401, responseBody: '{"error":"Unauthorized"}', ms: 12, at: "now" });
+          throw new Error("GET /v1/workspaces → 401");
+        },
+      },
+    },
+  });
+
+  const said: string[] = [];
+  const original = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((text: string) => {
+    said.push(text);
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    await cli.run(["api", "get", "/v1/workspaces"]).catch((err: Error) => err);
+  } finally {
+    process.stderr.write = original;
+  }
+  match(said.join(""), /"command": "api get"/);
+  match(said.join(""), /Unauthorized/);
+});
+
+test("--quiet keeps a failure quiet — the message is the whole output", async () => {
+  const trace = new Trace();
+  const cli = new Cli({ name: "acme", stack, trace }).command("api", {
+    summary: "the api",
+    verbs: {
+      get: {
+        summary: "GET",
+        run: () => {
+          trace.add({ kind: "http", method: "GET", url: "/x", status: 500, ms: 1, at: "now" });
+          throw new Error("boom");
+        },
+      },
+    },
+  });
+  const said: string[] = [];
+  const original = process.stderr.write.bind(process.stderr);
+  process.stderr.write = ((text: string) => {
+    said.push(text);
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    await cli.run(["api", "get", "/x", "--quiet"]).catch(() => undefined);
+  } finally {
+    process.stderr.write = original;
+  }
+  equal(said.join(""), "");
+});
