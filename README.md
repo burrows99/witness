@@ -33,6 +33,7 @@ name is taken on npmjs.com.
 - [Install](#install)
 - [Usage](#usage)
 - [Evidence](#evidence)
+- [A worked example: Grafana, from nothing](#a-worked-example-grafana-from-nothing)
 - [The conventions worth keeping](#the-conventions-worth-keeping)
 - [Tests](#tests)
 - [API](#api)
@@ -354,6 +355,107 @@ For a HAR, create the context yourself with Playwright's `recordHar` — `record
 
 ```ts
 const context = await browser.newContext({ recordHar: { path: ".witness/artifacts/network.har" } });
+```
+
+## A worked example: Grafana, from nothing
+
+Everything below is real and reproducible — the repo is [`examples/grafana/`](examples/grafana). Grafana
+is somebody else's software, chosen because neither this tool nor its author has any say over it.
+
+```bash
+docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana
+npx witness init                                   # writes .witness/{config.jsonc, SKILL.md, app.ts}
+#   …describe the product: services, api, routes, actions — 60 lines, below…
+npx witness action run grafana.signIn grafana.openDashboards username=admin password=admin
+```
+
+<video src="https://github.com/burrows99/witness/raw/main/docs/example/grafana.mp4" controls width="760"></video>
+
+![Signing in to Grafana and opening its dashboards](docs/example/grafana.gif)
+
+*(the [MP4](docs/example/grafana.mp4) is what the run actually produced; the GIF above is it, for GitHub)*
+
+### What produced it
+
+Two actions, declared as data. No test file, no page objects, no code:
+
+```jsonc
+"actions": {
+  "grafana.signIn": {
+    "summary": "sign in the way a first-time admin does, and get past the password prompt",
+    "app": "grafana",
+    "inputs": ["username", "password"],
+    "steps": [
+      { "goto": { "route": "login" } },
+      { "type": { "on": { "placeholder": "email or username" }, "value": "{username}" } },
+      { "type": { "on": { "placeholder": "password" }, "value": "{password}" }, "note": "typed, not filled: this gets recorded" },
+      { "click": { "role": "button", "name": "Log in" } },
+      { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
+      { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
+      { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin" } }
+    ]
+  },
+  "grafana.openDashboards": { "…": "the second one" }
+}
+```
+
+Two of those lines are there because a run told me so. `Skip` is a `button` that looks like a link — the
+frame from the failing step showed it. The home page's heading is "Good evening", not a fixed greeting,
+so the assertion moved to the line underneath it. Both were one-line edits to the description, found by
+looking at what came back rather than by reading Grafana's source.
+
+### What came back
+
+```
+.witness/artifacts/cli/grafana-signin-then-grafana-opendashboards/run/
+  video.mp4                                  ← the recording above
+  actions/grafana-signin/01-goto.png … 07-expect.png       a frame per step
+  actions/grafana-signin/debug.md            ← the story, below
+  actions/grafana-signin/debug.json          the same thing for a program to read
+  actions/grafana-opendashboards/…
+  index.md                                   everything on disk, by spec
+```
+
+[`debug.md`](docs/example/debug.md), in full — generated, not written:
+
+```md
+# grafana.signIn — ok (2.6s)
+
+## What it was doing
+1. ✓ `goto` login — 506ms · actions/grafana-signin/01-goto.png
+2. ✓ `type` placeholder=email or username — 880ms · actions/grafana-signin/02-type.png
+3. ✓ `type` typed, not filled: this gets recorded — 301ms · …
+4. ✓ `click` role=button name=Log in — 91ms · …
+5. ✓ `click` Grafana renders Skip as a button styled as a link — 360ms · …
+6. ✓ `waitForUrl` localhost:3010/(\?.*)?$ — 45ms · …
+7. ✓ `expect` text=Welcome to Grafana — 432ms · …
+
+## Network (83 requests)
+| at | step | method | status | ms | url |
+|---|---|---|---|---|---|
+| 5ms | goto | GET | 200 | 57ms | http://localhost:3010/login |
+| 1.7s | click | POST | 200 | 58ms | http://localhost:3010/login |
+| 2.2s | waitForUrl | GET | 200 | 19ms | http://localhost:3010/api/plugins/grafana-lokiexplore-app/settings |
+…and 68 static assets (scripts, styles, fonts, images) — all under 400, slowest 262ms.
+
+## Where to look
+- the recording: `video.mp4`
+- everything, in the trace viewer: `npx playwright show-trace …/trace.zip`
+```
+
+Every request is tagged with the **step** that was running when it happened — that join is the thing an
+agent cannot do from a trace file, a video or an HTML report, and it is why this file exists. When a
+step fails, the same file gains a "Where it broke" section: the error, the frame from that moment, and
+what the page was doing during that step.
+
+And the same description answers questions without a browser at all:
+
+```bash
+$ npx witness stack status
+grafana  http://localhost:3010    up       witness-example-grafana
+
+$ npx witness api get /api/health --quiet
+{ "database": "ok", "version": "13.2.0", "commit": "f681b1359f6a0b8ecb9f2c49a88ac72b75bde73b" }
 ```
 
 ## The conventions worth keeping

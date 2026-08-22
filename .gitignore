@@ -9,3 +9,6 @@ artifacts/
 
 # Built for publishing; the sources are what this repository is.
 dist/
+
+# The example keeps its config and its README; a run own evidence belongs to that run.
+examples/*/.witness/artifacts/
