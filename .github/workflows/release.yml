@@ -1,8 +1,8 @@
 name: Auto Release
 
 # Every merge to main cuts a version: tests, build, a patch bump, a tag, a GitHub Release with
-# generated notes, and the package on npm. Releases surface in followers' feeds and notify watchers;
-# the registry is what makes the README's install line true.
+# generated notes, and the package on this repository's npm registry. Releases surface in followers'
+# feeds and notify watchers; the registry is what makes the README's install line true.
 #
 # Put "[skip release]" in the commit SUBJECT (first line) to skip one. The version-bump commit this
 # workflow pushes carries that marker itself, which is what stops it triggering itself.
@@ -12,7 +12,7 @@ on:
 
 permissions:
   contents: write # tag, push the version bump, publish the release
-  id-token: write # npm trusted publishing (OIDC) — no long-lived token to leak
+  packages: write # publish to this repository's own npm registry
 
 concurrency:
   group: auto-release
@@ -36,12 +36,14 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # Node 24 for the npm that can do trusted publishing (11.5.1+); the package itself runs on 22.6+.
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.skip != 'true'
         with:
           node-version: 24
-          registry-url: https://registry.npmjs.org
+          # This repository's own registry: the package belongs to the repo that builds it, and the
+          # workflow's own token is the only credential — nothing to create, rotate or leak.
+          registry-url: https://npm.pkg.github.com
+          scope: "@burrows99"
 
       - name: Install, test, build
         if: steps.gate.outputs.skip != 'true'
@@ -71,18 +73,8 @@ jobs:
             --title "${{ steps.ver.outputs.tag }}" \
             --generate-notes
 
-      # Trusted publishing signs each publish with a short-lived OIDC token and attaches provenance,
-      # with nothing to steal from the repository. It has to be configured once on npmjs.com against
-      # THIS workflow file, and a package that does not exist yet cannot be configured — so the first
-      # publish uses a granular token in NPM_TOKEN, and the secret can be deleted afterwards.
-      - name: Publish to npm
+      - name: Publish the package
         if: steps.gate.outputs.skip != 'true'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          TRUSTED: ${{ vars.NPM_TRUSTED_PUBLISHING }}
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ] && [ "$TRUSTED" != "true" ]; then
-            echo "::warning::not published — set the NPM_TOKEN secret, or configure trusted publishing on npmjs.com and set the NPM_TRUSTED_PUBLISHING variable to true"
-            exit 0
-          fi
-          npm publish --access public
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        run: npm publish

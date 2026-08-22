@@ -1,10 +1,10 @@
 # witness _(@burrows99/witness)_
 
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
-[![npm](https://img.shields.io/npm/v/@burrows99/witness?style=flat-square)](https://www.npmjs.com/package/@burrows99/witness)
-[![node](https://img.shields.io/node/v/@burrows99/witness?style=flat-square)](https://nodejs.org)
+[![release](https://img.shields.io/github/v/release/burrows99/witness?style=flat-square)](https://github.com/burrows99/witness/releases)
+[![node](https://img.shields.io/badge/node-%3E%3D22.6-brightgreen?style=flat-square)](https://nodejs.org)
 [![tests](https://img.shields.io/github/actions/workflow/status/burrows99/witness/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/burrows99/witness/actions/workflows/tests.yml)
-[![license](https://img.shields.io/npm/l/@burrows99/witness?style=flat-square)](LICENSE)
+[![license](https://img.shields.io/github/license/burrows99/witness?style=flat-square)](LICENSE)
 
 Drive a running system from one config file, and come back with evidence rather than a pass/fail.
 
@@ -22,8 +22,9 @@ and then needs to *see it work*. Without this, that means throwaway curl, ad-hoc
 taken by hand, and nothing anyone can rerun. With it, driving the app is a call — and the same call
 works from a spec, from a shell, and from an agent.
 
-The repository and the directory are called `witness`; the package is `@burrows99/witness`, because the
-unscoped name was already taken on npm.
+The repository and the directory are called `witness`; the package is `@burrows99/witness`, because a
+GitHub Packages name is always scoped to the account that owns the repository — and because the unscoped
+name is taken on npmjs.com.
 
 ## Table of Contents
 
@@ -55,9 +56,34 @@ a flow end to end and come back with a video.
 
 ## Install
 
+Published to **GitHub Packages**, the registry that belongs to this repository. Point your project at it
+once — `.npmrc`, beside your `package.json`:
+
+```
+@burrows99:registry=https://npm.pkg.github.com
+```
+
 ```bash
-npm install --save-dev @burrows99/witness
-npx witness init                 # writes .witness/{config.jsonc, app.ts, .gitignore}
+npm install --save-dev @burrows99/witness      # or pnpm add -D / yarn add -D
+npx witness init                               # writes .witness/{config.jsonc, app.ts, .gitignore}
+```
+
+**GitHub Packages asks for a token even when the package is public** — that is the npm registry's
+behaviour, not a setting on this package ([the container registry allows anonymous pulls; the npm one
+does not](https://docs.github.com/en/packages/learn-github-packages/about-permissions-for-github-packages)).
+Any GitHub token with `read:packages` will do, and it is the same line every consumer of a GitHub
+Packages dependency needs:
+
+```bash
+npm config set //npm.pkg.github.com/:_authToken $YOUR_GITHUB_TOKEN     # or put it in ~/.npmrc
+```
+
+In CI, `${{ secrets.GITHUB_TOKEN }}` already has it — no secret to create.
+
+Installing straight from git works too, and needs no token at all:
+
+```bash
+npm install --save-dev github:burrows99/witness
 ```
 
 ### Dependencies
@@ -75,6 +101,8 @@ npx witness init                 # writes .witness/{config.jsonc, app.ts, .gitig
 npm update @burrows99/witness
 npx witness config template > .witness/config.jsonc.new    # the full surface of the new version
 ```
+
+Every merge to `main` publishes a release and a package version, so `@latest` is whatever `main` is.
 
 The template is generated from the type declarations of the copy that prints it, so it always describes
 the version you have rather than the version somebody documented.
