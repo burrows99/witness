@@ -160,6 +160,34 @@ Things that cost other people an afternoon:
 - An action that takes inputs is composed with `run: { "action": …, "with": { … } }`; the bare
   string form passes on whatever the caller already had.
 
+## Describing what you ship
+
+A description is not written in one sitting and it is not reverse-engineered from a finished
+product. It is built by whoever is shipping, one change at a time: **if your change touches a
+screen, the same change describes it** — the route it added, the locator it needs, the action a
+person now performs. A description written this way is never out of date, because it was never
+written separately from the thing it describes.
+
+The part that needs a person (or an agent) is the part a machine cannot be right about: which
+flows matter, what to call them, and what is worth claiming about them. The part that does NOT
+need judgment is what a screen actually renders — and that is not read out of the app's source.
+It is read out of a run:
+
+```bash
+npx witness action list                                    # what is already described — reuse before adding
+#   … write the action for what you changed …
+npx witness action run <yours>                             # it will fail on a locator; that is the point
+#   … open the frame the story names, fix it, run again …
+EVIDENCE=before npx witness action run <yours>             # then make the change, then EVIDENCE=after
+```
+
+**A locator you have not run is a guess.** In this tool's own worked example, five of nine
+actions named something that did not exist on the page — a button that looked like a link, a
+placeholder with different words, a test id with the item's name appended, a table whose header
+is a row like any other. Not one of those was visible in the app's source; every one was in the
+frame from the step that failed. Write the step, run it, read the frame, fix it — before the
+change ships, not after somebody else's run breaks on it.
+
 ## What a run leaves behind
 
 ```
@@ -213,6 +241,9 @@ Anything that meets the outside world is a provider picked by name:
   answered, the database of what was stored. Pick the one the claim is about.
 - **Read the payload before theorising.** One `api get` beats an afternoon of inference from
   screenshots.
+- **Describe it in the change that makes it.** A route, a locator or an action added a week
+  later is a week of runs that could not see it — and by then the frame that would have told
+  you what it is called is gone.
 - **Narrate.** A recording nobody can follow is not evidence: caption before each action.
 - **Leave the note.** An action's `verify` writes `manual-verification.md` — every value a
   template, so it says what THIS run saw. It turns "it passed" into something a reviewer can
