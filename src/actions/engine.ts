@@ -220,7 +220,10 @@ export class Actions {
       const target = at(step.store.from);
       values[step.store.as] = (await target.textContent())?.trim() ?? "";
     }
-    if (step.waitForUrl) await page.waitForURL(new RegExp(text(step.waitForUrl)), { timeout: 60_000 });
+    if (step.waitForUrl) {
+      const wait = typeof step.waitForUrl === "string" ? { url: step.waitForUrl } : step.waitForUrl;
+      await page.waitForURL(new RegExp(text(wait.url)), { timeout: wait.timeout ?? 60_000 });
+    }
     if (step.wait) await page.waitForTimeout(step.wait);
     if (step.caption) await drawCaption(page, text(step.caption.text), step.caption.sub ? text(step.caption.sub) : undefined);
     if (step.slide) await drawSlide(page, text(step.slide.title), (step.slide.lines ?? []).map(text));
@@ -371,8 +374,13 @@ export type StepConfig = {
   };
   /** Read something off the screen and keep it for the steps after this one. */
   store?: { from: LocatorSpec; as: string };
-  /** Wait until the address matches this pattern — how a flow says "and it took me there". */
-  waitForUrl?: string;
+  /**
+   * Wait until the address matches this pattern — how a flow says "and it took me there".
+   *
+   * The object form sets how long. Worth setting whenever the wait is how the step FAILS: a rejected
+   * sign-in never navigates, and the default minute is a minute of nothing per attempt.
+   */
+  waitForUrl?: string | { url: string; timeout?: number };
   /** Wait this many milliseconds. The last resort: prefer waiting for a thing over waiting for time. */
   wait?: number;
   /** Draw a caption into the page, so the recording says what is about to happen. */

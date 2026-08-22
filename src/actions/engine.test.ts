@@ -214,3 +214,21 @@ test("a whole-placeholder input keeps its type instead of becoming text", when, 
   ok(did.some(d => d.includes('"A title"')));
   ok(did.some(d => d.includes('"Some body"')));
 });
+
+test("waiting for a URL can say how long to wait", when, async () => {
+  // The wait IS how some steps fail — a rejected sign-in never navigates — and a default minute of
+  // nothing per attempt is the difference between a loop and a coffee break.
+  const waits: number[] = [];
+  const { page } = fakePage();
+  const withWait = {
+    ...(page as unknown as Record<string, unknown>),
+    waitForURL: async (_pattern: RegExp, opts: { timeout: number }) => {
+      waits.push(opts.timeout);
+    },
+  } as never;
+
+  await engine({
+    a: { steps: [{ waitForUrl: "/chat" }, { waitForUrl: { url: "/chat", timeout: 2000 } }] },
+  }).run("a", withWait);
+  deepEqual(waits, [60_000, 2000]);
+});
