@@ -58,6 +58,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # The tags are the record of what has shipped, and package.json can be behind them — an
+          # earlier workflow that tagged without bumping leaves `npm version patch` colliding with a
+          # tag that already exists. Catch up to the newest tag first, never backwards.
+          latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)"
+          current="$(node -p 'require("./package.json").version')"
+          if [ -n "$latest" ] && [ "${latest#v}" != "$current" ] &&
+             [ "$(printf '%s\n%s\n' "${latest#v}" "$current" | sort -V | tail -n1)" = "${latest#v}" ]; then
+            npm version --no-git-tag-version "${latest#v}"
+          fi
+
           # The bump commit says [skip release] so this workflow does not trigger itself.
           version="$(npm version patch -m 'Release %s [skip release]')"
           echo "tag=$version" >> "$GITHUB_OUTPUT"
