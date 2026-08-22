@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { Cli, System, Workspace } from "../src/index.ts";
+import { Skill } from "../src/skill/skill.ts";
 import { Template } from "../src/config/template.ts";
 
 /**
@@ -73,6 +74,28 @@ function entryPoint(dir: string): string {
   return path.relative(dir, path.join(here, "..", "src", "index.ts"));
 }
 
+/**
+ * `witness skill`: how to use this, generated from what this copy can actually do.
+ *
+ * Its own command rather than a verb under `config`, because it is not about the description — and it
+ * has to answer before there is one, which is the moment somebody most needs it.
+ */
+const skill: Parameters<Cli["command"]>[1] = {
+  summary: "how to use this, generated from what this copy can do — regenerate after an upgrade",
+  passthrough: () => {
+    process.stdout.write(`${describe()}\n`);
+  },
+};
+
+/** With a description, the instructions name that product's own apps, actions, operations and queries. */
+function describe(): string {
+  try {
+    return Skill.for({ system: System.fromConfig(Workspace.find({ config: configFile }).configFile) }).render();
+  } catch {
+    return Skill.for().render();
+  }
+}
+
 /** `witness init`: the directory, a description generated from the types, and what specs import. */
 const init: Parameters<Cli["command"]>[1] = {
   summary: `make a ${Workspace.DIRECTORY}/ in this directory`,
@@ -82,6 +105,9 @@ const init: Parameters<Cli["command"]>[1] = {
     const entry = entryPoint(dir);
     const { workspace, written } = Workspace.create(root, {
       "config.jsonc": Template.forWitness().render(),
+      // How to use this, generated from what this copy can actually do — so an agent that opens the
+      // directory finds instructions rather than having to infer the tool from its own source.
+      "SKILL.md": describe(),
       // Everything a run leaves behind lands here, and none of it belongs in a commit. Kept beside the
       // output rather than in the project's own .gitignore: this directory brings its own rules with it.
       ".gitignore": "# What runs leave behind. The description beside it is worth committing; this is not.\nartifacts/\n",
@@ -99,6 +125,12 @@ const init: Parameters<Cli["command"]>[1] = {
 
 if (rest[0] === "init") {
   init.passthrough!(rest.slice(1));
+  process.exit(0);
+}
+
+// Before a description exists is exactly when the instructions are worth having.
+if (rest[0] === "skill") {
+  skill.passthrough!([]);
   process.exit(0);
 }
 
@@ -120,4 +152,4 @@ try {
   process.exit(2);
 }
 
-Cli.main(system.addCommands({ config, init }).cli(), rest);
+Cli.main(system.addCommands({ config, init, skill }).cli(), rest);

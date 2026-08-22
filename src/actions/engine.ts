@@ -339,10 +339,15 @@ export type Params = Record<string, unknown>;
 export type StepConfig = {
   /** A human note for the trace, when the verb alone does not say why. */
   note?: string;
+  /** Go to one of an app's declared routes, or to a URL outright. */
   goto?: { app?: string; route?: string; url?: string; params?: Record<string, string> };
+  /** Click something, named the way a person would name it. */
   click?: LocatorSpec;
+  /** Put a value in a field at once. Prefer `type` for anything that gets recorded. */
   fill?: { on: LocatorSpec; value: string };
+  /** Type into a field, key by key: an instantly-full field reads as a bot in a video. */
   type?: { on: LocatorSpec; value: string; delay?: number };
+  /** A key, on the keyboard — `Enter`, `Escape`, `Control+A`. */
   press?: string;
   /** Fill a set of labelled fields: `{ "Heading": "…", "Body": "…" }`. */
   fillFields?: unknown;
@@ -354,6 +359,7 @@ export type StepConfig = {
   select?: { from: string; where: Record<string, string>; pick?: string; as: string };
   /** Another action, run here with the values collected so far. */
   run?: string;
+  /** Assert something is on the screen — the claim the step list exists to make. */
   expect?: {
     on: LocatorSpec;
     state?: "visible" | "hidden";
@@ -363,12 +369,19 @@ export type StepConfig = {
     /** Why this must hold — it becomes the failure message. */
     because?: string;
   };
+  /** Read something off the screen and keep it for the steps after this one. */
   store?: { from: LocatorSpec; as: string };
+  /** Wait until the address matches this pattern — how a flow says "and it took me there". */
   waitForUrl?: string;
+  /** Wait this many milliseconds. The last resort: prefer waiting for a thing over waiting for time. */
   wait?: number;
+  /** Draw a caption into the page, so the recording says what is about to happen. */
   caption?: { text: string; sub?: string };
+  /** A full-frame card spliced into the video: what this section of the recording is about. */
   slide?: { title: string; lines?: string[] };
+  /** Call one of the config's declared operations, mid-flow, and keep what it answered. */
   api?: { operation: string; params?: Record<string, string>; body?: unknown; as?: string; pick?: string };
+  /** Run one of the config's named queries and keep the answer — what was STORED, mid-flow. */
   query?: { name: string; params?: Record<string, string>; as?: string };
   as?: string;
 };
