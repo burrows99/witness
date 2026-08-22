@@ -115,8 +115,9 @@ test("the part that cannot be generated is the part worth reading", () => {
   const out = skill();
   match(out, /## The shape of it/);
   match(out, /\*\*The command line is for state\.\*\*/);
-  match(out, /\*\*A spec is for behaviour\.\*\*/);
-  match(out, /\*\*The description is data/);
+  match(out, /\*\*An action is for behaviour\.\*\*/);
+  // The claim the whole tool rests on: there is no file to write, so it had better say so.
+  match(out, /\*\*There are no test files to write\*\*/);
 });
 
 test("witness's own features describe themselves", () => {
@@ -125,7 +126,8 @@ test("witness's own features describe themselves", () => {
   match(out, /- `npx witness stack` /);
   match(out, /- `goto` — Go to one of an app's declared routes/);
   match(out, /- \*\*video\*\*: `ffmpeg`/);
-  match(out, /\.witness\/artifacts\/<spec>\/<test>\/<cut>\//);
+  match(out, /\.witness\/artifacts\/cli\/<the actions you ran>\/<cut>\//);
+  match(out, /- `check` — A claim about the values collected so far/);
   equal(out.includes("undefined"), false);
 });
 
@@ -133,7 +135,7 @@ test("what the command line is CALLED and what a skill may be NAMED are differen
   // A project whose config says `npm run acme --` — so its own help text reads correctly — cannot
   // carry that as a skill name, and its examples cannot say `witness`.
   const out = new Skill({
-    name: "npm run acme --",
+    name: "acme",
     run: "npm run acme --",
     commands: [
       { noun: "stack", summary: "what is up", verbs: [{ verb: "status", summary: "reachability" }] },
@@ -142,11 +144,14 @@ test("what the command line is CALLED and what a skill may be NAMED are differen
     types: types(),
   }).render();
 
-  match(out, /^---\nname: npm-run-acme\n/);
+  match(out, /^---\nname: acme\n/);
   match(out, /npm run acme -- stack status\s+# is it up/);
   match(out, /- `npm run acme -- stack` — what is up/);
-  match(out, /`EVIDENCE=before npm run acme -- test`/);
+  match(out, /`EVIDENCE=before npm run acme -- action run …`/);
   ok(!/`witness stack`/.test(out), "the examples must be what this project actually types");
+  // The one place the help's own name belongs: saying that it is not what you type.
+  match(out, /Its own help calls it `acme`/);
+  ok(!/^acme stack status/m.test(out), "an example must never be the untypeable name");
 });
 
 test("what a reader types is read off how the tool was run, not guessed", () => {
@@ -156,4 +161,6 @@ test("what a reader types is read off how the tool was run, not guessed", () => 
   equal(Skill.invocation({}), "npx witness");
   // `npm test` runs the suite; nobody drives this through it, and it takes no `--`.
   equal(Skill.invocation({ npm_lifecycle_event: "test" }), "npx witness");
+  // `npx witness skill` sets it to `npx`, which produced a file telling its reader to type `npm run npx --`.
+  equal(Skill.invocation({ npm_lifecycle_event: "npx" }), "npx witness");
 });

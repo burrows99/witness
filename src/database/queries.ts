@@ -5,7 +5,7 @@ import type { Postgres } from "./postgres.ts";
  * The database as a named set of queries.
  *
  * Same reasoning as {@link Operations}: what a system reads and writes out of band is worth having in
- * one readable list rather than scattered through specs as SQL strings. It also makes the dangerous half
+ * one readable list rather than scattered through step lists as SQL strings. It also makes the dangerous half
  * obvious — anything that writes is right there to be reviewed.
  *
  * `sql()` stays available for the genuinely one-off read.

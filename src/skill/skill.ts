@@ -19,7 +19,7 @@ import { TypeSource, type TypeField } from "../config/types.ts";
  * with nobody remembering anything.
  *
  * What it cannot generate is the shape of the work — when to reach for a command and when to write a
- * spec — so that part is prose, and it is the part worth reading.
+ * description — so that part is prose, and it is the part worth reading.
  */
 export class Skill {
   private readonly name: string;
@@ -78,7 +78,9 @@ export class Skill {
   static invocation(env: Record<string, string | undefined> = process.env): string {
     const script = env.npm_lifecycle_event;
     // `npm test` and `npm start` take no `--`, and neither is how this gets driven.
-    return script && !["test", "start", "install", "prepare"].includes(script) ? `npm run ${script} --` : "npx witness";
+    // `npx` is npm's own launcher and sets this too, which made `npx witness skill` generate a file
+    // telling its reader to type `npm run npx --`.
+    return script && !["test", "start", "install", "prepare", "npx", "exec"].includes(script) ? `npm run ${script} --` : "npx witness";
   }
 
   static for(opts: { system?: SystemLike; sourceDir?: string } = {}): Skill {
@@ -88,7 +90,6 @@ export class Skill {
       // A real stack over no services: enough to register the built-in nouns and ask them their names.
       const stack = new Stack({ root: process.cwd(), services: {} });
       const cli = new Cli({ name: "witness", stack }).withDefaults({
-        test: { command: "", args: [] },
         api: async () => ({}),
         sql: () => "",
         renderVideos: () => [],
@@ -146,7 +147,6 @@ export class Skill {
       ...this.commandSection(),
       ...this.productSection(),
       ...this.actionSection(),
-      ...this.specSection(),
       ...this.evidenceSection(),
       ...this.configSection(),
       ...this.rules(),
@@ -170,27 +170,28 @@ export class Skill {
       "**The command line is for state.** Setting it up, reading it back, and finding out whether the",
       "thing is even running. Every command reports the whole exchange — the request, the response, the",
       "statement, the timing — because the caller usually cannot open a network tab. Reach for it first:",
-      "most questions (\"why is this empty\", \"did that save\") are answered in one command, and writing a",
-      "test to answer them is how an afternoon disappears.",
+      "most questions (\"why is this empty\", \"did that save\") are answered in one command.",
       "",
-      "**A spec is for behaviour.** A sequence someone performs, with assertions, branching and narration.",
-      "That is a program, so it lives in a file — `.witness/specs/*.spec.ts`.",
+      "**An action is for behaviour.** A sequence someone performs, with its narration and its claims —",
+      `declared in the config and run outright: \`${this.run} action run <name> [key=value…]\` drives it`,
+      "in a browser and comes back with the frames, the debug story and the video. Chain several and they",
+      "share one browser, one recording, and whatever each one stored.",
       "",
-      "**A declared action needs no file at all.** It is data, so it can just be run:",
-      `\`${this.name} action run <name> [key=value…]\` drives it in a browser and comes back with the`,
-      "frames, the debug story and the video. Chain several and they share one browser, one recording,",
-      "and whatever each one stored. Reach for a spec when there is a decision or an assertion to make.",
-      "",
-      "**The description is data, and it is the point.** Routes, requests, queries, sign-in flows and",
-      "actions are declared in `.witness/config.jsonc`, not written as code. Anything you would otherwise",
-      "hand-write twice belongs there; anything with a decision in it belongs in a spec.",
+      "There is no third thing. **There are no test files to write**: an action composes other actions",
+      "(`run`), narrates (`caption`, `slide`), asserts against the screen (`expect`) and against what the",
+      "API answered or the database stored (`check`). Anything you would otherwise write as a program",
+      "belongs in `.witness/config.jsonc` as steps — that is the whole idea, and it is why a description",
+      "of a product is worth more than a suite about it.",
       "",
     ];
   }
 
   private loop(): string[] {
     const has = (noun: string): boolean => this.commands.some(c => c.noun === noun);
-    const tool = this.name;
+    // `this.name` is what the tool's own help calls itself and is often not typeable (`npm run acme --`
+    // is, `grafana` is not). Every example is what a reader has to type — which is the whole reason
+    // these are two different things.
+    const tool = this.run;
     return [
       "## The loop",
       "",
@@ -199,13 +200,13 @@ export class Skill {
         [`${tool} stack status`, "is it up, and is what is answering ours"],
         ...(has("api") ? [[`${tool} api get /v1/whatever`, "read the real payload before theorising about it"] as const] : []),
         ...(has("db") ? [[`${tool} db sql "select …"`, "what was actually stored"] as const] : []),
-        [`${tool} test --before`, "record the behaviour as it is now"],
+        [`EVIDENCE=before ${tool} action run <name>`, "record the behaviour as it is now"],
         ["#   … make the change …", ""],
-        [`${tool} test --after`, "record it again, filed beside the first"],
+        [`EVIDENCE=after ${tool} action run <name>`, "record it again, filed beside the first"],
       ]),
       "```",
       "",
-      "Then read `.witness/artifacts/<spec>/<test>/<cut>/actions/<action>/debug.md`: what was attempted,",
+      "Then read `.witness/artifacts/cli/<chain>/<cut>/actions/<action>/debug.md`: what was attempted,",
       "what the network did during each step, what the console said, and — if something failed — the step",
       "it failed on with the frame from that moment. That file exists so nobody has to re-run anything",
       "with more logging.",
@@ -280,67 +281,26 @@ export class Skill {
     lines.push(
       "",
       "`{placeholders}` are filled from the action's inputs and from anything an earlier step stored, so",
-      "a value read off the screen or out of a response is available to every step after it.",
+      "a value read off the screen or out of a response is available to every step after it. A dotted",
+      "name reaches inside it: `{stats.dashboards}` after an `api` step kept the answer, `{rows.length}`",
+      "for how many things a `store` gathered.",
       "",
-    );
-    return lines;
-  }
-
-  /** The half a config cannot express — and the half that was documented nowhere. */
-  private specSection(): string[] {
-    return [
-      "## Writing a spec",
+      "Things that cost other people an afternoon:",
       "",
-      "A spec is for a decision, an assertion or narration. Everything it needs is on the system your",
-      "`app.ts` exports:",
-      "",
-      "```ts",
-      'import { expect } from "@playwright/test";',
-      'import { caption, slide, testFor } from "@burrows99/witness";',
-      "",
-      'import { app } from "../app.ts";           // `export const app = System.find()`',
-      "",
-      "const test = testFor(app);                  // the config's identities, already in the browser",
-      'const member = app.cast<{ email: string }>("memberA");',
-      "",
-      'test("what the claim is", async ({ page }) => {',
-      "  const evidence = app.evidence();",
-      "",
-      '  await slide(page, "What this shows", ["one line per point"]);',
-      '  const run = await app.run("app.signIn", page, { email: member.email, password: app.secret("memberAPassword") });',
-      "  expect(run.ok).toBe(true);",
-      "",
-      '  await caption(page, "About to do the thing", "why it matters");',
-      '  await app.run("app.doTheThing", page, { id: "…" });',
-      '  await evidence.frame(page, "what it looks like now");',
-      "",
-      "  // Assert at the layer the claim is about: the screen, the API, or what was stored.",
-      '  const stored = app.db.query("thing.byId", { id: "…" });',
-      "",
-      "  await evidence.manualVerification({",
-      '    title: "What this shows",',
-      "    subject: { account: member.email, stored },",
-      '    notes: ["how a person re-walks this by hand"],',
-      "  });",
-      "});",
-      "```",
-      "",
-      "- `app.run(action, page, inputs)` returns everything it did, and throws with that attached when a",
-      "  step fails. `app.db.query`, `app.api.call`, `app.secret`, `app.cast` are the rest of the surface.",
-      "- **An assertion passing is not the same as evidence.** A `css` or `testId` match can succeed on a",
-      "  node that is off-screen — the run goes green and the picture shows nothing. Assert on what is",
+      "- **An assertion passing is not the same as evidence.** A `css` or `testId` match can succeed on",
+      "  a node that is off-screen — the run goes green and the picture shows nothing. Assert on what is",
       "  visible, and open the frame before you believe your own caption.",
-      "- `{placeholders}` substitute inside locator specs too, not only in values.",
+      "- `{placeholders}` substitute inside locators too, not only in values.",
       "- `waitForUrl` takes a **regular expression** — a bare substring is the commonest useful form, and",
       "  a glob (`**/products/**`) is a syntax error, not a pattern.",
       "- `store` reads ONE element; `store: { …, \"all\": true }` reads every match as an array.",
-      "- When a run fails, the LAST line it prints is where the story is — that is the reporter in",
-      "  `playwright.config.ts` (`[\"@burrows99/witness/reporter\"]`), which exists because a runner's own",
-      "  output buries it under a wall of attachment paths.",
-      `- Everything after \`test\` goes to the runner: \`${this.run} test chat-persists\` runs one spec,`,
-      "  `--headed` watches it, `KEEP=1` tells a spec that cleans up to leave its data alone.",
+      "- `expect` is about the screen and `check` is about the values — comparing what the API said to",
+      "  what the page shows is a `check`, and it is the whole reason an action needs no program.",
+      "- An action that takes inputs is composed with `run: { \"action\": …, \"with\": { … } }`; the bare",
+      "  string form passes on whatever the caller already had.",
       "",
-    ];
+    );
+    return lines;
   }
 
   private evidenceSection(): string[] {
@@ -348,7 +308,7 @@ export class Skill {
       "## What a run leaves behind",
       "",
       "```",
-      ".witness/artifacts/<spec>/<test>/<cut>/",
+      ".witness/artifacts/cli/<the actions you ran>/<cut>/",
       "  video.mp4                          the recording",
       "  frames/01-….png                    stills, in the order they were taken",
       "  actions/<action>/01-….png          a frame per step",
@@ -356,9 +316,9 @@ export class Skill {
       "  manual-verification.md             how to re-walk it by hand",
       "```",
       "",
-      `\`<cut>\` is \`before\`, \`after\` or \`run\` — \`EVIDENCE=before ${this.run} test\`, or \`${this.run} test --before\`.`,
+      `\`<cut>\` is \`before\`, \`after\` or \`run\` — set it with \`EVIDENCE=before ${this.run} action run …\`.`,
       "The two halves sit side by side and a re-run overwrites rather than accumulates. Nothing is named",
-      "by hand: the path comes from the spec, the test and the cut.",
+      "by hand: the path comes from what was run and which cut it was.",
       "",
     ];
   }

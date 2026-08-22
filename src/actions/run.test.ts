@@ -27,6 +27,8 @@ const fakeBrowser = (): { launch: () => Promise<never>; closed: string[] } => {
   const page = {};
   const context = {
     newPage: async () => page,
+    // Playwright's own trace, which used to arrive only through the runner.
+    tracing: { start: async () => undefined, stop: async ({ path }: { path: string }) => void closed.push(`trace ${path.split("/").pop()}`) },
     close: async () => void closed.push("context"),
   };
   const browser = {
@@ -66,7 +68,8 @@ test("it runs each action in turn, passing what one stored to the next", async (
   // Unpinned afterwards: the next thing to ask for evidence is not part of this run.
   equal(pinned, undefined);
   // The recording is written when the context closes, so it closes before anything looks for it.
-  deepEqual(browser.closed, ["context", "browser"]);
+  // The trace is written before the context closes: after that there is nothing left to write it from.
+  deepEqual(browser.closed, ["trace trace.zip", "context", "browser"]);
 });
 
 test("a failing action comes back with its own evidence rather than a stack trace", async () => {

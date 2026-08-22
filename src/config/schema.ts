@@ -15,7 +15,7 @@ import type { ServiceSpec } from "../environment/stack.ts";
  * different app.
  *
  * Read at runtime rather than `import`ed, because these files are loaded by two runtimes (Node directly
- * for the CLI, a test runner that transpiles to CommonJS for the specs) and JSON module semantics differ
+ * for the CLI, a bundler for anything importing this) and JSON module semantics differ
  * between them. `fs.readFileSync` behaves the same in both.
  */
 export type SystemConfig = {
@@ -31,7 +31,7 @@ export type SystemConfig = {
   services: Record<string, ServiceSpec>;
   /**
    * Who the system can be. An identity with `cookies` is injected into every browser context the
-   * system opens — the dev-auth blob a staff app trusts locally, and the reason specs need no login.
+   * system opens — the dev-auth blob a staff app trusts locally, and the reason a run needs no login.
    */
   identities?: Record<string, IdentityConfig>;
   /**
@@ -47,7 +47,6 @@ export type SystemConfig = {
   database?: DatabaseConfig;
   apps?: Record<string, AppConfig>;
   evidence?: { dir?: string; links?: string[] };
-  runner?: RunnerConfig;
   /** How the run's recordings become MP4s. See the video providers. */
   video?: VideoConfig;
   /**
@@ -70,7 +69,7 @@ export type IdentityConfig = Record<string, unknown> & {
 /**
  * The default API client.
  *
- * Identical in shape to any other client — the only thing that makes it the default is that specs reach
+ * Identical in shape to any other client — the only thing that makes it the default is that an action reaches
  * it as `app.api` rather than `app.client(name)`. Its wire format, auth and operations are all providers'
  * business, which is why the types come from there.
  */
@@ -92,7 +91,7 @@ export type AppConfig = {
   /** Named forms on those screens: field name → the placeholder that finds the input. */
   forms?: Record<string, Record<string, string>>;
   /**
-   * Named locators — the handful of things a spec asserts on directly.
+   * Named locators — the handful of things an action asserts on directly.
    *
    * Named rather than spelled out at the call site for the same reason routes are: when the markup
    * changes, one line changes.
@@ -124,16 +123,9 @@ export type SignInConfig = {
    *
    * Apps commonly mark a link-minted session as staff-driven and behave differently for it — suppressed
    * analytics, a banner. Un-marking it is the only way to record what an ordinary sign-in looks like,
-   * and it belongs here rather than in every spec that needs it.
+   * and it belongs here rather than in every action that needs it.
    */
   afterInject?: { query: string; params?: Record<string, string> }[];
-};
-
-export type RunnerConfig = {
-  test?: { command: string; args: string[] };
-  video?: { command: string; args: string[] };
-  /** Environment for the runner — `{service}` expands to that service's URL, `@service` to its container. */
-  env?: Record<string, string>;
 };
 
 export type CliGroupConfig = {

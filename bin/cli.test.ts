@@ -1,5 +1,5 @@
 import { deepEqual, equal, match, ok } from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { tmpdir } from "node:os";
@@ -120,12 +120,13 @@ test("init makes a .witness that the next command finds", when, () => {
   equal(made.status, 0);
   match(made.out, /wrote \.witness\/config\.jsonc/);
   match(made.out, /wrote \.witness\/\.gitignore/);
-  match(made.out, /wrote \.witness\/app\.ts/);
+  match(made.out, /wrote \.witness\/SKILL\.md/);
 
   // What runs leave behind is ignored by the directory itself, not by the project's own .gitignore.
   match(readFileSync(path.join(dir, ".witness", ".gitignore"), "utf8"), /^artifacts\/$/m);
-  // …and what specs import needs no path repeated in it.
-  match(readFileSync(path.join(dir, ".witness", "app.ts"), "utf8"), /export const app = System\.find\(\)/);
+  // A description, instructions, and what not to commit. Nothing to import and nothing to compile:
+  // the whole point is that a project describes its product rather than programming against it.
+  deepEqual(readdirSync(path.join(dir, ".witness")).sort(), [".gitignore", "SKILL.md", "config.jsonc"]);
 
   const nested = path.join(dir, "apps", "web");
   mkdirSync(nested, { recursive: true });

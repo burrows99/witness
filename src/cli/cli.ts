@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 
 import type { Stack } from "../environment/stack.ts";
 import type { Trace } from "../diagnostics/trace.ts";
@@ -11,7 +10,7 @@ import type { Trace } from "../diagnostics/trace.ts";
  * agent (or a person) has to write a spec to do any of it, which is why so much poking at local stacks
  * ends up as throwaway curl and psql that nobody can rerun.
  *
- * The generic verbs are here (`stack status`, `api`, `db`, `test`, `video`); a project registers its own
+ * The generic verbs are here (`stack status`, `api`, `db`, `video`); a project registers its own
  * vocabulary on top. Exit codes are the POSIX ones a caller can branch on:
  *   0 it worked · 1 it ran and failed · 2 you asked for something that does not exist.
  */
@@ -34,20 +33,12 @@ export class Cli {
     return this;
   }
 
-  /**
-   * The generic half: where the stack is, the escape hatches into it, and running the suite.
-   *
-   * `test` re-exports the stack's own resolution into the environment before handing over to the test
-   * runner, which is what lets a second checkout (a worktree with its own ports) run without a wrapper
-   * script per scenario.
-   */
+  /** The generic half: where the stack is, and the escape hatches into it. */
   withDefaults(opts: {
-    test?: { command: string; args: string[]; cwd?: string };
     /** Rendering happens here, not in a subprocess. */
     renderVideos?: () => string[];
     api?: (method: string, path: string, body?: unknown) => Promise<unknown>;
     sql?: (query: string) => string;
-    env?: () => Record<string, string>;
   }): this {
     this.command("stack", {
       summary: "what is up, on which ports, from which checkout",
@@ -111,23 +102,6 @@ export class Cli {
         passthrough: () => {
           const written = render();
           process.stdout.write(`${written.length} video${written.length === 1 ? "" : "s"}\n`);
-        },
-      });
-    }
-
-    for (const [noun, spec] of [["test", opts.test]] as const) {
-      if (!spec) continue;
-      this.command(noun, {
-        summary: noun === "test" ? "run the suite against THIS checkout's stack" : "rebuild the recordings",
-        passthrough: (args: string[]) => {
-          // `--before` / `--after` name the cut being recorded; everything else goes to the runner.
-          const cut = args.find(a => a === "--before" || a === "--after");
-          const child = spawnSync(spec.command, [...spec.args, ...args.filter(a => a !== cut)], {
-            cwd: spec.cwd ?? this.stack.root,
-            stdio: "inherit",
-            env: { ...process.env, ...(opts.env?.() ?? {}), ...(cut ? { EVIDENCE: cut.slice(2) } : {}) },
-          });
-          process.exit(child.status ?? 1);
         },
       });
     }

@@ -97,7 +97,10 @@ export class Actions {
       for (const [index, step] of action.steps.entries()) {
         const at = Date.now();
         const label = Actions.verb(step);
-        inspector.mark(label, index);
+        // A composed action's every request was tagged `run`, which is the one tag that says nothing:
+        // the whole promise here is that traffic is tied to the step it belongs to, and eight screens
+        // of a walk all reading "run" is that promise not kept.
+        inspector.mark(label === "run" ? `run ${Actions.about(step)}` : label, index);
         try {
           await this.step(step, page, values, action.app);
         } catch (err) {
@@ -271,15 +274,58 @@ export class Actions {
       }
       values[step.select.as] = this.pick(found, step.select.pick);
     }
-    // An action can be built from other actions — the small ones stay usable on their own, which is what
-    // a spec needs when the thing under test is halfway through a flow.
+    // An action can be built from other actions — the small ones stay usable on their own, which is
+    // what a caller needs when the thing being looked at is halfway through a flow.
     if (step.run) {
-      const nested = await this.run(step.run, page, values);
+      const call = typeof step.run === "string" ? { action: step.run } : step.run;
+      // Without `with`, the composed action could only ever be run on the values that happened to be
+      // lying around — so an action taking an input could be composed once and never twice.
+      const nested = await this.run(call.action, page, { ...values, ...this.resolveParams(call.with, values) });
       Object.assign(values, nested.values);
     }
     if (step.query) {
       const answer = this.queries.query(step.query.name, { ...values, ...this.resolveParams(step.query.params, values) });
       if (step.query.as) values[step.query.as] = answer;
+    }
+    // The claim one layer makes against another: what the API answered against what the screen shows,
+    // what a list holds against what was counted. `expect` can only see the screen, so this was the
+    // last thing a description could not say and a program had to.
+    if (step.check) Actions.assert(step.check, values);
+    // A still worth keeping on its own, beside the automatic one per step: the frames a person is
+    // actually shown, named for what they show rather than for the verb that happened to take them.
+    if (step.frame) await this.evidence().frame(page, text(step.frame), { fullPage: step.fullPage });
+  }
+
+  /**
+   * One `check`, against the values collected so far.
+   *
+   * Everything is compared as text, because everything arrives as text: a number read off a screen, a
+   * number out of a JSON body and a number in the config are all strings by the time they meet. The
+   * numeric comparisons parse; the rest do not need to.
+   */
+  private static assert(check: NonNullable<StepConfig["check"]>, values: Params): void {
+    const actual = fill(check.that, values);
+    const because = check.because ? `${check.because} — ` : "";
+    const fail = (said: string): never => {
+      throw new Error(`${because}${JSON.stringify(check.that)} is ${JSON.stringify(actual)}, ${said}`);
+    };
+    const number = (raw: string, name: string): number => {
+      const parsed = Number(raw);
+      if (Number.isNaN(parsed)) fail(`and ${name} wants a number`);
+      return parsed;
+    };
+
+    if (check.equals !== undefined && actual !== fill(check.equals, values)) fail(`not ${JSON.stringify(fill(check.equals, values))}`);
+    if (check.not !== undefined && actual === fill(check.not, values)) fail(`which is what it must not be`);
+    if (check.contains !== undefined && !actual.includes(fill(check.contains, values))) fail(`which does not contain ${JSON.stringify(fill(check.contains, values))}`);
+    if (check.matches !== undefined && !new RegExp(check.matches).test(actual)) fail(`which does not match /${check.matches}/`);
+    if (check.atLeast !== undefined) {
+      const want = number(fill(String(check.atLeast), values), "atLeast");
+      if (number(actual, "the value") < want) fail(`which is less than ${want}`);
+    }
+    if (check.atMost !== undefined) {
+      const want = number(fill(String(check.atMost), values), "atMost");
+      if (number(actual, "the value") > want) fail(`which is more than ${want}`);
     }
   }
 
@@ -309,7 +355,7 @@ export class Actions {
   }
 
   /** Keys that modify a step rather than being what it does. Everything else names the verb. */
-  private static readonly MODIFIERS = ["as", "note", "within"];
+  private static readonly MODIFIERS = ["as", "note", "within", "fullPage"];
 
   /**
    * What the step IS — `goto`, `click`, `store`.
@@ -331,7 +377,9 @@ export class Actions {
     if (step.note) return step.note;
     if (step.reload) return "the same page, fresh";
     if (step.goto) return step.goto.url ?? step.goto.route ?? step.goto.app;
-    if (step.run) return step.run;
+    if (step.run) return typeof step.run === "string" ? step.run : step.run.action;
+    if (step.check) return step.check.because ?? step.check.that;
+    if (step.frame) return step.frame;
     if (step.api) return step.api.operation;
     if (step.query) return step.query.name;
     if (step.capture) return step.capture.url;
@@ -452,8 +500,41 @@ export type StepConfig = {
   capture?: { url: string; method?: string; as: string; pick?: string; timeout?: number };
   /** Pick one item out of a stored list by matching fields. */
   select?: { from: string; where: Record<string, string>; pick?: string; as: string };
-  /** Another action, run here with the values collected so far. */
-  run?: string;
+  /**
+   * Another action, run here with the values collected so far.
+   *
+   * `with` passes it inputs of its own — a template, so `{ "search": "{term}" }` forwards one of this
+   * action's. Without it a composed action could only run on whatever happened to be lying around.
+   */
+  run?: string | { action: string; with?: Record<string, string> };
+  /**
+   * A claim about the values collected so far — the one thing `expect` cannot make.
+   *
+   * `expect` looks at the screen. This looks at what the run has gathered: what the API answered
+   * against what the screen shows, how many rows a `store` read, whether a `query` found anything.
+   * `that` is a template, so `{stats.dashboards}` and `{rows.length}` are what it is usually about.
+   */
+  check?: {
+    that: string;
+    equals?: string;
+    not?: string;
+    contains?: string;
+    /** A REGULAR EXPRESSION the value must match. */
+    matches?: string;
+    atLeast?: number | string;
+    atMost?: number | string;
+    /** Why this must hold — it becomes the first half of the failure message. */
+    because?: string;
+  };
+  /**
+   * Keep a still of the screen right now, named for what it shows.
+   *
+   * Every step is photographed anyway, into the action's own directory. This is the other kind: the
+   * frames somebody is going to look at, numbered in order, named "signed in" rather than "04-click".
+   */
+  frame?: string;
+  /** For `frame`: capture below the fold. Wrong wherever the viewport itself is the claim. */
+  fullPage?: boolean;
   /** Assert something is on the screen — the claim the step list exists to make. */
   expect?: {
     on: LocatorSpec;

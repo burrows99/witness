@@ -21,13 +21,14 @@ const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 type Done = string[];
 
 /** A page that says what it was asked to do, and hands back whatever it was told to. */
-const fakePage = (opts: { text?: string; response?: unknown; gotoFails?: string } = {}): { page: never; did: Done } => {
+const fakePage = (opts: { text?: string; all?: string[]; response?: unknown; gotoFails?: string } = {}): { page: never; did: Done } => {
   const did: Done = [];
   const locator = (what: string) => ({
     click: async () => void did.push(`click ${what}`),
     fill: async (value: string) => void did.push(`fill ${what} ${JSON.stringify(value)}`),
     pressSequentially: async (value: string) => void did.push(`type ${what} ${JSON.stringify(value)}`),
     textContent: async () => opts.text ?? "  on screen  ",
+    allTextContents: async () => opts.all ?? [opts.text ?? "  on screen  "],
     count: async () => 1,
     filter: () => locator(what),
     nth: (n: number) => locator(`${what}#${n}`),
@@ -349,4 +350,71 @@ test("store reads one thing, or every one of them", when, async () => {
 
   equal(result.values.first, "What to expect");
   deepEqual(result.values.offered, options, "blank matches are not options");
+});
+
+test("a check is the claim one layer makes against another", when, async () => {
+  // `expect` only sees the screen. What the API answered against what the screen shows was the last
+  // thing a description could not say, and the reason a spec file still existed.
+  const { page } = fakePage({ text: "3" });
+  const result = await engine(
+    {
+      a: {
+        steps: [
+          { api: { operation: "stats", as: "stats" } },
+          { store: { from: { testId: "count" }, as: "shown" } },
+          { check: { that: "{shown}", equals: "{stats.dashboards}", because: "the screen should agree with the API" } },
+        ],
+      },
+    },
+    { api: () => ({ dashboards: 3 }) },
+  ).run("a", page);
+  ok(result.ok);
+});
+
+test("a check that does not hold fails the action, and says what it saw", when, async () => {
+  const { page } = fakePage({ text: "7" });
+  await rejects(
+    () =>
+      engine(
+        { a: { steps: [{ api: { operation: "stats", as: "stats" } }, { store: { from: "b", as: "shown" } }, { check: { that: "{shown}", equals: "{stats.dashboards}", because: "the screen should agree with the API" } }] } },
+        { api: () => ({ dashboards: 3 }) },
+      ).run("a", page),
+    /the screen should agree with the API — "\{shown\}" is "7", not "3"/,
+  );
+});
+
+test("a check counts what a list-reading store gathered", when, async () => {
+  const { page } = fakePage({ text: "anything" });
+  const run = (atLeast: number) =>
+    engine({ a: { steps: [{ store: { from: "li", as: "offered", all: true } }, { check: { that: "{offered.length}", atLeast } }] } }).run("a", page);
+  ok((await run(1)).ok);
+  await rejects(() => run(5), /which is less than 5/);
+});
+
+test("the other comparisons a claim about a value needs", when, async () => {
+  const { page } = fakePage({ text: "Prometheus data source" });
+  const check = (spec: Record<string, unknown>) => engine({ a: { steps: [{ store: { from: "h1", as: "title" } }, { check: { that: "{title}", ...spec } }] } }).run("a", page);
+  ok((await check({ contains: "Prometheus" })).ok);
+  ok((await check({ matches: "^Prometheus" })).ok);
+  ok((await check({ not: "something else" })).ok);
+  await rejects(() => check({ contains: "Graphite" }), /does not contain "Graphite"/);
+  await rejects(() => check({ matches: "^Graphite" }), /does not match/);
+  await rejects(() => check({ atMost: 3 }), /wants a number/);
+});
+
+test("a composed action can be given inputs of its own", when, async () => {
+  // Without this a composed action could only run on whatever values happened to be lying around, so
+  // one taking an input could be composed once and never twice.
+  const { page, did } = fakePage();
+  await engine({
+    search: { app: "app", inputs: ["term"], steps: [{ fill: { on: { placeholder: "Search" }, value: "{term}" } }] },
+    both: { steps: [{ run: { action: "search", with: { term: "prometheus" } } }, { run: { action: "search", with: { term: "graphite" } } }] },
+  }).run("both", page);
+  deepEqual(did, ['fill placeholder=Search "prometheus"', 'fill placeholder=Search "graphite"']);
+});
+
+test("the string form of run still means the same thing", when, async () => {
+  const { page, did } = fakePage();
+  await engine({ inner: { steps: [{ press: "Enter" }] }, outer: { steps: [{ run: "inner" }] } }).run("outer", page);
+  deepEqual(did, ["press Enter"]);
 });
