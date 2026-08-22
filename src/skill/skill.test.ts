@@ -1,0 +1,121 @@
+import { equal, match, ok } from "node:assert/strict";
+import { test } from "node:test";
+
+import { Skill } from "./skill.ts";
+import { TypeSource } from "../config/types.ts";
+
+const types = (): TypeSource =>
+  new TypeSource().read(`
+    export type StepConfig = {
+      /** A human note for the trace. */
+      note?: string;
+      /** Go to one of an app's declared routes. */
+      goto?: { route?: string };
+      /** Click something. */
+      click?: string;
+    };
+    export type SystemConfig = {
+      name: string;
+      /** What the product can DO. Sequences of steps. */
+      actions?: Record<string, string>;
+    };
+  `);
+
+const skill = (over: Partial<ConstructorParameters<typeof Skill>[0]> = {}): string =>
+  new Skill({
+    commands: [{ noun: "stack", summary: "what is up", verbs: [{ verb: "status", summary: "reachability of every service" }] }],
+    types: types(),
+    ...over,
+  }).render();
+
+test("it opens with frontmatter, so it can be used as a skill where skills live", () => {
+  const out = skill();
+  match(out, /^---\nname: witness\ndescription: >-/);
+  match(out, /Drive this project's running app and come back with evidence/);
+});
+
+test("the commands are the command line's own, not a list somebody kept", () => {
+  const out = skill({
+    commands: [
+      { noun: "stack", summary: "what is up", verbs: [{ verb: "status", summary: "reachability" }] },
+      { noun: "order", summary: "orders", verbs: [{ verb: "show", summary: "<orderId>" }] },
+    ],
+  });
+  match(out, /- `witness stack` — what is up/);
+  match(out, /  - `stack status` — reachability/);
+  match(out, /- `witness order` — orders/);
+  match(out, /  - `order show` — <orderId>/);
+});
+
+test("the loop only offers commands this copy actually has", () => {
+  const bare = skill();
+  ok(!/witness api get/.test(bare), "no api noun, no api line");
+  ok(!/witness db sql/.test(bare));
+  const full = skill({
+    commands: [
+      { noun: "stack", summary: "s", verbs: [] },
+      { noun: "api", summary: "a", verbs: [] },
+      { noun: "db", summary: "d", verbs: [] },
+    ],
+  });
+  match(full, /witness api get \/v1\/whatever\s+# read the real payload/);
+  match(full, /witness db sql/);
+});
+
+test("the step verbs come from the type an action's steps are", () => {
+  const out = skill();
+  match(out, /- `goto` — Go to one of an app's declared routes\./);
+  match(out, /- `click` — Click something\./);
+  // `note` is bookkeeping, not something a step DOES.
+  ok(!/- `note`/.test(out));
+});
+
+test("the config's fields come from the type that reads them, required marked", () => {
+  const out = skill();
+  match(out, /- `name` \(required\)/);
+  match(out, /- `actions` — What the product can DO\./);
+});
+
+test("without a description it says how to get one; with one it names what the product has", () => {
+  match(skill(), /The config is a template until you cut it down/);
+
+  const described = new Skill({
+    name: "acme",
+    commands: [],
+    types: types(),
+    product: {
+      apps: ["customer"],
+      actions: [{ name: "customer.cancelOrder", summary: "cancel an order" }],
+      queries: ["order.status"],
+      operations: ["orders.show"],
+    },
+  }).render();
+  match(described, /^---\nname: acme/);
+  match(described, /- \*\*apps\*\*: `customer`/);
+  match(described, /  - `customer\.cancelOrder` — cancel an order/);
+  match(described, /- \*\*operations\*\*: `orders\.show`/);
+  match(described, /- \*\*queries\*\*: `order\.status`/);
+});
+
+test("the providers are the registered ones", () => {
+  const out = skill({ providers: new Map([["client", ["rest", "graphql"]]]) });
+  match(out, /- \*\*client\*\*: `rest`, `graphql`/);
+});
+
+test("the part that cannot be generated is the part worth reading", () => {
+  const out = skill();
+  match(out, /## The shape of it/);
+  match(out, /\*\*The command line is for state\.\*\*/);
+  match(out, /\*\*A spec is for behaviour\.\*\*/);
+  match(out, /\*\*The description is data/);
+});
+
+test("witness's own features describe themselves", () => {
+  // The guarantee: no list in here is written twice.
+  const out = Skill.for().render();
+  match(out, /- `witness stack` /);
+  match(out, /- `goto` — Go to one of an app's declared routes/);
+  match(out, /- \*\*video\*\*: `ffmpeg`/);
+  match(out, /\.witness\/artifacts\/<spec>\/<test>\/<cut>\//);
+  equal(out.includes("undefined"), false);
+});

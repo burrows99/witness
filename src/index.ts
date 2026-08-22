@@ -24,3 +24,4 @@ export * from "./evidence/index.ts";
 export * from "./diagnostics/index.ts";
 export * from "./cli/index.ts";
 export * from "./providers/index.ts";
+export * from "./skill/index.ts";

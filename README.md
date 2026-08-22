@@ -28,6 +28,7 @@ name is taken on npmjs.com.
 
 ## Table of Contents
 
+- [The shape of it](#the-shape-of-it)
 - [Background](#background)
 - [Install](#install)
 - [Usage](#usage)
@@ -38,6 +39,32 @@ name is taken on npmjs.com.
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
+
+## The shape of it
+
+Two surfaces, and knowing which one you are on is most of the value:
+
+- **The command line is for state** — set it up, read it back, find out whether the thing is even
+  running. Every command reports the whole exchange (request, response, statement, timing), because the
+  caller usually cannot open a network tab. Most questions — *why is this empty*, *did that save* — are
+  one command, and writing a test to answer them is how an afternoon disappears.
+- **A spec is for behaviour** — a sequence someone performs, with assertions and narration, recorded.
+  That is a program, so it lives in a file, and it is what produces the video, the frames and the note a
+  reviewer reads.
+- **The description is data, and it is the point** — routes, requests, queries, sign-in flows and
+  actions are declared in `.witness/config.jsonc`, never written twice.
+
+A run leaves a **debug story** behind: `debug.md` and `debug.json`, with every request, console message
+and uncaught error tagged with the step that was running when it happened. Playwright's trace is still
+the debugger for a person; this is the version a program can read without opening a GUI.
+
+```bash
+witness init                    # .witness/{config.jsonc, SKILL.md, app.ts}
+witness skill                   # how to use it, generated from what this copy can do
+witness stack status            # is it up, and is what is answering ours
+witness api get /v1/whatever    # read the real payload before theorising about it
+witness test --before           # …change something…      witness test --after
+```
 
 ## Background
 
@@ -65,7 +92,7 @@ once — `.npmrc`, beside your `package.json`:
 
 ```bash
 npm install --save-dev @burrows99/witness      # or pnpm add -D / yarn add -D
-npx witness init                               # writes .witness/{config.jsonc, app.ts, .gitignore}
+npx witness init                               # writes .witness/{config.jsonc, SKILL.md, app.ts, .gitignore}
 ```
 
 **GitHub Packages asks for a token even when the package is public** — that is the npm registry's
@@ -115,6 +142,7 @@ your-project/
   docker-compose.yml
   .witness/
     config.jsonc              the description of this product
+    SKILL.md                  how to use this, generated — `witness skill` rewrites it
     app.ts                    `export const app = System.find()` — what specs import
     specs/                    what it can prove
     stubs/                    pages the declared stand-ins serve
@@ -371,6 +399,7 @@ runs in a bare checkout too.
 | `Trace` | Everything the harness sent and ran, with bodies. What a caller gets back instead of a boolean. |
 | `Inspector` | The network, the console and the uncaught errors — each tagged with the step it happened during. |
 | `Story` | All of that written up as `debug.md` / `debug.json`, pointing at the trace and the video. |
+| `Skill` | The instructions for whoever drives it — generated from the commands, the step verbs and the config's own types. |
 | `StubServer` | A declared stand-in for a third party the app calls server-side, with its state and its request log. |
 | `Cli` | A git-style command line (`<tool> <noun> <verb>`) with `stack`/`api`/`db`/`test`/`video` built in. |
 

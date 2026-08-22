@@ -173,6 +173,20 @@ export class Cli {
     );
   }
 
+  /**
+   * Every noun and verb registered, for whatever wants to describe this command line.
+   *
+   * Asked rather than listed: the instructions handed to an agent are generated from this, so a verb
+   * that exists is documented and one that does not cannot be.
+   */
+  get commands(): { noun: string; summary: string; verbs: { verb: string; summary: string }[] }[] {
+    return [...this.nouns].map(([noun, spec]) => ({
+      noun,
+      summary: spec.summary,
+      verbs: Object.entries(spec.verbs ?? {}).map(([verb, handler]) => ({ verb, summary: handler.summary })),
+    }));
+  }
+
   /** The verbs already registered under a noun, so a caller can add to them rather than replace them. */
   verbs(noun: string): Record<string, Verb> | undefined {
     return this.nouns.get(noun)?.verbs;
