@@ -161,14 +161,14 @@ export class Evidence {
    */
   artefacts(): { video?: string; frames?: string; trace?: string; har?: string } {
     const output = this.context.outputDir;
-    const found = (at: string | undefined): string | undefined => (at && fs.existsSync(at) ? at : undefined);
+    // Where each of these LANDS, not whether it is there yet: the video is rendered after the run, the
+    // trace when the test ends, and the frames by whatever the spec does next. Every one of them would
+    // be missing from a story written in the middle, which is when a story is written.
     return {
-      video: found(path.join(this.dir, "video.mp4")),
-      frames: found(path.join(this.dir, "frames")),
-      // The runner writes the trace when the TEST ends, which is after every action in it has run — so
-      // this names where it will be rather than checking for a file that cannot exist yet.
+      video: path.join(this.dir, "video.mp4"),
+      frames: path.join(this.dir, "frames"),
       trace: output ? path.join(output, "trace.zip") : undefined,
-      har: output ? found(path.join(output, "network.har")) : undefined,
+      har: output && fs.existsSync(path.join(output, "network.har")) ? path.join(output, "network.har") : undefined,
     };
   }
 
