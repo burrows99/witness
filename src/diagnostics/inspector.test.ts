@@ -125,3 +125,27 @@ test("stopping detaches every listener — a page outlives the action that watch
   emit("request", request());
   equal(inspector.requests.length, 0);
 });
+
+test("a failure with no readable body says why, rather than saying nothing", async () => {
+  // "→ 500" and nothing else is a dead end, and "why is there nothing here" is the next question
+  // every single time.
+  const { page, emit } = fakePage();
+  const inspector = new Inspector(page);
+
+  const empty = request({ url: () => "http://localhost:3000/api/workspaces" });
+  emit("request", empty);
+  emit("response", response(empty, { status: () => 500, text: async () => "" }));
+
+  const gone = request({ url: () => "http://localhost:3000/api/other" });
+  emit("request", gone);
+  emit("response", response(gone, {
+    status: () => 500,
+    text: async () => {
+      throw new Error("Response body is unavailable for redirect responses");
+    },
+  }));
+
+  const seen = await inspector.stop();
+  equal(seen.requests[0].bodyUnavailable, "the response had no body");
+  equal(seen.requests[1].bodyUnavailable, "Response body is unavailable for redirect responses");
+});

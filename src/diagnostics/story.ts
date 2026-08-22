@@ -262,6 +262,8 @@ export class Story {
     ];
     if (request.requestBody) lines.push("Sent:", "```", Story.shorten(request.requestBody, 1200), "```", "");
     if (request.responseBody) lines.push("Came back:", "```", Story.shorten(request.responseBody, 1200), "```", "");
+    // The one thing worse than a failure with no body is a failure with no body and no explanation.
+    else if (request.bodyUnavailable) lines.push(`Came back with no readable body: _${request.bodyUnavailable}_`, "");
     return lines;
   }
 
