@@ -162,6 +162,28 @@ suite already had would have skipped the one test that matters in the one place 
 and the pull request would have gone green on it. A test that needs a binary needs a line in the
 workflow that installs the binary; the package is not the binary.
 
+**A wired fixture is not a runnable one, and the compose file cannot tell you which it is.** Grafana
+was pointed at the stack's identity provider so that a sign-in leaving the app would be permanently
+reproducible, and that half is: `/login/generic_oauth` answers 302 and a browser lands on Keycloak's
+origin. Nothing past that leg works, for two reasons neither of which is visible in the file that set
+it up. Keycloak's master realm keeps `sslRequired: external`, so every OIDC endpoint — the login
+form, the token exchange, the admin API — answers plain HTTP with `HTTPS required`; and the
+`witness-demo` client the compose file names Grafana's client as was never registered anywhere,
+because a `start-dev` container imports no realm and nobody created one. So the round trip #76 exists
+for can be *described* end to end and can only be *run* as far as the provider's error page. An hour
+went into planning a demo of the callback before anyone asked the provider a question. Curl the
+fixture before building on it: `wired` is a statement about one file, `works` is a statement about
+two processes.
+
+**`action run` exits 0 on an action that failed.** `runActions` catches a failing action so its
+evidence still gets rendered, and the command line prints that result and returns — so
+`./bin/witness action run x; echo "exit=$?"` prints `exit=0` directly underneath `"ok": false`, and
+`witness help` says `0 ok · 1 failed` three lines further down. It was caught filming: a terminal
+recording of a run of an action that does not exist showed the error and `exit=0` in the same frame,
+which is evidence contradicting itself in the one place this repository can least afford it. Same
+family as `gh pr checks` — a green from a command that was never asked the question. Until it is
+fixed, do not put `echo "exit=$?"` after `action run` in anything anybody will watch.
+
 ---
 
 ## Changing this repository
@@ -260,6 +282,18 @@ precisely the mistake this file records twice already, arriving through a third 
 "%{size_download}"` on each minted URL and compare against the bytes on disk. It is one command, it
 runs after the body is published, and it is the only check that cannot be talked into agreeing with
 you.
+
+**A synthetic paste carrying real `File`s does work, and it needs no particular page.** The two
+entries above are both true and both about finding GitHub's own file input. There is a third door,
+and it mints four assets in one call from the ordinary issue comment box: create your own
+`<input type="file">` in the page, upload into **that** with the browser tool (it is a real input, so
+`find` gives a ref and the extension attaches real `File` objects), then dispatch
+`new ClipboardEvent("paste", { clipboardData: dt })` at the comment `textarea` with those files in a
+`DataTransfer`. GitHub's editor uploads them and writes the `user-attachments` URLs into the field,
+where the page's own JavaScript can read them. "A synthetic `⌘V` carries no clipboard" is what the
+first entry says and it is right — a synthesised *keystroke* carries nothing. A synthesised *paste
+event* carries whatever you put in it, and the files it puts there came from the one tool that can
+read a local path. Nothing is submitted; clear the textarea and the assets still exist.
 
 ---
 

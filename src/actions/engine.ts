@@ -38,6 +38,8 @@ export class Actions {
   private readonly evidence: () => Evidence;
   /** A declared credential, resolved when a step actually asks for one, in its service's scope first. */
   private readonly secret: (name: string, scope?: string) => string;
+  /** Where a service in this stack answers — the origin a step can be sent to and expect to arrive on. */
+  private readonly origin: (service: string) => string;
 
 
   constructor(opts: {
@@ -51,6 +53,8 @@ export class Actions {
     evidence: () => Evidence;
     /** Optional: without it, `{secret.x}` says the config declares no secrets. */
     secret?: (name: string, scope?: string) => string;
+    /** Optional: without it, a step naming a service to land on says there is no stack to look one up in. */
+    origin?: (service: string) => string;
   }) {
     this.operations = opts.operations;
     this.client = opts.client ?? (name => {
@@ -63,6 +67,9 @@ export class Actions {
     this.evidence = opts.evidence;
     this.secret = opts.secret ?? ((name: string) => {
       throw new Error(`{secret.${name}} — this system was built without any way to resolve secrets`);
+    });
+    this.origin = opts.origin ?? (service => {
+      throw new Error(`a step waits for service "${service}", and this system was built without a stack to find one in`);
     });
   }
 
@@ -315,14 +322,37 @@ export class Actions {
         : ((await target.textContent())?.trim() ?? "");
     }
     if (step.waitForUrl) {
-      const wait = typeof step.waitForUrl === "string" ? { url: step.waitForUrl } : step.waitForUrl;
+      // Copied rather than written through: `wait.url` is derived here, and writing it back into the
+      // step would leave the FIRST run's port and the first run's params in the loaded description.
+      const wait = typeof step.waitForUrl === "string" ? { url: step.waitForUrl } : { ...step.waitForUrl };
       // A route rather than a literal, because the port is already declared — and `portVar` means it
       // can differ per checkout. `"localhost:3020/…"` in a step is that knob quietly disconnected.
       if (wait.route) {
         const there = this.appUrl(wait.app ?? defaultApp ?? "", wait.route, values);
-        wait.url = `${there.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?(\\?.*)?$`;
+        wait.url = `${Actions.literally(there)}/?(\\?.*)?$`;
       }
-      await page.waitForURL(new RegExp(text(wait.url)), { timeout: wait.timeout ?? 60_000 });
+      // Where a sign-in that LEAVES the app expects to arrive. The origin is one this description
+      // already declares, so the port stays in the config rather than in the step — the same reason
+      // `route` exists, one service along.
+      //
+      // Naming it is the whole difference between this and the handoff links `Explore.handoff`
+      // refuses to walk. A crawl must reach nobody it was not pointed at, because nobody asked it to
+      // go there; a step that says `keycloak` is somebody pointing at their own identity provider,
+      // by the name their own stack gives it.
+      if (wait.service) wait.url = `^${Actions.literally(this.origin(wait.service))}(?:[/?#]|$)`;
+      // An object naming none of the three used to compile to `new RegExp("")`, which matches the
+      // address bar whatever is in it: the step passed, instantly, having waited for nothing.
+      if (!wait.url) throw new Error("waitForUrl waits for nothing — name a `route`, a `service` or a `url`");
+      const pattern = new RegExp(text(wait.url));
+      await page.waitForURL(pattern, { timeout: wait.timeout ?? 60_000 }).catch((err: unknown) => {
+        // Playwright's message says what was waited FOR. Half of reading a failed wait is knowing
+        // where the browser actually ended up — a sign-in that never left, an app that bounced it
+        // back to its own login — and that is the half no timeout carries.
+        throw new Error(
+          `${wait.service ? `waited for ${wait.service} (${this.origin(wait.service)})` : `waited for /${pattern.source}/`}` +
+            `, and the browser is on ${page.url()} — ${err instanceof Error ? err.message.split("\n")[0] : String(err)}`,
+        );
+      });
     }
     if (step.wait) await page.waitForTimeout(step.wait);
     if (step.caption) await drawCaption(page, text(step.caption.text), step.caption.sub ? text(step.caption.sub) : undefined);
@@ -441,6 +471,17 @@ export class Actions {
     }
   }
 
+  /**
+   * A URL as itself, inside a pattern.
+   *
+   * `waitForUrl` takes a regular expression, and every origin this stack has is full of characters
+   * that mean something in one — `.`, and the `?` a query begins with. Two callers now: a route and
+   * a service.
+   */
+  private static literally(url: string): string {
+    return url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
   /** Keys that modify a step rather than being what it does. Everything else names the verb. */
   private static readonly MODIFIERS = ["as", "note", "within", "fullPage"];
 
@@ -473,7 +514,10 @@ export class Actions {
     if (step.select) return `${step.select.from} where ${JSON.stringify(step.select.where)}`;
     if (step.press) return step.press;
     if (step.wait) return `${step.wait}ms`;
-    if (step.waitForUrl) return typeof step.waitForUrl === "string" ? step.waitForUrl : (step.waitForUrl.route ?? step.waitForUrl.url);
+    if (step.waitForUrl)
+      return typeof step.waitForUrl === "string"
+        ? step.waitForUrl
+        : (step.waitForUrl.route ?? step.waitForUrl.url ?? (step.waitForUrl.service && `${step.waitForUrl.service}, which is not this app`));
     if (step.caption) return step.caption.text;
     if (step.slide) return step.slide.title;
     if (step.fillFields) return "a set of labelled fields";
@@ -720,10 +764,16 @@ export type StepConfig = {
    * port is in the config, `portVar` lets it differ per checkout, and a literal `localhost:3020` in a
    * step is that knob quietly disconnected.
    *
+   * `service` is the same thing for an address that is NOT this app: any path on that service's
+   * origin. It is how a description says a sign-in LEAVES — click the button, land on the identity
+   * provider, fill its form there, and `waitForUrl` a route to say you came back. The provider is
+   * named the way the stack names it, so its port is declared exactly once, and the step is a
+   * statement about where the browser must be rather than a substring of an address.
+   *
    * The object form sets how long. Worth setting whenever the wait is how the step FAILS: a rejected
    * sign-in never navigates, and the default minute is a minute of nothing per attempt.
    */
-  waitForUrl?: { url?: string; route?: string; app?: string; timeout?: number } | string;
+  waitForUrl?: { url?: string; route?: string; app?: string; service?: string; timeout?: number } | string;
   /** Wait this many milliseconds. The last resort: prefer waiting for a thing over waiting for time. */
   wait?: number;
   /** Draw a caption into the page, so the recording says what is about to happen. */

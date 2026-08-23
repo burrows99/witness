@@ -239,7 +239,13 @@
       "probe": { "path": "/api/health", "contains": "database" },
       "secrets": {
         "adminUser": { "containerEnv": "GF_SECURITY_ADMIN_USER" },
-        "adminPassword": { "containerEnv": "GF_SECURITY_ADMIN_PASSWORD" }
+        "adminPassword": { "containerEnv": "GF_SECURITY_ADMIN_PASSWORD" },
+        // The credentials this app's sign-in has to type on somebody ELSE's page. Declared here,
+        // where the sign-in that needs them is, and read out of the container that owns them: the
+        // long `containerEnv` form exists for exactly this, a credential belonging to another
+        // service.
+        "providerUser": { "containerEnv": { "service": "keycloak", "key": "KC_BOOTSTRAP_ADMIN_USERNAME" } },
+        "providerPassword": { "containerEnv": { "service": "keycloak", "key": "KC_BOOTSTRAP_ADMIN_PASSWORD" } }
       },
       "api": {
         "auth": {
@@ -268,6 +274,30 @@
             { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin" } }
           ]
         },
+        "signInWithKeycloak": {
+          "summary": "the sign-in that leaves the app: Grafana hands the browser to Keycloak, on a second origin",
+          "steps": [
+            { "goto": { "route": "login" } },
+            { "expect": { "on": { "role": "link", "name": "Keycloak" }, "because": "the handoff is a link on the app's OWN login page — that is what makes it hard to see" } },
+            { "wait": 600, "note": "the login card fades in, and a frame taken before it lands shows the app as a ghost" },
+            { "click": { "role": "link", "name": "Keycloak" }, "note": "the handoff `config explore` refuses to walk, asked for on purpose" },
+            // The description names WHERE it is going, by the name this stack already gives it, so
+            // Keycloak's port is written down once and `KEYCLOAK_PORT` moving cannot quietly turn
+            // this step into a wait for nothing.
+            { "waitForUrl": { "service": "keycloak", "timeout": 15000 }, "note": "a different origin, on purpose" },
+            { "store": { "from": "#kc-page-title", "as": "providerSays" } },
+            { "frame": "on the identity provider" }
+            // The rest of a sign-in, on a stack whose provider will talk to a browser: type
+            // `{secret.providerUser}` and `{secret.providerPassword}` into its form, click its Sign
+            // In, `{ "waitForUrl": { "route": "home" } }` to say we came back, and `expect` the
+            // welcome to prove the session took. Left out because it cannot RUN here, not because it
+            // cannot be said: this Keycloak answers every OIDC endpoint over plain HTTP with
+            // `HTTPS required`, and nothing ever registered the `witness-demo` client the compose
+            // file points Grafana at, so what we land on is its error page and not its login form.
+          ],
+          "returns": "left Grafana, landed on Keycloak — whose own page says \"{providerSays}\""
+        },
+
         "describeItself": {
           "summary": "what `config explore` reads off a client-rendered app — no browser, just the CLI",
           "records": "terminal",
@@ -338,6 +368,25 @@
         },
         { "press": "Enter" },
         { "wait": 12000, "note": "the skill loads the description before it renders, and the spec reads every type declaration under src/ twice" }
+      ]
+    },
+
+    // A sign-in that LEAVES the app is the shape behind SSO, social login and every hosted identity
+    // provider. Until a step could name the origin it expects to land on, a description had two
+    // choices: a literal address, which is the one thing `portVar` exists to keep out of a step, or
+    // nothing at all.
+    "theSignInThatLeavesTheApp": {
+      "summary": "a description that crosses an origin on purpose, and a run that says where it landed",
+      "records": "terminal",
+      "pane": { "height": 1000, "fontSize": 16 },
+      "steps": [
+        { "caption": { "text": "asking witness to sign in somewhere that is not this app" } },
+        { "type": { "on": "prompt", "value": "./bin/witness action run grafana.signInWithKeycloak --quiet > /tmp/witness-76.json" } },
+        { "press": "Enter" },
+        { "wait": 25000, "note": "it loads the description, opens a browser and crosses two origins before it says anything" },
+        { "type": { "on": "prompt", "value": "jq -r 'if .ok then (.results[0].value, (.results[0].steps[] | .step + \"  \" + (.detail // \"\"))) else .error end' /tmp/witness-76.json" } },
+        { "press": "Enter" },
+        { "wait": 6000, "note": "what the run says it did, on one screen — the claim last, where a recording ends" }
       ]
     },
 
