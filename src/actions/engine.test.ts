@@ -202,7 +202,28 @@ test("a failing step stops the action and brings its evidence with it", when, as
 
 test("an action nobody declared points at where they are declared", when, async () => {
   const { page } = fakePage();
-  await rejects(() => engine({}).run("nope", page), /no such action "nope" — see the config's actions/);
+  await rejects(() => engine({}).run("nope", page), /no such action "nope" — declared: none/);
+  await rejects(() => engine({ "a.b": { steps: [] } }).run("nope", page), /no such action "nope" — declared: a\.b/);
+});
+
+test("a service's own action reaches its siblings by bare name", when, async () => {
+  // Being under the same service is what says which `signIn` is meant; repeating the prefix inside it
+  // says nothing new, and getting it wrong was a whole class of typo.
+  const { page, did } = fakePage();
+  await engine({
+    "grafana.signIn": { steps: [{ press: "Enter" }] },
+    "grafana.tour": { steps: [{ run: "signIn" }] },
+  }).run("grafana.tour", page);
+  deepEqual(did, ["press Enter"]);
+});
+
+test("a bare name that is not a sibling still means what it says", when, async () => {
+  const { page, did } = fakePage();
+  await engine({
+    shared: { steps: [{ press: "Escape" }] },
+    "grafana.tour": { steps: [{ run: "shared" }] },
+  }).run("grafana.tour", page);
+  deepEqual(did, ["press Escape"]);
 });
 
 test("the declared actions are listed, which is what the command line offers", when, () => {

@@ -41,6 +41,11 @@ declared in the config and run outright: `npx witness action run <name> [key=val
 in a browser and comes back with the frames, the debug story and the video. Chain several and they
 share one browser, one recording, and whatever each one stored.
 
+**A service owns what is true about it.** Its credentials, its API, its screens and its actions
+are written under it in `services`, once — an action there needs no `app` and no `<service>.`
+in its own name, and reaches its siblings and its service's secrets by bare name. The top level
+carries only what is SHARED or about more than one service.
+
 There is no third thing. **There are no test files to write**: an action composes other actions
 (`run`), narrates (`caption`, `slide`), asserts against the screen (`expect`) and against what the
 API answered or the database stored (`check`). Anything you would otherwise write as a program
@@ -111,7 +116,7 @@ asked for something that does not exist.
   - `grafana.theWholeProduct` — the whole of a fresh Grafana, walked once, and checked against its own API as it goes
 - **operations**: `health`, `stats`, `org`, `org.users`, `users`, `users.count`, `search`, `folders`, `datasources`, `plugins`, `annotations`, `permissions`
 - **cast**: `admin` — `app.cast("name")`
-- **secrets it will ask for**: `adminUser`, `adminPassword` — `app.secret("name")`; the config says where each comes from
+- **secrets it will ask for**: `grafana.adminUser`, `grafana.adminPassword` — `app.secret("name")`; the config says where each comes from
 
 `npx witness action show <name>` prints the steps of any of them, as declared.
 
@@ -219,11 +224,11 @@ by hand: the path comes from what was run and which cut it was.
 - `services` (required)
 - `identities` — Who the system can be.
 - `cast` — The cast: the real rows a scenario is pinned to, and why that one.
-- `secrets` — Where credentials come from.
-- `actions` — What the product can DO — sequences of steps, with everything they touch declared.
-- `api`
-- `database`
-- `apps`
+- `secrets` — Credentials SHARED by everything — one CI token, one org key.
+- `actions` — Sequences that are about more than one service, or about the product as a whole.
+- `api` — @deprecated Declare these under the service they belong to.
+- `database` — @deprecated Declare this under the service it runs on.
+- `apps` — @deprecated Declare a service's screens as its own `app`.
 - `evidence`
 - `video` — How the run's recordings become MP4s.
 - `stubs` — Local stand-ins for third parties the app calls SERVER-SIDE.

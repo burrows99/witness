@@ -9,69 +9,55 @@
   "name": "grafana",
 
   "services": {
-    // `stack status` compares the port's real publisher against this name, so another project's
-    // container answering on 3010 reads as NOT OURS rather than as a healthy Grafana.
+    // Everything true about this service, written once. Nothing below names "grafana" again:
+    // being written here is what says which service it is about.
     "grafana": {
       "kind": "in-house",
       "port": 3010,
       "portVar": "GRAFANA_PORT",
       "container": "witness-example-grafana",
-      "probe": { "path": "/api/health", "contains": "database" }
-    }
-  },
+      "probe": { "path": "/api/health", "contains": "database" },
 
-  // Where the credentials come from — read out of the RUNNING container, which is the provider to
-  // prefer: a container keeps the values it was created with, so a file on disk and the process
-  // serving requests can disagree, and the process is the one telling the truth. Nothing secret is in
-  // this repository; `docker-compose.yml` beside this file is what puts them in the container.
-  "secrets": {
-    "adminUser": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
-    "adminPassword": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
-  },
-
-  "cast": {
-    "admin": {
-      "username": "admin",
-      "why": "a fresh Grafana has exactly one account, and it is an admin — which is what makes the whole surface reachable"
-    }
-  },
-
-  // Grafana's HTTP API, by name. Every one of these answers `witness api …` with the whole exchange.
-  "api": {
-    "service": "grafana",
-    "auth": {
-      // Grafana takes a username and a password on its API. `basic` is a provider like any other.
-      "admin": {
-        "provider": "basic",
-        "username": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
-        "from": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
-      }
-    },
-    "operations": {
-      "health": { "path": "/api/health", "summary": "is it up, and is its database reachable" },
-      "stats": { "path": "/api/admin/stats", "auth": "admin", "summary": "what this instance holds, counted" },
-      "org": { "path": "/api/org", "auth": "admin", "summary": "the organisation the caller is in" },
-      "org.users": { "path": "/api/org/users", "auth": "admin", "pick": "0", "summary": "who is in it" },
-      "users": { "path": "/api/users", "auth": "admin", "summary": "every account on the instance" },
-      "users.count": { "path": "/api/admin/stats", "auth": "admin", "pick": "users", "summary": "how many there are" },
-      "search": { "path": "/api/search", "auth": "admin", "summary": "every dashboard and folder" },
-      "folders": { "path": "/api/folders", "auth": "admin", "summary": "folders a dashboard can live in" },
-      "datasources": { "path": "/api/datasources", "auth": "admin", "summary": "what it can query" },
-      "plugins": {
-        "path": "/api/plugins",
-        "auth": "admin",
-        "where": { "type": "datasource" },
-        "map": { "id": "id", "name": "name", "enabled": "enabled" },
-        "summary": "the data source plugins it ships with — narrowed and reshaped here, because the raw answer is 60 fields per plugin"
+      // Where its credentials come from. Its own actions reach them by bare name.
+      "secrets": {
+        "adminUser": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
+        "adminPassword": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
       },
-      "annotations": { "path": "/api/annotations", "auth": "admin", "summary": "notes pinned to a moment in time" },
-      "permissions": { "path": "/api/access-control/user/permissions", "auth": "admin", "summary": "what the caller is allowed to do" }
-    }
-  },
 
-  "apps": {
-    "grafana": {
-      "service": "grafana",
+      // What it can be asked. The one service with an `api` is what `witness api …` talks to.
+      "api": {
+      "auth": {
+        // Grafana takes a username and a password on its API. `basic` is a provider like any other.
+        "admin": {
+          "provider": "basic",
+          "username": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
+          "from": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
+        }
+      },
+      "operations": {
+        "health": { "path": "/api/health", "summary": "is it up, and is its database reachable" },
+        "stats": { "path": "/api/admin/stats", "auth": "admin", "summary": "what this instance holds, counted" },
+        "org": { "path": "/api/org", "auth": "admin", "summary": "the organisation the caller is in" },
+        "org.users": { "path": "/api/org/users", "auth": "admin", "pick": "0", "summary": "who is in it" },
+        "users": { "path": "/api/users", "auth": "admin", "summary": "every account on the instance" },
+        "users.count": { "path": "/api/admin/stats", "auth": "admin", "pick": "users", "summary": "how many there are" },
+        "search": { "path": "/api/search", "auth": "admin", "summary": "every dashboard and folder" },
+        "folders": { "path": "/api/folders", "auth": "admin", "summary": "folders a dashboard can live in" },
+        "datasources": { "path": "/api/datasources", "auth": "admin", "summary": "what it can query" },
+        "plugins": {
+          "path": "/api/plugins",
+          "auth": "admin",
+          "where": { "type": "datasource" },
+          "map": { "id": "id", "name": "name", "enabled": "enabled" },
+          "summary": "the data source plugins it ships with — narrowed and reshaped here, because the raw answer is 60 fields per plugin"
+        },
+        "annotations": { "path": "/api/annotations", "auth": "admin", "summary": "notes pinned to a moment in time" },
+        "permissions": { "path": "/api/access-control/user/permissions", "auth": "admin", "summary": "what the caller is allowed to do" }
+      }
+      },
+
+      // What a person sees of it.
+      "app": {
       "routes": {
         "home": "/",
         "login": "/login",
@@ -108,160 +94,162 @@
         "profileHeading": { "text": "Profile" },
         "themePicker": { "text": "Interface theme" }
       }
+      },
+
+      // What can be DONE with it. No prefix and no `app`: both are what being here already
+      // says, and a step reaches its siblings by bare name for the same reason.
+      "actions": {
+      "signIn": {
+        "summary": "sign in the way a first-time admin does, and get past the password prompt",
+        "steps": [
+          { "goto": { "route": "login" } },
+          { "type": { "on": { "placeholder": "email or username" }, "value": "{secret.adminUser}" } },
+          { "type": { "on": { "placeholder": "password" }, "value": "{secret.adminPassword}" }, "note": "the declared secret, read out of the running container — never typed on a command line, never stored as a value" },
+          { "click": { "role": "button", "name": "Log in" } },
+          { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
+          { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
+          { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin — under a heading that changes with the time of day, which is why the assertion is on this line and not that one" } }
+        ]
+      },
+      "openDashboards": {
+        "summary": "the dashboards list — what a new install has, which is nothing",
+        "steps": [
+          { "caption": { "text": "Dashboards", "sub": "A fresh install has none, and says so." } },
+          { "goto": { "route": "dashboards" } },
+          { "expect": { "on": { "testId": "data-testid CreateNewButton New button" }, "because": "an admin can always start one — by test id, because two buttons on this screen are called New" } },
+          { "store": { "from": { "role": "row" }, "as": "dashboardRows", "all": true }, "note": "every row the list is offering, as data" }
+        ]
+      },
+      "startADashboard": {
+        "summary": "open the blank dashboard editor, without saving anything",
+        "steps": [
+          { "caption": { "text": "A new dashboard", "sub": "Opened, and deliberately not saved." } },
+          { "goto": { "route": "newDashboard" } },
+          { "expect": { "on": { "text": "Add a panel to visualize your data" }, "because": "an empty dashboard says what to do next — the wording is 13.2's, and the frame is how I know" } }
+        ]
+      },
+      "openExplore": {
+        "summary": "the ad-hoc query screen, which is empty until something is connected",
+        "steps": [
+          { "caption": { "text": "Explore", "sub": "Ad-hoc queries — once there is something to query." } },
+          { "goto": { "route": "explore" } },
+          { "wait": 800, "note": "the query editor mounts after the route" }
+        ]
+      },
+      "openDataSources": {
+        "summary": "what this Grafana can query — nothing yet, on a fresh install",
+        "steps": [
+          { "caption": { "text": "Connections", "sub": "What it can query. Nothing, so far." } },
+          { "goto": { "route": "dataSources" } },
+          { "wait": 600 }
+        ]
+      },
+      "browseConnections": {
+        "summary": "the catalogue of things it could connect to, and how many there are",
+        "inputs": ["search"],
+        "steps": [
+          { "goto": { "route": "addConnection" } },
+          { "wait": 800 },
+          { "type": { "on": { "placeholder": "Search Grafana plugins" }, "value": "{search}" }, "note": "the catalogue is long; searching is what a person does" },
+          { "wait": 600 },
+          { "store": { "from": { "css": "[data-testid^=\"data-testid Connections plugin card\"]" }, "as": "offered", "all": true }, "note": "what the catalogue is offering for that search, as data" }
+        ]
+      },
+      "openUsers": {
+        "summary": "who can sign in — one account, on a fresh install",
+        "steps": [
+          { "caption": { "text": "Users", "sub": "One account on a fresh install: the admin you just were." } },
+          { "goto": { "route": "users" } },
+          { "expect": { "on": { "role": "table" }, "because": "the admin user list is a table" } },
+          { "store": { "from": { "css": "tbody tr" }, "as": "userRows", "all": true }, "note": "the body's rows: `role=row` also matches the header, which is not an account" }
+        ]
+      },
+      "openProfile": {
+        "summary": "the signed-in account's own page",
+        "steps": [
+          { "caption": { "text": "Profile", "sub": "The account you are signed in as." } },
+          { "goto": { "route": "profile" } },
+          { "wait": 600 }
+        ]
+      },
+      "theWholeProduct": {
+        "summary": "the whole of a fresh Grafana, walked once, and checked against its own API as it goes",
+        "steps": [
+          {
+            "slide": {
+              "title": "Grafana, described",
+              "lines": [
+                "One config file: services, API operations, routes, locators, actions.",
+                "The order, the narration and the cross-checks are steps in it too.",
+                "There is no test file. This IS the description."
+              ]
+            }
+          },
+          { "run": "signIn" },
+          { "frame": "signed in" },
+
+          { "api": { "operation": "stats", "as": "stats" }, "note": "what the instance says about itself, before looking at a single screen" },
+          {
+            "slide": {
+              "title": "What it says it holds",
+              "lines": ["{stats.dashboards} dashboards · {stats.datasources} data sources · {stats.users} user", "Every screen after this should agree with that."]
+            }
+          },
+
+          { "run": "openDashboards" },
+          { "frame": "dashboards, empty" },
+          { "api": { "operation": "search", "as": "listed" } },
+          { "check": { "that": "{listed.length}", "equals": "{stats.dashboards}", "because": "the API and the screen should agree about how many dashboards there are" } },
+
+          { "run": "startADashboard" },
+          { "frame": "a new dashboard, unsaved" },
+
+          {
+            "slide": {
+              "title": "Nothing to query yet",
+              "lines": ["Explore and Connections are the two halves of that:", "one asks questions, the other is where the answers come from."]
+            }
+          },
+          { "run": "openExplore" },
+          { "frame": "explore" },
+          { "run": "openDataSources" },
+          { "frame": "no data sources" },
+
+          { "caption": { "text": "What it could connect to", "sub": "Searching the catalogue the way a person would." } },
+          { "run": { "action": "browseConnections", "with": { "search": "prometheus" } } },
+          { "check": { "that": "{offered.length}", "atLeast": 1, "because": "searching the catalogue for prometheus should offer something" } },
+          { "frame": "the connection catalogue" },
+
+          { "slide": { "title": "Who can get in", "lines": ["The API says {stats.users}. The screen should say the same."] } },
+          { "run": "openUsers" },
+          { "frame": "one account" },
+          { "check": { "that": "{userRows.length}", "equals": "{stats.users}", "because": "the user table should hold the accounts the API counted" } },
+
+          { "run": "openProfile" },
+          { "frame": "the admin's own page" }
+        ],
+        "verify": {
+          "title": "What a fresh Grafana is",
+          "subject": { "instance": "http://localhost:3010", "account": "{secret.adminUser}", "dashboards": "{stats.dashboards}", "users": "{stats.users}" },
+          "signIn": ["docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana", "open http://localhost:3010 — admin / admin"],
+          "notes": [
+            "The API reported {stats.dashboards} dashboards, {stats.datasources} data sources and {stats.users} user.",
+            "Dashboards, Explore, Connections, Users and Profile were each opened and photographed.",
+            "The catalogue offered {offered.length} matches for \"prometheus\" — see the frame.",
+            "Nothing was saved: the new dashboard was opened and abandoned."
+          ]
+        }
+      }
+      }
     }
   },
-
-  // What a person can DO. Each of these runs on its own from a shell, and they chain.
-  "actions": {
-    "grafana.signIn": {
-      "summary": "sign in the way a first-time admin does, and get past the password prompt",
-      "app": "grafana",
-      "steps": [
-        { "goto": { "route": "login" } },
-        { "type": { "on": { "placeholder": "email or username" }, "value": "{secret.adminUser}" } },
-        { "type": { "on": { "placeholder": "password" }, "value": "{secret.adminPassword}" }, "note": "the declared secret, read out of the running container — never typed on a command line, never stored as a value" },
-        { "click": { "role": "button", "name": "Log in" } },
-        { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
-        { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
-        { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin — under a heading that changes with the time of day, which is why the assertion is on this line and not that one" } }
-      ]
-    },
-    "grafana.openDashboards": {
-      "summary": "the dashboards list — what a new install has, which is nothing",
-      "app": "grafana",
-      "steps": [
-        { "caption": { "text": "Dashboards", "sub": "A fresh install has none, and says so." } },
-        { "goto": { "route": "dashboards" } },
-        { "expect": { "on": { "testId": "data-testid CreateNewButton New button" }, "because": "an admin can always start one — by test id, because two buttons on this screen are called New" } },
-        { "store": { "from": { "role": "row" }, "as": "dashboardRows", "all": true }, "note": "every row the list is offering, as data" }
-      ]
-    },
-    "grafana.startADashboard": {
-      "summary": "open the blank dashboard editor, without saving anything",
-      "app": "grafana",
-      "steps": [
-        { "caption": { "text": "A new dashboard", "sub": "Opened, and deliberately not saved." } },
-        { "goto": { "route": "newDashboard" } },
-        { "expect": { "on": { "text": "Add a panel to visualize your data" }, "because": "an empty dashboard says what to do next — the wording is 13.2's, and the frame is how I know" } }
-      ]
-    },
-    "grafana.openExplore": {
-      "summary": "the ad-hoc query screen, which is empty until something is connected",
-      "app": "grafana",
-      "steps": [
-        { "caption": { "text": "Explore", "sub": "Ad-hoc queries — once there is something to query." } },
-        { "goto": { "route": "explore" } },
-        { "wait": 800, "note": "the query editor mounts after the route" }
-      ]
-    },
-    "grafana.openDataSources": {
-      "summary": "what this Grafana can query — nothing yet, on a fresh install",
-      "app": "grafana",
-      "steps": [
-        { "caption": { "text": "Connections", "sub": "What it can query. Nothing, so far." } },
-        { "goto": { "route": "dataSources" } },
-        { "wait": 600 }
-      ]
-    },
-    "grafana.browseConnections": {
-      "summary": "the catalogue of things it could connect to, and how many there are",
-      "app": "grafana",
-      "inputs": ["search"],
-      "steps": [
-        { "goto": { "route": "addConnection" } },
-        { "wait": 800 },
-        { "type": { "on": { "placeholder": "Search Grafana plugins" }, "value": "{search}" }, "note": "the catalogue is long; searching is what a person does" },
-        { "wait": 600 },
-        { "store": { "from": { "css": "[data-testid^=\"data-testid Connections plugin card\"]" }, "as": "offered", "all": true }, "note": "what the catalogue is offering for that search, as data" }
-      ]
-    },
-    "grafana.openUsers": {
-      "summary": "who can sign in — one account, on a fresh install",
-      "app": "grafana",
-      "steps": [
-        { "caption": { "text": "Users", "sub": "One account on a fresh install: the admin you just were." } },
-        { "goto": { "route": "users" } },
-        { "expect": { "on": { "role": "table" }, "because": "the admin user list is a table" } },
-        { "store": { "from": { "css": "tbody tr" }, "as": "userRows", "all": true }, "note": "the body's rows: `role=row` also matches the header, which is not an account" }
-      ]
-    },
-    "grafana.openProfile": {
-      "summary": "the signed-in account's own page",
-      "app": "grafana",
-      "steps": [
-        { "caption": { "text": "Profile", "sub": "The account you are signed in as." } },
-        { "goto": { "route": "profile" } },
-        { "wait": 600 }
-      ]
-    },
-    "grafana.theWholeProduct": {
-      "summary": "the whole of a fresh Grafana, walked once, and checked against its own API as it goes",
-      "app": "grafana",
-      "steps": [
-        {
-          "slide": {
-            "title": "Grafana, described",
-            "lines": [
-              "One config file: services, API operations, routes, locators, actions.",
-              "The order, the narration and the cross-checks are steps in it too.",
-              "There is no test file. This IS the description."
-            ]
-          }
-        },
-        { "run": "grafana.signIn" },
-        { "frame": "signed in" },
-
-        { "api": { "operation": "stats", "as": "stats" }, "note": "what the instance says about itself, before looking at a single screen" },
-        {
-          "slide": {
-            "title": "What it says it holds",
-            "lines": ["{stats.dashboards} dashboards · {stats.datasources} data sources · {stats.users} user", "Every screen after this should agree with that."]
-          }
-        },
-
-        { "run": "grafana.openDashboards" },
-        { "frame": "dashboards, empty" },
-        { "api": { "operation": "search", "as": "listed" } },
-        { "check": { "that": "{listed.length}", "equals": "{stats.dashboards}", "because": "the API and the screen should agree about how many dashboards there are" } },
-
-        { "run": "grafana.startADashboard" },
-        { "frame": "a new dashboard, unsaved" },
-
-        {
-          "slide": {
-            "title": "Nothing to query yet",
-            "lines": ["Explore and Connections are the two halves of that:", "one asks questions, the other is where the answers come from."]
-          }
-        },
-        { "run": "grafana.openExplore" },
-        { "frame": "explore" },
-        { "run": "grafana.openDataSources" },
-        { "frame": "no data sources" },
-
-        { "caption": { "text": "What it could connect to", "sub": "Searching the catalogue the way a person would." } },
-        { "run": { "action": "grafana.browseConnections", "with": { "search": "prometheus" } } },
-        { "check": { "that": "{offered.length}", "atLeast": 1, "because": "searching the catalogue for prometheus should offer something" } },
-        { "frame": "the connection catalogue" },
-
-        { "slide": { "title": "Who can get in", "lines": ["The API says {stats.users}. The screen should say the same."] } },
-        { "run": "grafana.openUsers" },
-        { "frame": "one account" },
-        { "check": { "that": "{userRows.length}", "equals": "{stats.users}", "because": "the user table should hold the accounts the API counted" } },
-
-        { "run": "grafana.openProfile" },
-        { "frame": "the admin's own page" }
-      ],
-      "verify": {
-        "title": "What a fresh Grafana is",
-        "subject": { "instance": "http://localhost:3010", "account": "{secret.adminUser}", "dashboards": "{stats.dashboards}", "users": "{stats.users}" },
-        "signIn": ["docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana", "open http://localhost:3010 — admin / admin"],
-        "notes": [
-          "The API reported {stats.dashboards} dashboards, {stats.datasources} data sources and {stats.users} user.",
-          "Dashboards, Explore, Connections, Users and Profile were each opened and photographed.",
-          "The catalogue offered {offered.length} matches for \"prometheus\" — see the frame.",
-          "Nothing was saved: the new dashboard was opened and abandoned."
-        ]
-      }
+  // Where the credentials come from — read out of the RUNNING container, which is the provider to
+  // prefer: a container keeps the values it was created with, so a file on disk and the process
+  // serving requests can disagree, and the process is the one telling the truth. Nothing secret is in
+  "cast": {
+    "admin": {
+      "username": "admin",
+      "why": "a fresh Grafana has exactly one account, and it is an admin — which is what makes the whole surface reachable"
     }
   },
 
