@@ -108,6 +108,9 @@ asked for something that does not exist.
 
 - **apps**: `gitea`, `mailpit`, `grafana` — routes open as `app.<name>.<route>.open(page)`
 - **actions**:
+  - `theApp` — the app a person uses
+  - `theWatcher` — what is watching it
+  - `theMail` — where its mail actually goes
   - `tour` — the whole stack, walked once: the app, the database it wrote to, the mail it sent, and what watches it
   - `gitea.register` — the first account, made the way a person makes one
   - `gitea.askForAReset` — the one thing a fresh install will actually send mail about
@@ -156,6 +159,12 @@ for how many things a `store` gathered.
 
 Things that cost other people an afternoon:
 
+- **Say a thing once.** Inside a service, `{ "containerEnv": "KEY" }` means THAT service's
+  container — naming the service again is what being written there already says. An `auth` block
+  points at a credential the `secrets` block declares with `{ "secret": "name" }` rather than
+  respelling where it comes from, which is two places to change and one to forget.
+- **Wait for a route, not a URL.** `{ "waitForUrl": { "route": "home" } }` resolves through the
+  service's declared port; a literal `localhost:3020` in a step disconnects `portVar` quietly.
 - **An assertion passing is not the same as evidence.** A `css` or `testId` match can succeed on
   a node that is off-screen — the run goes green and the picture shows nothing. Assert on what is
   visible, and open the frame before you believe your own caption.
@@ -248,7 +257,7 @@ Anything that meets the outside world is a provider picked by name:
 
 - **auth**: `apiKey`, `bearer`, `basic`, `cookie`, `login`
 - **client**: `rest`, `graphql`
-- **secret**: `containerEnv`, `envFile`, `env`, `literal`
+- **secret**: `containerEnv`, `secret`, `envFile`, `env`, `literal`
 - **stub**: `http`
 - **video**: `ffmpeg`
 

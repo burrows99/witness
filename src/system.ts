@@ -86,11 +86,18 @@ export class System {
       this.stack,
       config.api ?? { service: "", operations: {} },
       this.trace,
+      // Scoped to the service whose API this is, so its `auth` can name that service's own
+      // credentials — which is the whole point of them being written under it.
+      name => this.secretOrNothing(name, config.api?.service),
     );
     for (const [clientName, spec] of Object.entries(config.clients ?? {})) {
       const base = this.stack.endpoints[spec.service];
       if (base === undefined) throw new Error(`client "${clientName}" names service "${spec.service}", which is not declared`);
-      this.clients.set(clientName, new Operations(new HttpApi(base, () => ({}), this.trace), this.stack, spec, this.trace));
+      this.clients.set(
+        clientName,
+        // Scoped to the service that owns the client, so its `auth` can name its own secrets.
+        new Operations(new HttpApi(base, () => ({}), this.trace), this.stack, spec, this.trace, name => this.secretOrNothing(name, clientName)),
+      );
     }
 
     this.postgres = config.database
@@ -285,11 +292,22 @@ export class System {
     // grafana's password, and two services with a `password` is the normal case.
     for (const candidate of scoped(name, scope?.includes(".") ? scope.slice(0, scope.indexOf(".")) : scope)) {
       const spec = this.config.secrets?.[candidate];
-      if (spec !== undefined) return resolveSecret(spec as Parameters<typeof resolveSecret>[0], this.stack);
+      // Handed the lookup so a secret can point at another one — an `auth` block naming the
+      // credential the `secrets` block already declared, rather than respelling where it comes from.
+      if (spec !== undefined) return resolveSecret(spec as Parameters<typeof resolveSecret>[0], this.stack, at => this.secretOrNothing(at, scope));
     }
     throw new Error(
       `no secret "${name}"${scope ? ` for ${scope}` : ""} — declared: ${Object.keys(this.config.secrets ?? {}).join(", ") || "none"}`,
     );
+  }
+
+  /** The same lookup, for something pointing at another secret — undefined rather than throwing. */
+  private secretOrNothing(name: string, scope?: string): string | undefined {
+    try {
+      return this.secret(name, scope);
+    } catch {
+      return undefined;
+    }
   }
 
   /** A container's environment — the running process, never the file it was created from. */

@@ -28,7 +28,17 @@ export type AuthConfig = {
   value?: string;
 };
 
-export type AuthContext = { stack: Stack; params: Record<string, unknown> };
+export type AuthContext = {
+  stack: Stack;
+  params: Record<string, unknown>;
+  /**
+   * The credentials this description already declares, by name.
+   *
+   * So an `auth` block can point at one rather than respelling where it comes from — two places to
+   * change and one place to forget, which this repository's own config had twice.
+   */
+  declared?: (name: string) => string | undefined;
+};
 /** A provider returns the headers a request should carry. */
 export type AuthProvider = (config: AuthConfig, context: AuthContext) => Promise<Record<string, string>>;
 
@@ -43,20 +53,20 @@ const isSecret = (value: unknown): boolean =>
   typeof value === "string" ||
   (!!value && typeof value === "object" && Object.keys(value).length === 1 && secretProviders.has(Object.keys(value)[0]));
 
-const credential = (config: AuthConfig, stack: Stack): string =>
+const credential = (config: AuthConfig, stack: Stack, declared?: (name: string) => string | undefined): string =>
   config.fromContainerEnv
     ? stack.env(config.fromContainerEnv.service, config.fromContainerEnv.key)
-    : resolveSecret(config.from ?? config.value, stack);
+    : resolveSecret(config.from ?? config.value, stack, declared);
 
 export const authProviders = new Registry<AuthProvider>("auth")
   /** A key in a header — the shape of most service-to-service auth. */
-  .register("apiKey", async (config, { stack }) => {
-    const value = credential(config, stack);
+  .register("apiKey", async (config, { stack, declared }) => {
+    const value = credential(config, stack, declared);
     if (!value) throw new Error(`apiKey auth resolved to nothing (${JSON.stringify(config.from ?? config.fromContainerEnv)})`);
     return { [config.header ?? "X-API-KEY"]: value };
   })
   /** The same, as a bearer token. */
-  .register("bearer", async (config, { stack }) => ({ Authorization: `Bearer ${credential(config, stack)}` }))
+  .register("bearer", async (config, { stack, declared }) => ({ Authorization: `Bearer ${credential(config, stack, declared)}` }))
   /**
    * A username and a password, the way half the world's admin APIs still want them.
    *
@@ -64,9 +74,9 @@ export const authProviders = new Registry<AuthProvider>("auth")
    * is a secret source like any other, because it is as likely to live in a container's environment as
    * the password is.
    */
-  .register("basic", async (config, { stack }) => {
-    const user = resolveSecret(config.username, stack);
-    const password = credential(config, stack);
+  .register("basic", async (config, { stack, declared }) => {
+    const user = resolveSecret(config.username, stack, declared);
+    const password = credential(config, stack, declared);
     if (!user || !password) {
       throw new Error(`basic auth needs a username and a password (got ${user ? "no password" : "no username"})`);
     }
@@ -86,7 +96,7 @@ export const authProviders = new Registry<AuthProvider>("auth")
    * often. The token is fetched once and reused; `derive` lifts anything else the callee needs out of
    * the login answer (a practice id, a tenant), which is the part that is usually undocumented.
    */
-  .register("login", async (config, { stack }) => {
+  .register("login", async (config, { stack, declared }) => {
     const cached = logins.get(JSON.stringify(config.login));
     if (cached) return cached;
     if (!config.login) throw new Error("login auth needs a `login` block");

@@ -318,6 +318,12 @@ export class Actions {
     }
     if (step.waitForUrl) {
       const wait = typeof step.waitForUrl === "string" ? { url: step.waitForUrl } : step.waitForUrl;
+      // A route rather than a literal, because the port is already declared — and `portVar` means it
+      // can differ per checkout. `"localhost:3020/…"` in a step is that knob quietly disconnected.
+      if (wait.route) {
+        const there = this.appUrl(wait.app ?? defaultApp ?? "", wait.route, values);
+        wait.url = `${there.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?(\\?.*)?$`;
+      }
       await page.waitForURL(new RegExp(text(wait.url)), { timeout: wait.timeout ?? 60_000 });
     }
     if (step.wait) await page.waitForTimeout(step.wait);
@@ -461,7 +467,7 @@ export class Actions {
     if (step.select) return `${step.select.from} where ${JSON.stringify(step.select.where)}`;
     if (step.press) return step.press;
     if (step.wait) return `${step.wait}ms`;
-    if (step.waitForUrl) return typeof step.waitForUrl === "string" ? step.waitForUrl : step.waitForUrl.url;
+    if (step.waitForUrl) return typeof step.waitForUrl === "string" ? step.waitForUrl : (step.waitForUrl.route ?? step.waitForUrl.url);
     if (step.caption) return step.caption.text;
     if (step.slide) return step.slide.title;
     if (step.fillFields) return "a set of labelled fields";
@@ -704,10 +710,14 @@ export type StepConfig = {
    * A regex, not a glob: `products/\\d+` works, `**\/products/**` is a syntax error. A bare substring
    * is a valid regex and the commonest useful form.
    *
+   * `route` waits for a route this description already declares, which is the form to prefer: the
+   * port is in the config, `portVar` lets it differ per checkout, and a literal `localhost:3020` in a
+   * step is that knob quietly disconnected.
+   *
    * The object form sets how long. Worth setting whenever the wait is how the step FAILS: a rejected
    * sign-in never navigates, and the default minute is a minute of nothing per attempt.
    */
-  waitForUrl?: string | { url: string; timeout?: number };
+  waitForUrl?: { url?: string; route?: string; app?: string; timeout?: number } | string;
   /** Wait this many milliseconds. The last resort: prefer waiting for a thing over waiting for time. */
   wait?: number;
   /** Draw a caption into the page, so the recording says what is about to happen. */

@@ -64,7 +64,9 @@ export function normalise(config: SystemConfig): SystemConfig {
   let api = config.api;
   let database = config.database;
 
-  for (const [name, service] of owned) {
+  for (const [name, declared] of owned) {
+    // Everything this service declares, with itself filled in wherever a `containerEnv` left it out.
+    const service = inThisService(declared, name);
     for (const [actionName, action] of Object.entries(service.actions ?? {})) {
       // `grafana.signIn`, and it belongs to `grafana` — both of which the author had to type, and
       // either of which they could get wrong.
@@ -72,6 +74,8 @@ export function normalise(config: SystemConfig): SystemConfig {
     }
     if (service.app) apps[name] = { service: name, ...service.app };
     for (const [secretName, secret] of Object.entries(service.secrets ?? {})) {
+      // `{ "containerEnv": "KEY" }` inside a service means THAT service's container. Naming it again
+      // is the thing the whole reorganisation was against, and it was the commonest line in the file.
       // Scoped, and resolved scope-first: two services with an `adminKey` is the normal case, and a
       // description that cannot say so forces one of them to be renamed to avoid the other.
       secrets[qualify(name, secretName)] = secret;
@@ -104,6 +108,26 @@ export function normalise(config: SystemConfig): SystemConfig {
 
 /** What `DatabaseConfig.credential` used to be called, when it could only hold a literal. */
 export const OLDER_NAME = "password";
+
+/**
+ * A secret written inside a service, with that service filled in.
+ *
+ * `{ "containerEnv": "ADMIN_KEY" }` is the short form and the one worth writing: the container is the
+ * one this service runs in, which is what being written here already says.
+ */
+function inThisService<T>(within: T, service: string): T {
+  if (Array.isArray(within)) return within.map(item => inThisService(item, service)) as T;
+  if (!within || typeof within !== "object") return within;
+  const from = within as Record<string, unknown>;
+  if (typeof from.containerEnv === "string") return { ...from, containerEnv: { service, key: from.containerEnv } } as T;
+  if (from.containerEnv && typeof from.containerEnv === "object" && !("service" in (from.containerEnv as object))) {
+    return { ...from, containerEnv: { service, ...(from.containerEnv as object) } } as T;
+  }
+  // Anywhere inside the service, not just under `secrets`: a database's credential and an `auth`
+  // block's are the same kind of thing, and a rule that only held in one place is a rule nobody can
+  // remember.
+  return Object.fromEntries(Object.entries(from).map(([key, value]) => [key, inThisService(value, service)])) as T;
+}
 
 /** `grafana` + `signIn` → `grafana.signIn`, and an already-qualified name is left alone. */
 export function qualify(service: string, name: string): string {

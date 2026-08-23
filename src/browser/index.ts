@@ -9,4 +9,4 @@ export { appSurface, type RouteMap, type Screens } from "./surface.ts";
 export { describe as describeLocator, type LocatorSpec, locate } from "./locator.ts";
 export { SignIn } from "./sign-in.ts";
 export { identityCookies } from "./identities.ts";
-export { beat, caption, markRecordingStart, resetSlideMarks, slide, slideMarks, type SlideMark, typeIn } from "./narration.ts";
+export { beat, caption, markRecordingStart, pane, resetSlideMarks, slide, slideMarks, type SlideMark, typeIn } from "./narration.ts";

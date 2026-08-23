@@ -162,6 +162,11 @@ The sequence, its narration and its claims — all of it data:
 }
 ```
 
+Say a thing once: inside a service `{"containerEnv": "KEY"}` means *that* service's container, an
+`auth` block points at a declared credential with `{"secret": "name"}` rather than respelling where it
+comes from, and `{"waitForUrl": {"route": "home"}}` resolves through the declared port instead of
+hardcoding a host that makes `portVar` a lie.
+
 `run` composes small actions into big ones without making either less usable alone. `expect` is about
 the screen and `check` is about the values, which is what makes a cross-layer claim expressible without
 a program. A credential reaches a step as `{secret.<name>}` — resolved when asked for, never typed on a
