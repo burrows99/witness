@@ -469,6 +469,39 @@
       ]
     },
 
+    "whatTheCrawlCouldNotSee": {
+      "summary": "what `config explore` finds on two applications nobody here chose",
+      "records": "terminal",
+      // Pointed at `.witness/unknown.config.jsonc` — grocy and linkding, which run as their own
+      // compose project. Everything in this repo's own stack has a large anonymous surface and
+      // placeholders on its inputs, so every one of them flatters this command; these two do neither.
+      //
+      // Tall, because a fragment arrives in one write and its headline is the FIRST line. The default
+      // thirty rows would end on the JSON and cut off the only sentence either cut is about.
+      "pane": { "width": 1400, "height": 1650, "fontSize": 13 },
+      "steps": [
+        { "caption": { "text": "config explore, pointed at an app that keeps everything behind a login" } },
+        { "type": { "on": "prompt", "value": "./bin/witness --config .witness/unknown.config.jsonc config explore grocy" } },
+        { "press": "Enter" },
+        { "wait": 9000, "note": "a browser start and one page — measured at 1.4s" },
+        { "type": { "on": "prompt", "value": "clear" } },
+        { "press": "Enter" },
+        { "wait": 1200 },
+        {
+          "caption": { "text": "and the same crawl, pointed at a declared sign-in" },
+          "note": "worded as what the command was TOLD to do, because in the before cut it is ignored and a caption saying it signed in would be over a frame showing a login page"
+        },
+        {
+          "type": {
+            "on": "prompt",
+            "value": "./bin/witness --config .witness/unknown.config.jsonc config explore linkding --as=linkding.signIn --pages=2"
+          }
+        },
+        { "press": "Enter" },
+        { "wait": 15000, "note": "a sign-in, a container exec for the credential, and two pages — measured at 3.4s" }
+      ]
+    },
+
     "theApp": {
       "summary": "the app a person uses",
       "steps": [

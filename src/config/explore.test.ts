@@ -3,6 +3,12 @@ import { test } from "node:test";
 
 import { Explore, type PageFacts } from "./explore.ts";
 
+/** Reading a real page needs the browser half, which is an optional peer everywhere but CI. */
+const havePlaywright = await import("@playwright/test").then(
+  () => true,
+  () => false,
+);
+
 /** The real thing, taken from Gitea's registration screen. */
 const REGISTER = `- navigation "Navigation Bar":
   - link "Home":
@@ -65,6 +71,20 @@ const MESSAGE = (id: string, score: number) => `- link "MailpitMailpit":
   - tab "HTML Check ${score}%"
   - tab "Link Check"
 `;
+
+/**
+ * One field, as `readPage` reports it.
+ *
+ * The two defaults are the case most of these tests are not about — a labelled text box with a
+ * placeholder. Anything asking about a label or a password says so, because a helper that fixes an
+ * argument has removed that argument from the suite.
+ */
+const field = (name: string, placeholder: string, label = "", password = false): PageFacts["fields"][number] => ({
+  name,
+  placeholder,
+  label,
+  password,
+});
 
 const page = (path: string, yaml: string, fields: PageFacts["fields"] = []): PageFacts => {
   const nodes = Explore.parse(yaml);
@@ -148,8 +168,7 @@ test("forms carry the placeholder that finds the input, not the label", () => {
   // one, so reading these off the aria tree would produce a form that cannot fill anything.
   const forms = Explore.forms([
     page("/user/sign_up", REGISTER, [
-      { name: "user_name", placeholder: "Username" },
-      { name: "email", placeholder: "Email Address" },
+      field("user_name", "Username"), field("email", "Email Address"),
     ]),
   ]);
   deepEqual(forms.register, { userName: "Username", email: "Email Address" });
@@ -161,14 +180,13 @@ test("a field is named for what it is, not for the example data in it", () => {
   // The placeholder is the right thing to MATCH on and the wrong thing to NAME from.
   const forms = Explore.forms([
     page("/register", '- main "Create your account"\n', [
-      { name: "full_name", placeholder: "Ada Lovelace" },
-      { name: "email", placeholder: "you@organisation.ch" },
+      field("full_name", "Ada Lovelace"), field("email", "you@organisation.ch"),
     ]),
   ]);
   deepEqual(forms.createYourAccount, { fullName: "Ada Lovelace", email: "you@organisation.ch" });
   // And a `name` attribute that is not an identifier falls back to the placeholder rather than to
   // nothing: a form named from example data beats no form at all, which is what dropping it means.
-  deepEqual(Explore.forms([page("/x", '- main "Search"\n', [{ name: "2", placeholder: "Find a repository" }])]).search, {
+  deepEqual(Explore.forms([page("/x", '- main "Search"\n', [field("2", "Find a repository")])]).search, {
     findARepository: "Find a repository",
   });
 });
@@ -177,17 +195,118 @@ test("the same form on three pages is one form", () => {
   // `welcomeBack`, `welcomeBack2`, `welcomeBack3` — one sign-in box seen on three routes. The rule
   // that stops a name collision from silently dropping an entry cannot tell a collision from a
   // repeat, so it renamed rather than recognised.
-  const signIn = [
-    { name: "user", placeholder: "email or username" },
-    { name: "password", placeholder: "password" },
-  ];
+  const signIn = [field("user", "email or username"), field("password", "password", "", true)];
   const forms = Explore.forms([
     page("/login", '- main "Welcome back"\n', signIn),
     page("/settings", '- main "Welcome back"\n', signIn),
     page("/reports", '- main "Welcome back"\n', signIn),
-    page("/reset", '- main "Forgot your password"\n', [{ name: "user", placeholder: "Email or username" }]),
+    page("/reset", '- main "Forgot your password"\n', [field("user", "Email or username")]),
   ]);
   deepEqual(Object.keys(forms), ["welcomeBack", "forgotYourPassword"]);
+});
+
+/**
+ * The one test in this file that opens a browser, because the defect it exists for lives in a CSS
+ * selector and no fixture can reach one.
+ *
+ * `readPage` asked for `input[placeholder], textarea[placeholder]`, so a well-labelled input with no
+ * placeholder was invisible to it. Every assertion available without a DOM passed against that: the
+ * fixtures upstream of `forms` are lists of fields somebody typed, and the selector is exactly the
+ * step that decides what gets into one. The markup is lifted off grocy, linkding and microbin —
+ * three applications added to the stack for not being ones anybody here chose.
+ */
+test("a field is found by being a field, not by carrying a placeholder", async t => {
+  if (!havePlaywright) return t.skip("needs @playwright/test");
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true }).catch(() => undefined);
+  if (!browser) return t.skip("needs a chromium binary — `npx playwright install chromium`");
+  const origin = new URL("http://localhost:8094");
+  try {
+    const page = await browser.newPage();
+
+    // grocy's and linkding's login forms, which between them produced `"forms": {}`: labels, no
+    // placeholders, a CSRF token, a submit button and a checkbox. The search box outside the form is
+    // the reason for the "inside a form where there is one" rule.
+    await page.setContent(`<input type="search" name="q" placeholder="Search everything">
+      <form>
+        <input type="hidden" name="csrfmiddlewaretoken" value="9SoQ">
+        <label for="username">Username</label><input type="text" id="username" name="username">
+        <label for="password">Password</label><input type="password" id="password" name="password">
+        <input type="checkbox" id="stay" name="stay_logged_in"><label for="stay">Stay logged in permanently</label>
+        <input type="submit" value="Login">
+      </form>`);
+    const login = { ...(await Explore.readPage(page, origin)), path: "/login" };
+    deepEqual(login.fields, [
+      { name: "username", placeholder: "", label: "Username", password: false },
+      { name: "password", placeholder: "", label: "Password", password: true },
+    ]);
+    // Still nothing `forms` can carry — a `getByPlaceholder("")` matches every input on the page — but
+    // it is said out loud now, with the label a `fillFields` step matches on.
+    deepEqual(Explore.forms([login]), {});
+    deepEqual(Explore.unfillable([login]), ["/login — Username, Password"]);
+
+    // microbin's paste form, which has one of each: a placeholder on the textarea, four labelled
+    // selects, an optional password, and a file input the page hides behind a styled label.
+    await page.setContent(`<form>
+        <label for="expiration">Expiration</label>
+        <select id="expiration" name="expiration"><option>10 minutes</option></select>
+        <label for="password_field">Password</label><input type="password" id="password_field">
+        <textarea id="content-input" placeholder="Type something here."></textarea>
+        <label for="file">Select or drop file attachment</label>
+        <input type="file" id="file" name="file" style="display: none">
+        <input type="hidden" name="content" id="content">
+      </form>`);
+    const paste = { ...(await Explore.readPage(page, origin)), path: "/" };
+    // Raw here, in the order #73 asks: the `name` attribute, then the label, then the id. Turning
+    // those into identifiers is `forms`' job and happens once, further down.
+    deepEqual(
+      paste.fields.map(each => each.name),
+      ["expiration", "Password", "content-input"],
+    );
+    // The one field with a placeholder still goes where it always went.
+    deepEqual(Object.values(Explore.forms([paste]))[0], { contentInput: "Type something here." });
+    deepEqual(Explore.unfillable([paste]), ["/ — Expiration, Password"]);
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
+});
+
+test("the same placeholderless form on three pages is named once", () => {
+  // The rule `forms` already had, applied to the note as well: a sign-in box seen on three routes is
+  // one form, and three identical lines is how a generated block stops being read.
+  const signIn = [field("username", "", "Username"), field("password", "", "Password", true)];
+  deepEqual(
+    Explore.unfillable([
+      page("/login", '- main "Sign in"\n', signIn),
+      page("/stock", '- main "Sign in"\n', signIn),
+      page("/chores", '- main "Sign in"\n', signIn),
+    ]),
+    ["/login — Username, Password"],
+  );
+  // A field with no label falls back to what it is called, because saying nothing is what this replaced.
+  deepEqual(Explore.unfillable([page("/x", "", [field("apiToken", "")])]), ["/x — apiToken"]);
+});
+
+test("a placeholder of nothing but whitespace is not a placeholder", () => {
+  // linkding's tag box carries `placeholder=" "`, and the fragment offered `"tagString": " "` —
+  // which reads as a described field and resolves to whatever the page happens to have.
+  const blank = [field("tagString", " ", "Tags")];
+  deepEqual(Explore.forms([page("/bookmarks/new", '- main "New bookmark"\n', blank)]), {});
+  deepEqual(Explore.unfillable([page("/bookmarks/new", "", blank)]), ["/bookmarks/new — Tags"]);
+});
+
+test("a label that is not one line is made into one", () => {
+  // Django's admin puts a whole select's options inside the label, so linkding's real one arrives as
+  // `Action: ⏎⏎ --------- ⏎⏎ Delete selected feed tokens` — which broke out of the `//` block and
+  // left a fragment that could not be pasted anywhere.
+  const django = field("action", "", "Action: \n\n  ---------\n\n  Delete selected feed tokens\n");
+  const [line] = Explore.unfillable([page("/admin/", "", [django])]);
+  ok(!line.includes("\n"));
+  equal(line, "/admin/ — Action: --------- Delete selected feed tokens");
+  // And one too long to keep is cut at a WORD: `fillFields` matches an exact label and then a
+  // prefix, so a shortened label still finds the field and one cut mid-word finds nothing.
+  const long = field("x", "", "Internet Archive integration, enabled for every bookmark");
+  deepEqual(Explore.unfillable([page("/settings", "", [long])]), ["/settings — Internet Archive integration, enabled for every…"]);
 });
 
 test("paths that differ in one segment are one operation with a parameter", () => {
@@ -321,9 +440,63 @@ test("a page with nothing to do on it is said out loud", async () => {
   deepEqual(real.empty, []);
 });
 
+test("a crawl that never got past a login says so, rather than reporting a small app", () => {
+  // Measured: grocy — stock, chores, recipes, equipment — walked ONE page, `/login`, and so did
+  // linkding. `Walked 1 page` reads as "this app is small", which is the opposite of what it meant.
+  const grocy = {
+    routes: {},
+    locators: {},
+    forms: {},
+    unfillable: [],
+    operations: {},
+    visited: ["/login"],
+    skipped: [],
+    empty: [],
+    behindSignIn: true,
+  };
+  const rendered = Explore.render(grocy, "grocy");
+  match(rendered, /Every page walked has a password field on it/);
+  match(rendered, /config explore grocy --as=<action>/);
+  // Having already run one, being told to run one is noise. What that reader needs to hear is that
+  // the action they named did not sign THIS service in.
+  const after = Explore.render(grocy, "grocy", "grocy.signIn");
+  match(after, /ran `grocy\.signIn` first and still landed here/);
+  ok(!after.includes("--as=<action>"));
+});
+
+test("one page with an optional password box is not a wall", async () => {
+  // microbin's paste form carries an optional password, and microbin has no authentication at all.
+  // The claim is every page walked, which is why the note is worded as what was observed.
+  const optional = [field("contentInput", "Type something here."), field("password", "", "Password", true)];
+  const seen = new Map([
+    ["/", optional],
+    ["/list", []],
+    ["/guide", []],
+  ]);
+  const microbin = await Explore.crawl({
+    origin: "http://localhost:8096",
+    maxPages: 5,
+    maxDepth: 1,
+    from: ["/", "/list", "/guide"],
+    read: async url => ({ ...page(new URL(url).pathname, '- main "microbin"\n- button "Save"\n', seen.get(new URL(url).pathname)) }),
+  });
+  equal(microbin.behindSignIn, false);
+  ok(!Explore.render(microbin, "microbin").includes("password field"));
+
+  // And the app where every page did want one.
+  const linkding = await Explore.crawl({
+    origin: "http://localhost:8095",
+    maxPages: 5,
+    maxDepth: 0,
+    read: async () => ({ ...page("/login/", '- main "Login"\n', [field("username", "", "Username"), field("password", "", "Password", true)]) }),
+  });
+  equal(linkding.behindSignIn, true);
+  match(Explore.render(linkding, "linkding"), /front door and not/);
+});
+
 test("the fragment says it is a starting point and where it came from", () => {
   const rendered = Explore.render(
-    { routes: { home: "/" }, locators: {}, forms: {}, operations: {}, visited: ["/"], skipped: [], empty: [] },
+    { routes: { home: "/" }, locators: {}, forms: {}, unfillable: [], operations: {}, visited: ["/"], skipped: [], empty: [], behindSignIn: false },
     "web",
   );
   match(rendered, /Walked 1 page: \//);

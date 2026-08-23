@@ -6,6 +6,7 @@
 npx witness init                      # reads the compose file beside you
 npx witness config explore            # the service with screens
 npx witness config explore mailpit --pages=20 --depth=3
+npx witness config explore grocy --as=grocy.signIn   # signed in first, then walked
 ```
 
 `init` reads `docker compose config` and writes the whole `services` block: where each service runs,
@@ -26,12 +27,26 @@ all**. That is the feature working: an API map is worth having where one exists 
 inventing one where it does not would be worse than saying nothing. Declare `operations` by hand from
 what the product documents.
 
-Four honest limits. **`forms` finds inputs by placeholder**, so an app that labels its inputs instead
-produces a thin `forms` block — use `fillFields`, which matches by label. Anything behind a login
-is only reachable if the config declares an `identity` whose cookies get you in. And **a sign-in that
-leaves the app is not walked** — an OAuth or SAML start endpoint is a same-origin link that redirects
-to an identity provider, and exploring your stack must not send a third party a request. It is named
-in the fragment rather than dropped silently.
+Three honest limits.
+
+**A `forms` entry is a placeholder**, because that is what `page.getByPlaceholder` takes — so a field
+with no placeholder attribute cannot be one, however well labelled it is. It is still FOUND: fields are
+found by being fields, and the ones that cannot go in `forms` are named in the fragment, with their
+labels, under "Fields with no placeholder". Fill those with a **`fillFields`** step, which matches by
+label — exactly, then by prefix. Rule of thumb: `forms` where the app has placeholders, `fillFields`
+where it labels instead, and a login form is usually the second (gitea's, grocy's and linkding's all
+are). Nothing stops one form using both.
+
+**Anything behind a login needs a way in.** `--as=<action>` runs a declared sign-in first and walks
+with the session it leaves — the same argument `check drift` takes, for the same reason. Without it a
+crawl describes the front door: grocy — stock, chores, recipes, equipment — walks exactly one page,
+`/login`. An `identity` whose cookies get you in works too, where a session cookie can be had out of
+band. A crawl where every page walked carried a password field says so in the fragment, because
+`Walked 1 page` otherwise reads as "this app is small" rather than "I could not get in".
+
+**A sign-in that leaves the app is not walked** — an OAuth or SAML start endpoint is a same-origin
+link that redirects to an identity provider, and exploring your stack must not send a third party a
+request. It is named in the fragment rather than dropped silently.
 
 Then the rest of this page is the trimming.
 
