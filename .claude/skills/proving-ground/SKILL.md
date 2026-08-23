@@ -35,6 +35,20 @@ different way — not because it was convenient.
 | mariadb | not HTTP, **no `container_name`** | a *second* database, and compose-default naming |
 | redis | not HTTP, no `container_name` | two ways to get a probe wrong at once |
 
+And a **second, separate** project — `docker compose -f docker-compose.unknown.yml up -d` — of three
+applications chosen purely for obscurity, because the ten above are all well known and that turned out
+to flatter the tool badly:
+
+| service | stack | what it stresses |
+|---|---|---|
+| grocy | PHP, household ERP | a domain nobody has memorised, entirely behind a login |
+| linkding | Django, bookmarks | a small app with an ordinary, well-labelled login form |
+| microbin | Rust, pastebin | no authentication at all — the control |
+
+`config explore` looked excellent on gitea (twelve routes). That is a fact about gitea's large
+**anonymous** surface. grocy — a whole ERP — described as one route to its login page, and its
+`name="username"` form came back as `"forms": {}`. Two defects the other ten could not show.
+
 **Adding one is the point.** When a defect is found in the wild, add the smallest OSS app that
 reproduces it, so the fleet grows into the shape of what actually goes wrong. Pick for
 *architectural difference*, never for familiarity: a fourth server-rendered Go app teaches nothing.

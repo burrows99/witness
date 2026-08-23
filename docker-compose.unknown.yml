@@ -1,0 +1,44 @@
+# Applications chosen for OBSCURITY, not quality — a separate compose project so it can be brought up
+# only when it is wanted, and so it never collides with the main stack.
+#
+#   docker compose -f docker-compose.unknown.yml up -d
+#
+# The main stack is ten services we or the wider world know well, and it flattered the tool twice.
+# `config explore` looked excellent on gitea — twelve routes — which is a fact about gitea's large
+# ANONYMOUS surface, not about the tool's reach. These three found two defects the other ten could not
+# (#121, #122): grocy is a whole household ERP that described as one route to its login page, and its
+# perfectly ordinary `name="username"` login form came back as `"forms": {}`.
+#
+# Applications chosen for OBSCURITY, not quality. The point is that nobody — human or model — has
+# memorised their route tables, their domain vocabulary or their markup. They stand in for the
+# closed-source app a developer actually works on.
+name: unknown-apps
+
+services:
+  # Household ERP. Domain vocabulary that exists almost nowhere else: chores, batteries, stock
+  # entries, equipment, meal plans. PHP.
+  grocy:
+    image: lscr.io/linuxserver/grocy:latest
+    container_name: unknown-grocy
+    ports: ["${GROCY_PORT:-8094}:80"]
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+      TZ: Europe/London
+
+  # Bookmark manager. Django, tiny, real login form.
+  linkding:
+    image: sissbruecker/linkding:latest
+    container_name: unknown-linkding
+    ports: ["${LINKDING_PORT:-8095}:9090"]
+    environment:
+      LD_SUPERUSER_NAME: admin
+      LD_SUPERUSER_PASSWORD: unknown-demo-only
+
+  # Pastebin. Rust, minimal, almost no chrome at all.
+  microbin:
+    image: danielszabo99/microbin:latest
+    container_name: unknown-microbin
+    ports: ["${MICROBIN_PORT:-8096}:8080"]
+    environment:
+      MICROBIN_EDITABLE: "true"
