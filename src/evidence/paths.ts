@@ -16,8 +16,8 @@ import { playwright } from "../browser/playwright.ts";
  *     <artifacts>/cli/<the actions you ran>/<cut>/
  *       video.mp4
  *       frames/01-her-dashboard.png
- *       actions/ops.createModule/01-click.png
- *       actions/ops.createModule/debug.md
+ *       ops.createModule/01-click.png
+ *       ops.createModule/debug.md
  *       manual-verification.md
  */
 export type EvidenceContext = {
