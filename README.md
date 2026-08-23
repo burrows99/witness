@@ -1,5 +1,7 @@
 # witness _(@burrows99/witness)_
 
+![Four services driven by one description: the app, what it made, the mail it sent, and what watches it](docs/banner.png)
+
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 [![release](https://img.shields.io/github/v/release/burrows99/witness?style=flat-square)](https://github.com/burrows99/witness/releases)
 [![node](https://img.shields.io/badge/node-%3E%3D22.6-brightgreen?style=flat-square)](https://nodejs.org)
@@ -30,6 +32,7 @@ owns the repository, and the unscoped name is taken on npmjs.com.
 - [Where a description comes from](#where-a-description-comes-from)
 - [The conventions worth keeping](#the-conventions-worth-keeping)
 - [API](#api)
+- [The picture on this repository](#the-picture-on-this-repository)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
@@ -400,6 +403,19 @@ registered.
 | secret | `containerEnv`, `envFile`, `env`, `literal` | `src/providers/secrets.ts` |
 | video | `ffmpeg` | `src/providers/video.ts` |
 | stub | `http` | `src/providers/stubs.ts` |
+
+## The picture on this repository
+
+[`docs/banner.png`](docs/banner.png) is the image above and the repository's social preview. The four
+panes in it are frames `witness action run tour` actually produced — not a mock of the output.
+
+```bash
+node docs/banner/make.mjs      # redraws it from docs/banner/*.png
+```
+
+Committed as source because the preview set here before was uploaded and forgotten: it 404'd, so every
+shared link rendered a blank card, and there was nothing in the repository to regenerate it from.
+Uploading a new one is **Settings → Social preview** — GitHub has no API for it.
 
 ## Maintainers
 

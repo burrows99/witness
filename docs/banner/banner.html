@@ -1,0 +1,50 @@
+<!doctype html>
+<!--
+  The social preview, and the README's banner.
+
+  Committed as source rather than uploaded and forgotten: the one that was set on this repository
+  404'd, which nobody could see and nobody could regenerate. `node docs/banner/make.mjs` redraws it
+  from the four frames beside it, which are what `witness action run tour` actually produced.
+-->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html, body { margin: 0; height: 100%; }
+      body {
+        width: 1280px; height: 640px; box-sizing: border-box;
+        background: #0b1220; color: #e2e8f0;
+        font-family: -apple-system, system-ui, "Segoe UI", sans-serif;
+        display: grid; grid-template-columns: 1fr 1fr; align-items: center;
+        padding: 0 56px; gap: 48px; overflow: hidden;
+      }
+      .kicker { font-size: 15px; letter-spacing: .18em; text-transform: uppercase; color: #7dd3fc; margin-bottom: 18px; }
+      h1 { font-size: 76px; font-weight: 650; margin: 0 0 14px; letter-spacing: -.02em; }
+      p { font-size: 23px; line-height: 1.45; color: #cbd5e1; margin: 0 0 26px; }
+      ul { margin: 0; padding: 0; list-style: none; font-size: 16px; color: #94a3b8; line-height: 1.9; }
+      li::before { content: "▪"; color: #7dd3fc; margin-right: 10px; }
+      .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+      .pane { border: 1px solid #312e81; border-radius: 8px; overflow: hidden; background: #1e1b4b; }
+      .pane .label { font-size: 11px; padding: 5px 9px; background: #312e81; color: #eef2ff; font-weight: 600; }
+      .pane img { display: block; width: 100%; height: 132px; object-fit: cover; object-position: top left; }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="kicker">evidence, not a pass/fail</div>
+      <h1>witness</h1>
+      <p>Drive a running system from one config file, and come back with what it actually did.</p>
+      <ul>
+        <li>a frame per step, and a video</li>
+        <li>the network and console, tied to the step</li>
+        <li>no test file to write</li>
+      </ul>
+    </div>
+    <div class="panes">
+      <div class="pane"><div class="label">the app</div><img src="01-registered-and-signed-in.png" /></div>
+      <div class="pane"><div class="label">what it made</div><img src="02-the-repository-on-screen.png" /></div>
+      <div class="pane"><div class="label">the mail it sent</div><img src="03-the-inbox.png" /></div>
+      <div class="pane"><div class="label">what watches it</div><img src="04-nothing-connected-yet.png" /></div>
+    </div>
+  </body>
+</html>
