@@ -89,6 +89,23 @@ the caller, and the fix is one size lower: inject the `execFile`, and assert the
 answer, the way `docker.test.ts` already does. Anywhere a default parameter exists so tests can avoid
 the real thing, ask what still covers the real thing.
 
+**A cast at the call site makes an optional field of everything.** `runActions(system as never, …)`
+silenced not just the mismatched `run` signature it was written for but every other missing property,
+so `actionConfig` — the field the terminal recorder branches on — went unsupplied by four fixtures.
+The production type then followed the fixtures rather than the callers: it was declared optional and
+read with `?.`, so `actionConfig` could be made to answer `undefined` for every action alive and 424
+tests still passed, with every `records: "terminal"` action quietly filming a blank browser instead of
+the shell. Export the parameter type and ANNOTATE the fixture rather than casting it: an annotation
+checks what is missing, and a cast is a promise that nothing is. Removing this one immediately found a
+second omission nobody had noticed — every fake result was missing `warnings`.
+
+**A test helper can swallow the argument that does the work.** `recorders.test.ts` wrapped `asTape`
+in a helper that hard-coded its `values` to `{}` — the argument `runActions` fills from the run's
+inputs, and the whole reason a step can say `{table}` or a shell can say `docker exec -it {container}
+bash`. With it hard-coded, `fill` could be deleted from `asTape` outright and every assertion in the
+file still passed, while every placeholder was typed into the recording literally. A helper that
+"simplifies" a call by fixing one of its arguments has removed that argument from the test suite.
+
 ---
 
 ## Changing this repository

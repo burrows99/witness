@@ -2,6 +2,7 @@ import { deepEqual, equal, match, ok } from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseRunArgs } from "./run.ts";
+import type { RunnableSystem } from "./run.ts";
 
 test("names and inputs are told apart by the thing that makes them different", () => {
   // `witness action run app.signIn app.openSettings email=ada@example.com password=…`
@@ -54,12 +55,15 @@ test("it runs each action in turn, passing what one stored to the next", async (
   const ran: { name: string; inputs: Record<string, unknown> }[] = [];
   let pinned: unknown;
 
-  const system = {
+  const system: RunnableSystem = {
     workspace: { resolve: (target = ".") => `/tmp/witness-run-test/${target}` },
-    run: async (name: string, _page: never, inputs: Record<string, unknown>) => {
+    run: async (name, _page, inputs) => {
       ran.push({ name, inputs });
-      return { action: name, ok: true, ms: 1, inputs, value: {}, values: { from: name }, steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
+      return { action: name, ok: true, ms: 1, inputs, value: {}, values: { from: name }, warnings: [], steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
     },
+    // Nothing declares a `records`, so every action here is a browser one — said rather than omitted,
+    // because an omission used to compile and quietly answer `undefined` for every action alive.
+    actionConfig: () => undefined,
     evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
     pinEvidence: (context: unknown) => {
       pinned = context;
@@ -67,7 +71,7 @@ test("it runs each action in turn, passing what one stored to the next", async (
     renderVideos: () => ["/tmp/witness-run-test/video.mp4"],
   };
 
-  const result = await runActions(system as never, { names: ["first", "second"], inputs: { email: "ada@example.com" } }, { launch: browser.launch });
+  const result = await runActions(system, { names: ["first", "second"], inputs: { email: "ada@example.com" } }, { launch: browser.launch });
 
   deepEqual(ran.map(r => r.name), ["first", "second"]);
   // The first action's inputs are the caller's; the second also gets what the first stored.
@@ -89,18 +93,19 @@ test("a failing action comes back with its own evidence rather than a stack trac
   const browser = fakeBrowser();
   const attached = { action: "second", ok: false, ms: 3, inputs: {}, value: {}, values: {}, steps: [{ step: "click", ms: 2, error: "no such button" }], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [], error: "no such button" };
 
-  const system = {
+  const system: RunnableSystem = {
     workspace: { resolve: (target = ".") => `/tmp/witness-run-test/${target}` },
-    run: async (name: string) => {
+    run: async name => {
       if (name === "second") throw Object.assign(new Error(`action "second" failed at step 1: no such button`), { result: attached });
-      return { action: name, ok: true, ms: 1, inputs: {}, value: {}, values: {}, steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
+      return { action: name, ok: true, ms: 1, inputs: {}, value: {}, values: {}, warnings: [], steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
     },
+    actionConfig: () => undefined,
     evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
     pinEvidence: () => undefined,
     renderVideos: () => [],
   };
 
-  const result = await runActions(system as never, { names: ["first", "second", "third"], render: false }, { launch: browser.launch });
+  const result = await runActions(system, { names: ["first", "second", "third"], render: false }, { launch: browser.launch });
   equal(result.ok, false);
   match(result.error!, /action "second" failed at step 1: no such button/);
   // The one that broke is in there, with its steps — and `third` never ran.
@@ -116,6 +121,7 @@ test("parallel gives each action its own lane, and the panes come out in the ord
     {
       workspace: { resolve: (t?: string) => `/tmp/witness-run-test/${t ?? ""}` },
       run: async (action: string) => (ran.push(action), { action, ok: true, values: {} }) as never,
+      actionConfig: () => undefined,
       evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
       pinEvidence: () => undefined,
       renderVideos: () => [],
@@ -148,6 +154,7 @@ test("a retry is a fresh browser, and keeps the failed attempt's evidence", asyn
         if (goes === 1) throw Object.assign(new Error("nope"), { result: { action, ok: false, values: {} } });
         return { action, ok: true, values: {} } as never;
       },
+      actionConfig: () => undefined,
       evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
       pinEvidence: () => undefined,
       renderVideos: () => [],
