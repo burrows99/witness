@@ -186,6 +186,8 @@ npx witness order show 1234            # the verbs the config declares
 npx witness check drift app.signIn     # does the description still match what is running
 npx witness action list                # what the product can DO
 npx witness action run app.signIn email=ada@example.com
+npx witness action run checkout refund --parallel   # side by side, in one video
+npx witness action run flaky --retries=2            # a fresh browser each go
 EVIDENCE=before npx witness action run app.checkout   # record a "before" cut
 ```
 
@@ -219,6 +221,12 @@ the `README.md` and the numbered directory names are for: `02-signIn` is the act
 `<cut>` is `before`, `after` or `run`, so the two halves of a before/after sit side by side instead of
 overwriting each other. `slide` steps are spliced into the video as full-frame cards, so it opens on
 what it means to show.
+
+`--parallel` drives every named action at once, each in its own browser, and stitches the recordings
+into **panels of one video** — two or three side by side, four or more in a grid. They cannot pass
+values to each other and each lane starts signed out, so anything needing a session must sign itself
+in. `--retries=N` gives a failing action more goes in a fresh browser and keeps the failed attempt's
+evidence in `<action>-retry-N/`, because the failure is the interesting one.
 
 ### The debug story
 

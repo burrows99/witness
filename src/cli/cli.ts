@@ -140,7 +140,9 @@ export class Cli {
     const before = this.trace?.mark() ?? 0;
     let result: unknown;
     try {
-      result = await handler.run(positional);
+      // Flags too: a verb that only ever saw its positional arguments could not be told to do
+      // anything differently, and `--parallel` was silently dropped on the way in.
+      result = await handler.run(positional, flags);
     } catch (err) {
       // What it sent and what came back, on the way out. "GET /x → 401" is the headline; the request
       // that produced it is the thing nobody can reconstruct afterwards.
@@ -218,7 +220,8 @@ export class Cli {
 
 export type Verb = {
   summary: string;
-  run: (args: string[]) => unknown;
+  /** `args` is the positional half; `flags` is everything that started with `--`. */
+  run: (args: string[], flags?: string[]) => unknown;
   /** Print the answer alone: this verb's output IS the thing wanted, not a report of a call. */
   raw?: boolean;
 };

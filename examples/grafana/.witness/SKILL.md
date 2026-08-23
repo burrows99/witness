@@ -43,6 +43,13 @@ share one browser, one recording, and whatever each one stored — and each invo
 signed-out browser, so an action that needs somebody signed in must run the one that signs in,
 in the same invocation (`… run signIn checkout`, or a `run` step inside it).
 
+`--parallel` drives every action you name AT ONCE, each in its own browser, and stitches the
+recordings into panels of one video — which is the whole reason to run them together. They
+cannot pass values to each other, and each lane is its own fresh signed-out browser, so anything
+needing a session must sign itself in (`run: signIn` as its first step). `--retries=N` gives a
+failing action more goes in a fresh browser, and keeps the failed attempt's evidence beside the
+one that worked — the failure is the interesting one.
+
 **A service owns what is true about it.** Its credentials, its API, its screens and its actions
 are written under it in `services`, once — an action there needs no `app` and no `<service>.`
 in its own name, and reaches its siblings and its service's secrets by bare name. The top level
@@ -98,7 +105,7 @@ with more logging.
 - `npx witness action` — run one of the declared actions in a browser, and report everything it did
   - `action list` — every action this config declares
   - `action show` — <action> — its steps, as declared
-  - `action run` — <action…> [key=value…] — drive them in a browser and report everything they did
+  - `action run` — <action…> [key=value…] [--parallel] [--retries N] — drive them and report everything they did
 
 Add `--quiet` for the bare answer. Exit codes: `0` it worked · `1` it ran and failed · `2` you
 asked for something that does not exist.

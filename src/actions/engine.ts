@@ -38,12 +38,7 @@ export class Actions {
   private readonly evidence: () => Evidence;
   /** A declared credential, resolved when a step actually asks for one, in its service's scope first. */
   private readonly secret: (name: string, scope?: string) => string;
-  /** Something the last step got away with that a reader should know about. */
-  private warning?: string;
-  /** Where the last `run` step's action filed its evidence, so the step list can point into it. */
-  private ran?: string;
-  /** Whatever else this run got away with — collected per run, and returned with it. */
-  private notices: string[] = [];
+
 
   constructor(opts: {
     operations: Operations;
@@ -106,6 +101,9 @@ export class Actions {
    */
   async run<T = unknown>(name: string, page: Page, inputs: Params = {}, within: Within = {}): Promise<ActionResult<T>> {
     const { from, quiet } = within;
+    // Per RUN, not per engine: two actions driving two browsers at once would otherwise interleave
+    // their warnings into each other's results, and the one instance is shared by both.
+    const running: Running = { notices: [] };
     // A service's own action reaches its siblings by bare name — being under the same service is what
     // says which `signIn` is meant, and repeating the prefix inside it says nothing new.
     const resolved = this.resolveName(name, from);
@@ -156,7 +154,7 @@ export class Actions {
         // of a walk all reading "run" is that promise not kept.
         inspector.mark(label === "run" ? `run ${Actions.about(step)}` : label, index);
         try {
-          await this.step(step, page, values, action.app, name, { at: into, index, quiet });
+          await this.step(step, page, values, action.app, name, { at: into, index, quiet }, running);
         } catch (err) {
           error = err instanceof Error ? err.message : String(err);
         }
@@ -164,9 +162,9 @@ export class Actions {
         // extra one was 8 of this walk's 58 — the same page, one blog panel later.
         const shot = step.run || quiet ? undefined : await this.frame(page, into, index, label);
         if (shot) screenshots.push(shot);
-        steps.push({ step: label, detail: Actions.about(step), ms: Date.now() - at, error, warning: this.warning, screenshot: shot, ran: this.ran });
-        this.warning = undefined;
-        this.ran = undefined;
+        steps.push({ step: label, detail: Actions.about(step), ms: Date.now() - at, error, warning: running.warning, screenshot: shot, ran: running.ran });
+        running.warning = undefined;
+        running.ran = undefined;
         this.trace.add({
           kind: "step",
           action: name,
@@ -196,11 +194,10 @@ export class Actions {
         : (values as unknown as T);
     // Before the result is built, so what it got away with is IN the result — and before the story,
     // so the story carries it too.
-    if (!quiet) this.note(name, action, values);
+    if (!quiet) this.note(name, action, values, running);
     const result: ActionResult<T> = {
       action: name,
-      // Emptied per run: what an earlier action got away with is not this one's news.
-      warnings: this.notices.splice(0),
+      warnings: running.notices,
       ok: !error,
       ms: Date.now() - started,
       inputs,
@@ -225,7 +222,7 @@ export class Actions {
   }
 
   /** One step. Every branch is a verb a config can use; there is deliberately no escape into code. */
-  private async step(step: StepConfig, page: Page, values: Params, defaultApp?: string, owner?: string, where: StepPlace = {}): Promise<void> {
+  private async step(step: StepConfig, page: Page, values: Params, defaultApp?: string, owner?: string, where: StepPlace = {}, running: Running = { notices: [] }): Promise<void> {
     const at = (spec: LocatorSpec): ReturnType<typeof locate> => locate(page, this.resolve(spec, values, owner) as LocatorSpec);
     const text = (s?: string): string => (s === undefined ? "" : fill(s, this.bag(values, owner)));
 
@@ -301,7 +298,7 @@ export class Actions {
       // The one failure mode that produces a GREEN run and a wrong deliverable: a match on a node that
       // is in the document and not in the picture. The assertion is satisfied, the frame beside it
       // shows nothing, and the caption above it claims something the evidence disproves.
-      if (step.expect.state !== "hidden") this.warning = await Actions.offScreen(page, target);
+      if (step.expect.state !== "hidden") running.warning = await Actions.offScreen(page, target);
     }
     if (step.store) {
       const target = at(step.store.from);
@@ -351,7 +348,7 @@ export class Actions {
         at: where.at ? `${where.at}/${step18}-${slug(child, 40)}` : undefined,
         quiet: where.quiet,
       });
-      this.ran = where.at ? `${where.at}/${step18}-${slug(child, 40)}` : undefined;
+      running.ran = where.at ? `${where.at}/${step18}-${slug(child, 40)}` : undefined;
       Object.assign(values, nested.values);
     }
     if (step.query) {
@@ -538,7 +535,7 @@ export class Actions {
    * writing code, in a tool whose whole claim is that there is no file to write. So it is a field:
    * the same note, from the description, filled with what the run gathered.
    */
-  private note(name: string, action: ActionConfig, values: Params): void {
+  private note(name: string, action: ActionConfig, values: Params, running: Running): void {
     if (!action.verify) return;
     const { title, subject = {}, signIn = [], notes = [] } = action.verify;
     /**
@@ -553,7 +550,7 @@ export class Actions {
         // run was about is the commonest one there is, and that account's name is usually a secret.
         return fill(value, this.bag(values, name));
       } catch (err) {
-        this.notices.push(`verify: ${err instanceof Error ? err.message : String(err)}`);
+        running.notices.push(`verify: ${err instanceof Error ? err.message : String(err)}`);
         return value.replace(/\{([\w.]+)\}/g, (whole, key: string) => (reach(values, key) === undefined ? `«${key} — nothing stored that»` : whole));
       }
     };
@@ -571,7 +568,7 @@ export class Actions {
         notes: notes.map(text),
       });
     } catch (err) {
-      this.notices.push(`verify: the note could not be written — ${err instanceof Error ? err.message : String(err)}`);
+      running.notices.push(`verify: the note could not be written — ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -604,6 +601,14 @@ export type Within = {
   /** Write no frames and no story: a read-only check drives the browser and should leave nothing. */
   quiet?: boolean;
 };
+
+/**
+ * What one run of one action is accumulating.
+ *
+ * On the instance this was a bug waiting for the day two actions ran at once: one engine, one
+ * `warning` field, two browsers writing to it.
+ */
+type Running = { warning?: string; ran?: string; notices: string[] };
 
 /** What a step needs to know about its own position, to file what it runs underneath itself. */
 type StepPlace = { at?: string; index?: number; quiet?: boolean };

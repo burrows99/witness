@@ -512,14 +512,18 @@ export class System {
             run: (args: string[]) => this.config.actions?.[Cli.need(args[0], "action")],
           },
           run: {
-            summary: "<action…> [key=value…] — drive them in a browser and report everything they did",
-            run: async (args: string[]) => {
+            summary: "<action…> [key=value…] [--parallel] [--retries N] — drive them and report everything they did",
+            run: async (args: string[], flags: string[] = []) => {
               const { names, inputs } = parseRunArgs(args);
               if (!names.length) Cli.die("missing <action> — `action list` says which", 2);
               return runActions(this as never, {
                 names,
                 inputs,
                 headed: process.env.HEADED === "1",
+                // Side by side in one video, each in its own browser. What `--parallel` is FOR is
+                // seeing two things happen at once, which is why it changes the recording.
+                parallel: flags.includes("--parallel"),
+                retries: Number(flags.find(flag => flag.startsWith("--retries"))?.split("=")[1] ?? 0),
                 cookies: identityCookies(this.config.identities),
               });
             },
