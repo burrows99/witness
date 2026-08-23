@@ -80,6 +80,15 @@ this repository's workflows define, by name, waits for them to be created, and o
 family as reading the tail of a pipe — a green from a command that was never asked what you wanted to
 know.
 
+**An injectable seam means the default is the one thing nothing runs.** `Compose.read(root, run =
+Compose.docker)` is injected by every test in its file, so `Compose.docker` — the only line of it that
+ever executes in production — was never called by one. Deleting `--no-interpolate` from it left 424
+tests passing and every generated config silently without its `portVar`, which is invisible until a
+second checkout runs its own ports. The seam that makes a parser testable is the same seam that hides
+the caller, and the fix is one size lower: inject the `execFile`, and assert the ARGV rather than the
+answer, the way `docker.test.ts` already does. Anywhere a default parameter exists so tests can avoid
+the real thing, ask what still covers the real thing.
+
 ---
 
 ## Changing this repository
