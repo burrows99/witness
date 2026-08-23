@@ -77,7 +77,12 @@ test("a name too long to keep is cut at a word", () => {
 
 test("an off-site link is somebody else's app", () => {
   const routes = Explore.routes([page("/user/sign_up", REGISTER)]);
-  ok(!Object.values(routes).some(path => path.includes("docs.gitea.com")));
+  // Every route is a PATH on this origin — the stronger claim, and the one that matters. Asking
+  // instead whether some off-site host appears in the string is the substring-URL-check that reads
+  // as sanitisation and is not one: a host can sit anywhere in a URL.
+  ok(Object.values(routes).every(path => path.startsWith("/")));
+  // The snapshot links to docs.gitea.com, and the four routes here are the four same-origin ones.
+  deepEqual(Object.values(routes).sort(), ["/", "/explore/repos", "/user/login", "/user/sign_up"]);
 });
 
 test("locators are what a step would assert on, and never a link", () => {
