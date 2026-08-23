@@ -89,6 +89,13 @@ one of them, that one included, is also reachable by the service that runs it: `
 the command line, `app.database("<service>")` in code. An app database plus an authz, queue or metrics
 database is the ordinary case, not a shape to describe your way around.
 
+The order is yours, and it is the whole of the rule — so `witness init` does not leave it to chance.
+`docker compose config` returns services **alphabetically**, which made `mariadb` the default on a
+stack whose app runs on Postgres, so a generated config puts a database the compose file says
+something `depends_on` above one nothing mentions. Where no `depends_on` exists anywhere the order is
+left exactly as compose gave it — a guess in a generated file is worse than an order somebody has to
+look at — and the generated header says which database it picked whenever there is more than one.
+
 ## Say a thing once
 
 The normaliser fills in what position already says. Inside a service you write `{ "containerEnv": "K" }`,

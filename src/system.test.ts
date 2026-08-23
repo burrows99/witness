@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 
 import type { SystemConfig } from "./config/schema.ts";
-import { normalise } from "./config/index.ts";
+import { loadConfig, normalise } from "./config/index.ts";
 
 /** The composite root pulls in the browser half, so this file runs where that is installed. */
 const havePlaywright = await import("@playwright/test").then(
@@ -142,6 +142,46 @@ test("a database credential is a source, not a string the config has to hold", (
   // can NAME a source instead of holding a value, which is the whole point of the change.
   ok(system.db, "the database is built without the password being written down");
 });
+
+test("a terminal action is recognised as one through the real System", when, () => {
+  // The seam nothing stood on. `runActions` asks `system.actionConfig(name)` and branches on
+  // `records`, and every test of that branch handed in its own stub — so `actionConfig` could be made
+  // to answer `undefined` for every action alive and 424 tests still passed, while every
+  // `records: "terminal"` action fell through to the browser path and filmed a blank screen beside the
+  // shell it was really about. Green run, wrong tool, and only the pixels would say so.
+  //
+  // Through `loadConfig`, not `new System({…})`: an action lives INSIDE its service in the file and is
+  // hoisted, qualified and given its service's recorder by `normalise`. A fixture handed straight to
+  // the constructor is the shape a config is WRITTEN in, which no caller ever passes.
+  const dir = inCheckout();
+  const file = path.join(dir, "config.jsonc");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      name: "acme",
+      root: ["marker"],
+      services: {
+        web: { port: 3000, container: "acme-web", actions: { openHome: { steps: [{ goto: { route: "home" } }] } } },
+        shell: {
+          port: 5432,
+          container: "acme-db",
+          records: "terminal",
+          shell: "docker exec -it acme-db bash",
+          actions: { readTheDatabase: { steps: [{ type: { on: "prompt", value: "psql -l" } }] } },
+        },
+      },
+    }),
+  );
+  const system = new System(loadConfig(file));
+
+  // Qualified by the service that owns it, and carrying that service's recorder — which is how a lane
+  // finds out to film a shell rather than a screen.
+  const terminal = system.actionConfig("shell.readTheDatabase");
+  equal(terminal?.records, "terminal");
+  equal(terminal?.shell, "docker exec -it acme-db bash");
+  // And a service that names no recorder still gets the browser.
+  equal(system.actionConfig("web.openHome")?.records, undefined);
+  equal(system.actionConfig("nothing.declared"), undefined);
 
 test("a service's own action reaches its own secret by bare name", when, () => {
   // The headline of the service-owned reorganisation, and the one line of it nothing stood on.

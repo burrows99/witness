@@ -17,7 +17,16 @@ the compose file, which is the first thing every description gets wrong.
 operations the app called while being walked. Nothing is written: merge and trim by hand, because a
 generated name is worse than the one you would choose.
 
-Three honest limits. **`forms` finds inputs by placeholder**, so an app that labels its inputs instead
+**How much of that you get depends on how the app is built, and the `operations` block most of all.**
+It is read off the XHR the app makes while being walked, so it is rich on an SPA or an API-first
+product and close to empty on a server-rendered one — there is very little to observe on a
+server-rendered surface, and less again signed out. Six pages of Gitea, the app in this repository's
+own stack, produce twelve routes, a locators block and a forms block, and **no `operations` block at
+all**. That is the feature working: an API map is worth having where one exists to be read, and
+inventing one where it does not would be worse than saying nothing. Declare `operations` by hand from
+what the product documents.
+
+Four honest limits. **`forms` finds inputs by placeholder**, so an app that labels its inputs instead
 produces a thin `forms` block — use `fillFields`, which matches by label. Anything behind a login
 is only reachable if the config declares an `identity` whose cookies get you in. And **a sign-in that
 leaves the app is not walked** — an OAuth or SAML start endpoint is a same-origin link that redirects
