@@ -13,7 +13,8 @@ import { currentContext, type EvidenceContext, slug } from "./paths.ts";
  *     artifacts/cli/<what was run>/<cut>/
  *       video.mp4                       the recording, put here by the video provider
  *       frames/01-her-dashboard.png     stills, numbered in the order they were taken
- *       actions/<action>/01-click.png   a frame per step of each action the test ran
+ *       <action>/01-click.png           a frame per step of each action the test ran
+ *       <action>/02-run/<composed>/     an action a step composed, filed inside that step
  *       manual-verification.md          how to re-walk it by hand
  *
  * `cut` is `EVIDENCE=before|after` (or `run`), so the two halves of a before/after cannot overwrite
@@ -134,13 +135,17 @@ export class Evidence {
   /** Any other artefact — a payload, a log, a note written as the run went. */
   write(name: string, contents: string): string {
     this.writeManifest();
-    // Each segment slugged on its own: slugging the whole thing turns `actions/x/debug.md` into one
+    // Each segment slugged on its own: slugging the whole thing turns `<action>/debug.md` into one
     // flat `actions-x-debug.md`, which loses the grouping the name was expressing.
     this.freshRun();
     const parts = name.split("/").filter(Boolean);
     const last = parts.pop() ?? "file";
     const extension = last.match(/\.\w+$/)?.[0] ?? "";
-    const file = path.join(this.dir, ...parts.map(part => slug(part, 64)), slug(last.replace(/\.\w+$/, ""), 64) + extension);
+    // A name that is ALREADY a filename is left alone. `slug` exists to make a description safe, and
+    // running it over a literal turned `README.md` into `readme.md` — the one file in the directory
+    // whose name is a convention, quietly renamed out of the convention.
+    const stem = last.replace(/\.\w+$/, "");
+    const file = path.join(this.dir, ...parts.map(part => slug(part, 64)), (/^[A-Za-z0-9._-]+$/.test(stem) ? stem : slug(stem, 64)) + extension);
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, contents);
     return file;

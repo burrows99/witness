@@ -1,0 +1,78 @@
+# Steps
+
+Every verb an action can use. One object per step; a step object holds one verb plus its modifiers.
+
+## Getting somewhere
+
+| verb | shape | notes |
+|---|---|---|
+| `goto` | `{ app?, route?, url?, params? }` | prefer `route` — `url` disconnects `portVar` |
+| `reload` | `true` | for "and it survives a refresh", which `goto` does not say |
+| `waitForUrl` | `{ route? , url?, app?, timeout? }` or a string | `url` is a **regular expression**, not a glob |
+| `wait` | `1200` | milliseconds. Last resort — prefer waiting for a thing |
+
+## Doing something
+
+| verb | shape | notes |
+|---|---|---|
+| `click` | a [locator](#locators) | |
+| `type` | `{ on, value, delay? }` | key by key — an instantly-full field reads as a bot on film |
+| `fill` | `{ on, value }` | at once. Faster, worse to watch |
+| `press` | `"Enter"`, `"Control+A"` | |
+| `fillFields` | `{ "Heading": "…", "Body": "…" }` | by label; `within` scopes it to a dialog |
+
+## Claiming something
+
+| verb | shape | notes |
+|---|---|---|
+| `expect` | `{ on, state?, text?, count?, timeout?, because? }` | about the **screen** |
+| `check` | `{ that, equals?, not?, contains?, matches?, atLeast?, atMost?, because? }` | about the **values gathered** — `matches` is a regex |
+
+`because` becomes the failure message. Write it for the person reading the failure.
+
+## Gathering
+
+| verb | shape | notes |
+|---|---|---|
+| `store` | `{ from, as, all? }` | read the screen. `all` gives an array |
+| `api` | `{ operation, client?, params?, body?, as?, pick? }` | ask a declared operation mid-flow |
+| `query` | `{ name, params?, as? }` | run a declared query — what was *stored* |
+| `capture` | `{ url, method?, as, pick?, timeout? }` | wait for a response and keep part of its body |
+| `select` | `{ from, where, pick?, as }` | pick one item out of a stored list |
+
+Everything stored is available to later steps as `{name}`, dotted for depth (`{order.status}`,
+`{rows.length}`).
+
+## Composing
+
+| verb | shape |
+|---|---|
+| `run` | `"signIn"` or `{ action, with? }` — `with` is a template map, so `{ "q": "{term}" }` forwards an input |
+
+The composed action's evidence lands **inside the step that ran it**.
+
+## Narrating
+
+| verb | shape | notes |
+|---|---|---|
+| `slide` | `{ title, lines?, kicker?, tone?, ms? }` | full-frame card spliced into the video. `tone`: `neutral` \| `bad` \| `good` |
+| `caption` | `{ text, sub? }` | drawn into the page for a moment |
+| `frame` | `"the order, cancelled"` | a still named for what it shows; `fullPage: true` for below the fold |
+| `note` | `"why this step exists"` | for the trace only |
+
+## Locators
+
+A string is a CSS selector. The object form:
+
+`role` · `name` · `exact` · `placeholder` · `testId` · `label` · `text` · `css` ·
+`labelledInput` / `labelledTextarea` (a label whose input is a sibling, no `htmlFor`) ·
+`nth` (0-based, or `first`) · `within` (scope to a dialog, card, section) · `frame` (a cross-origin iframe)
+
+`exact` applies to whichever of `name`/`label`/`placeholder`/`text` is used — without it, a field
+called "Password" also matches the button beside it called "Show password".
+
+Prefer `role`+`name`, then `label`/`placeholder`, then `testId`. `css` last: it survives a rewording
+and breaks on a restyle, which is the wrong way round, and it can match something invisible — so the
+run goes green and the picture shows nothing.
+
+`npx playwright codegen <url>` writes these for you, in that same order of preference.

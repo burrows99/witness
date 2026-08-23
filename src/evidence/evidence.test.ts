@@ -36,6 +36,14 @@ test("a written file keeps the grouping its name expressed", () => {
   equal(fs.readFileSync(file, "utf8"), "# what happened");
 });
 
+test("a name that is already a filename is not slugged into a different one", () => {
+  const { evidence } = workspace();
+  // `slug` lower-cases, which quietly renamed the one file in the directory whose name is a
+  // convention — and every doc that told a reader to open `README.md` was wrong about it.
+  match(evidence().write("README.md", "# what this run left behind"), /\/README\.md$/);
+  match(evidence().write("her dashboard.md", "#"), /\/her-dashboard\.md$/);
+});
+
 test("a stale file from the run before is not left sitting in the evidence", () => {
   const { evidence } = workspace();
   const first = evidence();
