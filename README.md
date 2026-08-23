@@ -75,6 +75,9 @@ from git needs no token: `npm i -D github:burrows99/witness`.
 
 **Needs** Node 22.6+. Optionally Docker (to read a container's environment or its database),
 [Playwright](https://playwright.dev) as a peer dependency (for the browser half), and ffmpeg (for MP4s).
+Playwright is looked for in the project first and beside the running command second, so a `witness` on
+the path can be pointed at a project that has none: `npm i -g @playwright/test` installs one browser
+per machine and leaves the project it is pointed at untouched.
 
 ## Describe a product
 

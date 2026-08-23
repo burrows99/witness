@@ -94,6 +94,20 @@
           ]
         },
 
+        "exploreFromElsewhere": {
+          "summary": "the browser half, driven from a directory that has no node_modules — the shape `--config` outside the repo exists for",
+          "records": "terminal",
+          "steps": [
+            { "caption": { "text": "a directory with nothing installed in it, pointed at this stack" } },
+            { "type": { "on": "prompt", "value": "W=$PWD; cd $(mktemp -d); pwd; ls -a" } },
+            { "press": "Enter" },
+            { "wait": 900 },
+            { "type": { "on": "prompt", "value": "node $W/bin/cli.ts config explore gitea --pages=1 --config $W/.witness/config.jsonc | head -8" }, "note": "the checkout's own CLI, so this cut is about the code in the diff and not about whatever is installed globally" },
+            { "press": "Enter" },
+            { "wait": 25000, "note": "a page is waited on before it is read, and a browser has to start first" }
+          ]
+        },
+
         "createRepo": {
           "summary": "a repository, through the screen a person uses",
           "steps": [

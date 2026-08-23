@@ -24,7 +24,10 @@ For working *on* the harness. If you are working *with* it, you want
 
 **Zero runtime dependencies.** Playwright is an optional peer — half of what this does (find a stack,
 ask an API, read a database, stand in for a third party) needs no browser, so nothing imports it at
-the top of a file. ffmpeg and VHS are optional binaries: missing means a warning, never a failure.
+the top of a file. It is resolved from the project first and from the running command second
+([browser](browser.md)) — a resolution question, not a dependency one: nothing is installed for you,
+but a browser installed once per machine counts. ffmpeg and VHS are optional binaries: missing means a
+warning, never a failure.
 
 **Node 22 native TypeScript**, strip-only. Explicit `.ts` on every relative import. No build step for
 development; no runtime type information, so anything needing to *read* a type reads the source

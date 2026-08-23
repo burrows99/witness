@@ -4,7 +4,7 @@
 
 | file | |
 |---|---|
-| `playwright.ts` (40) | the optional peer, imported lazily |
+| `playwright.ts` (66) | the optional peer, imported lazily — project first, then the running command |
 | `locator.ts` (85) | `LocatorSpec` → a Playwright locator, and back to a human string |
 | `screen.ts` (38), `surface.ts` (21), `web-app.ts` (28) | a route, an app, and the map between |
 | `sign-in.ts` (96) | magic-link sign-in, described rather than coded |
@@ -16,6 +16,20 @@
 `playwright()` resolves lazily; `requirePlaywright()` throws a sentence saying to install it. Nothing
 imports `@playwright/test` at the top of a file, because half of what this package does has nothing
 to do with a browser and a top-level import would make it a hard dependency in practice.
+
+It is looked for in two places: the **project** first, so a checkout or an installed dependency drives
+the version its own tests and its recorded locators were written against — then **the running command**
+(`realpathSync(process.argv[1])`), so a global install reaches `<prefix>/lib/node_modules`, which is
+where `npm i -g @playwright/test` puts it. Anchoring only at the working directory made a tool whose
+whole pitch is "point it at your stack" demand a dev dependency *of that stack*, which is the intrusion
+`--config`-outside-the-repo exists to avoid. It stays a resolution question rather than a dependency
+one: the manifest is unchanged, the peer is still optional, and npm still installs nothing on its own —
+a bare `npm i -g @burrows99/witness` has no browser and says so. What changed is that the browser can
+now be installed once per machine instead of once per project.
+
+`argv[1]` and not `import.meta.url`, which reads better and cannot be used here: a spec transpiled to
+CommonJS cannot parse `import.meta`, and this file is reachable from the barrel every spec imports.
+`src/index.test.ts` fails the build if that ever stops being true.
 
 ## locator
 

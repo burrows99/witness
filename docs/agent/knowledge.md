@@ -43,6 +43,13 @@ to get right could not happen here, and arrived instead as a bug report from som
 it had already described Microsoft's login screen as that product's own. Wiring Grafana to it was five
 environment variables. A stack that cannot produce the shape cannot catch the bug.
 
+**What is on this machine is not evidence of what an installer does.** The global install here had
+`@playwright/test` sitting inside it, which got read as "npm installs optional peers" and written into
+a source comment as fact. npm does not — `npm i -g --prefix /tmp/… <tarball>` added one package and
+nothing else, and the copy on this machine had arrived some other way. Same family as inferring a
+cause from a screenshot: the state in front of you is a result, and more than one thing produces it. A
+scratch prefix costs a second and is the only thing that can answer a question about installing.
+
 ---
 
 ## Changing this repository
@@ -73,6 +80,15 @@ real bug.
 **A grep with a lazy pattern will confidently mislead you.** `[a-z]+` missed `apiKey` and nearly
 "corrected" a correct provider table. Same shape as filtering paths with `grep -iv test`, which also
 strips `TestResults/`.
+
+**A file needing to know where it lives cannot use `import.meta`, and `argv[1]` is not enough on its
+own.** `import.meta.url` is the obvious way and type-checks, lints and passes every test near the file
+it is in; only `src/index.test.ts` catches it, because a spec transpiled to CommonJS cannot *parse* the
+token and one such file reachable from the barrel breaks every spec in every consuming project. The
+replacement is `realpathSync(process.argv[1])`, and the `realpathSync` is load-bearing rather than
+tidiness: a global `bin/` entry is a symlink, Node leaves `argv[1]` unresolved, and the unresolved path
+walks up an entirely different tree — `<prefix>/bin/…` instead of `<prefix>/lib/node_modules/…`, which
+finds nothing and looks exactly like not being installed.
 
 ---
 
