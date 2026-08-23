@@ -9,6 +9,7 @@
   ],
   "ignoreBinaries": [
     "ffmpeg",
-    "ffprobe"
+    "ffprobe",
+    "vhs"
   ]
 }
