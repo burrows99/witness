@@ -87,7 +87,10 @@ export class Story {
       const mark = step.error ? "✗" : "✓";
       const detail = step.detail ? ` ${step.detail}` : "";
       const shot = this.short(step.screenshot);
-      lines.push(`${index + 1}. ${mark} \`${step.step}\`${detail} — ${Story.duration(step.ms)}${shot ? ` · ${shot}` : ""}`);
+      // A `run` step has no frame of its own — the action it ran ends with one of that same screen —
+      // so it points at where that action put everything instead.
+      const where = step.ran ? ` · ${step.ran}/debug.md` : shot ? ` · ${shot}` : "";
+      lines.push(`${index + 1}. ${mark} \`${step.step}\`${detail} — ${Story.duration(step.ms)}${where}`);
       // A step that passed in a way worth knowing about. Indented under it, because the reader is
       // scanning for the ✗ and would otherwise never look at a ✓ again.
       if (step.warning) lines.push(`   ⚠ ${step.warning}`);
@@ -319,6 +322,8 @@ export type StoryStep = {
   /** It passed, and something about HOW it passed is worth saying — an assertion matched off-screen. */
   warning?: string;
   screenshot?: string;
+  /** For a `run` step: the directory the composed action filed its own evidence in. */
+  ran?: string;
 };
 
 /** The files a human should open, which this deliberately does not try to replace. */

@@ -100,10 +100,16 @@ export class Evidence {
     return file;
   }
 
-  /** A frame belonging to an action, kept with the action that took it. */
-  async actionFrame(page: Page, action: string, index: number, name: string): Promise<string> {
+  /**
+   * A frame belonging to an action, kept with the action that took it.
+   *
+   * `at` is a directory relative to this run — `grafana-thewholeproduct/02-signin` for an action a
+   * step composed. The path IS the call tree, which is the only way a directory listing can say who
+   * ran what.
+   */
+  async actionFrame(page: Page, at: string, index: number, name: string): Promise<string> {
     this.writeManifest();
-    const dir = this.prepare(path.join(this.dir, "actions", slug(action, 64)));
+    const dir = this.prepare(path.join(this.dir, ...at.split("/").map(part => slug(part, 64))));
     const file = path.join(dir, `${String(index).padStart(2, "0")}-${slug(name)}.png`);
     await page.screenshot({ path: file });
     return file;
@@ -163,6 +169,65 @@ export class Evidence {
       "",
     ];
     return this.write("manual-verification.md", lines.join("\n"));
+  }
+
+  /**
+   * What is where, written into the run it describes.
+   *
+   * Everything here is named to be read from a file listing rather than a GUI — Playwright files its
+   * own artefacts in one flat, opaquely-named directory and puts the structure in the trace viewer,
+   * which is right when a person is reading and useless when a program is. The cost of the other
+   * choice is that the layout has to explain itself, and until this it did not: a video at the top
+   * and none in the directory below read as one of them being missing.
+   */
+  readme(): string | undefined {
+    const tree = this.tree(this.dir, "");
+    if (!tree.length) return undefined;
+    return this.write(
+      "README.md",
+      [
+        `# What this run left behind`,
+        "",
+        "One browser session, so one recording and one set of named stills — both at this level.",
+        "Below them, a directory per action, and **an action a step composed sits inside that step**,",
+        "named for it. The directory tree is the call tree.",
+        "",
+        ...(fs.existsSync(path.join(this.dir, "video.mp4")) ? ["- `video.mp4` — the whole session, watchable"] : []),
+        ...(fs.existsSync(path.join(this.dir, "frames")) ? ["- `frames/` — the stills a `frame` step asked for, in order"] : []),
+        ...(fs.existsSync(path.join(this.dir, "manual-verification.md")) ? ["- `manual-verification.md` — how to re-walk this by hand"] : []),
+        "- `<action>/NN-<verb>.png` — a frame per step, numbered as they happened",
+        "- `<action>/debug.md` — what happened, with the network and console tied to each step",
+        "",
+        "## What ran what",
+        "",
+        "```",
+        ...tree,
+        "```",
+        "",
+      ].join("\n"),
+    );
+  }
+
+  /** The call tree, read back off the directories it produced. */
+  private tree(at: string, indent: string): string[] {
+    let out: string[] = [];
+    let entries: string[] = [];
+    try {
+      entries = fs
+        .readdirSync(at, { withFileTypes: true })
+        .filter(entry => entry.isDirectory() && entry.name !== "frames")
+        .map(entry => entry.name)
+        .sort();
+    } catch {
+      return [];
+    }
+    for (const entry of entries) {
+      const dir = path.join(at, entry);
+      const frames = fs.readdirSync(dir).filter(file => file.endsWith(".png")).length;
+      out.push(`${indent}${entry}${frames ? `  (${frames} frame${frames === 1 ? "" : "s"})` : ""}`);
+      out = out.concat(this.tree(dir, `${indent}  `));
+    }
+    return out;
   }
 
   /** Every write-up this test produced, for a reporter to attach. */

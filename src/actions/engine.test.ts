@@ -613,3 +613,39 @@ test("a value a step stored beats one the subject named", when, async () => {
   await actions.run("a", fakePage({ text: "ada, off the screen" }).page);
   deepEqual(written.notes, ["it was ada, off the screen"]);
 });
+
+test("a composed action's evidence lives inside the step that ran it", when, async () => {
+  // A flat `actions/` folder could not say who ran what: the composing action sat as a SIBLING of
+  // the eight it composed, and nothing on disk showed the difference.
+  const wrote: string[] = [];
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: {
+      "app.signIn": { steps: [{ press: "Enter" }] },
+      "app.tour": { steps: [{ press: "Escape" }, { run: "signIn" }] },
+    } as never,
+    url: () => "http://app/",
+    evidence: () =>
+      ({
+        actionFrame: async (_p: unknown, at: string, i: number, name: string) => {
+          wrote.push(`${at}/${String(i).padStart(2, "0")}-${name}.png`);
+          return "f.png";
+        },
+        write: (name: string) => (wrote.push(name), name),
+        // `tell` needs these to build the story; without them it fails quietly and writes nothing.
+        dir: "/tmp/witness",
+        artefacts: () => ({}),
+      }) as unknown as Evidence,
+  });
+  await actions.run("app.tour", fakePage().page, {});
+  // Numbered for the parent's own step list, so the child ties to the step without a second ordering.
+  ok(
+    wrote.includes("app-tour/02-signin/01-press.png"),
+    `expected the composed action under its step; got ${wrote.join(", ")}`,
+  );
+  ok(wrote.includes("app-tour/02-signin/debug.md"), "and its story beside its frames");
+  // No frame for the `run` step itself: the action it ran ends with one of that same screen.
+  ok(!wrote.some(file => file.includes("02-run.png")), `a run step should take no frame: ${wrote.join(", ")}`);
+});

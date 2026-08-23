@@ -272,7 +272,7 @@ export function writeIndex(out: string): void {
   const lines = [
     "# Evidence",
     "",
-    "Every artefact currently on disk, by spec. One directory per (spec · test · cut), so the two halves",
+    "Every artefact currently on disk. One directory per run and cut, so the two halves",
     "of a before/after sit beside each other and a re-run overwrites rather than accumulates.",
     "",
   ];

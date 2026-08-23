@@ -199,12 +199,22 @@ Everything about one run lands in one directory, named for what was run rather t
 
 ```
 .witness/artifacts/cli/<the actions you ran>/<cut>/
-  video.mp4                       the recording
+  README.md                       what is where, and the call tree
+  video.mp4                       the recording — one browser session, one video
   frames/01-her-dashboard.png     the stills a `frame` step named, in order
-  actions/<action>/01-click.png   a frame per step of every action the run went through
-  actions/<action>/debug.md       what happened, with the network and console tied to each step
   manual-verification.md          what the action's `verify` said, filled with what this run saw
+  refundAnOrder/                  ← a directory per action
+    01-slide.png … 12-check.png   a frame per step, numbered as they happened
+    debug.md                      what happened, with the network and console tied to each step
+    02-signIn/                    ← an action a step COMPOSED sits inside that step
+      01-goto.png … 05-expect.png
+      debug.md
 ```
+
+**The directory tree is the call tree.** Playwright files its own artefacts in one flat, opaquely
+named directory and puts the structure in the trace viewer — right when a person is reading, useless
+when a program is. The cost of inverting that is that the layout has to explain itself, which is what
+the `README.md` and the numbered directory names are for: `02-signIn` is the action step 2 ran.
 
 `<cut>` is `before`, `after` or `run`, so the two halves of a before/after sit side by side instead of
 overwriting each other. `slide` steps are spliced into the video as full-frame cards, so it opens on

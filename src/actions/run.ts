@@ -81,6 +81,15 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   // Turned into something watchable here rather than in a second command: the reason to drive a UI
   // from a shell is to see what happened, and a `.webm` named after a page id is not that.
   const videos = request.render === false ? [] : system.renderVideos();
+  // Written last, so it describes what is actually there — including the video, which does not exist
+  // until the line above. Pinned again for the moment it takes: unpinned, `evidence()` answers
+  // `cli/adhoc`, which is where this run's directories are NOT.
+  system.pinEvidence(context);
+  try {
+    system.evidence().readme();
+  } finally {
+    system.pinEvidence(undefined);
+  }
 
   return {
     ok: !failure,
@@ -157,7 +166,7 @@ export type RunResult = {
 type RunnableSystem = {
   workspace: { resolve: (target?: string) => string };
   run: (action: string, page: Page, inputs: Params) => Promise<ActionResult>;
-  evidence: () => { dir: string; writeManifest: (context: EvidenceContext) => void };
+  evidence: () => { dir: string; writeManifest: (context: EvidenceContext) => void; readme: () => string | undefined };
   pinEvidence: (context: EvidenceContext | undefined) => void;
   renderVideos: () => string[];
 };
