@@ -163,6 +163,41 @@ test("a retry is a fresh browser, and keeps the failed attempt's evidence", asyn
   equal(browser.closed.filter(what => what.startsWith("video panel")).length, 2);
 });
 
+test("an action with no screen never opens a browser", async () => {
+  // The launch sat above the short-circuit, so a recording VHS drives entirely on its own still
+  // required Playwright to be installed and paid the start-up: a fresh checkout could not film a
+  // shell until a browser had downloaded, and a machine with none failed outright. A browser is the
+  // wrong tool for the half of a product that has no screen — which is what the registry is for.
+  const { runActions } = await import("./run.ts");
+  const { recorderProviders } = await import("../providers/recorders.ts");
+  const was = recorderProviders.get("terminal");
+  let launched = 0;
+  recorderProviders.register("terminal", { available: () => true, record: (_steps, _values, out) => out });
+  try {
+    const result = await runActions(
+      {
+        workspace: { resolve: (t?: string) => `/tmp/witness-run-test/${t ?? ""}` },
+        run: async () => ({ ok: true, values: {} }) as never,
+        actionConfig: () => ({ records: "terminal" as const, steps: [] }),
+        evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
+        pinEvidence: () => undefined,
+        renderVideos: () => [],
+      },
+      { names: ["shell.readTheDatabase"], render: false },
+      {
+        launch: async () => {
+          launched += 1;
+          throw new Error("no browser here — and nothing about a terminal recording needs one");
+        },
+      },
+    );
+    ok(result.ok, result.error);
+    equal(launched, 0);
+  } finally {
+    recorderProviders.register("terminal", was);
+  }
+});
+
 test("the pane a description asks for is the pane it is filmed in", async () => {
   // Three fields were declared, typed and honoured by the tape, and the runner handed over two of the
   // five it had: a terminal pane was always 1280x900 at 20pt and nothing in a description could say

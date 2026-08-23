@@ -39,14 +39,24 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   const outputDir = system.workspace.resolve(path.join("artifacts", "test-results", `cli-${label}`));
   const context: EvidenceContext = { source: "cli", test: label, cut, group, outputDir };
 
-  const browser = await launch();
+  /**
+   * The browser, if anything here turns out to need one.
+   *
+   * Opened on the first lane rather than up here, because a `records: "terminal"` action never asks
+   * for a lane: VHS drives the steps itself. Launching first made a shell recording require Playwright
+   * to be installed and pay the start-up — on a fresh checkout it could not record a terminal until a
+   * browser had finished downloading, and on a machine with none it failed outright, for want of a
+   * thing nothing about the work touches. That contradicts the registry's whole reason for existing.
+   */
+  let browser: Browser | undefined;
+  const open = async (): Promise<Browser> => (browser ??= await launch());
   const cookies = request.cookies ?? [];
   // Slides are timed from here, so a card lands where the run actually showed it.
   markRecordingStart();
 
   /** A lane: its own context, its own page, its own recording. One of these per pane. */
   const lane = async (): Promise<Lane> => {
-    const context = await browser.newContext({
+    const context = await (await open()).newContext({
       viewport: { width: 1280, height: 900 },
       recordVideo: { dir: outputDir, size: { width: 1280, height: 900 } },
     });
@@ -212,8 +222,11 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
     // into every pane, which reads as several things happening at once. In the `finally`, because a
     // run that FAILED is the one whose narration somebody most wants to follow — and it had been
     // sitting in the `catch`, which is the only place it could never help.
-    await writeSlideCards({ browser, outputDir, panes: parallel ? names.length : 1 }).catch(() => undefined);
-    if (!keep) await browser.close();
+    // Only if something opened one: a card is rasterised in a browser, and a run of nothing but
+    // terminal actions has no slides to splice — `slide` is a step the engine executes, and the
+    // engine is what a terminal action does not go through.
+    if (browser) await writeSlideCards({ browser, outputDir, panes: parallel ? names.length : 1 }).catch(() => undefined);
+    if (!keep) await browser?.close();
     system.pinEvidence(undefined);
   }
 

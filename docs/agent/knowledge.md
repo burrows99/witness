@@ -50,6 +50,15 @@ nothing else, and the copy on this machine had arrived some other way. Same fami
 cause from a screenshot: the state in front of you is a result, and more than one thing produces it. A
 scratch prefix costs a second and is the only thing that can answer a question about installing.
 
+**A test on the recording cannot catch a recorder that alters what it records.** The obvious test for
+"a `Type` step must keep its backslash" reads the tape and asserts it says `\n` — and the tape DID say
+`\n`, in the `\\n` form `JSON.stringify` writes, which VHS then typed as two characters. Every
+assertion available without leaving the process passes against the defect, because the tape is exactly
+what the bug leaves intact. The test that catches it runs vhs for real on a step that writes its own
+argument to a file, and asserts on the file: the shell is the only witness to what the shell received.
+Same family as building a fixture in the shape the code expects — and it generalises past this repo, to
+anything whose output is a rendering of an instruction rather than the instruction.
+
 ---
 
 ## Changing this repository
@@ -172,13 +181,15 @@ before any browser is opened; drift never learned to, so the red says "your acti
 what it means is "this checker is the wrong one for this action". True of every terminal action on
 `main` — check it against an action you did not touch before believing it about yours.
 
-**A `Type` step loses a backslash, and a `{…}` inside one is read as a parameter.** A step typing
-`tr '\n' ' '` reached the shell as `tr 'n' ' '` — VHS drops the escape out of a double-quoted `Type`
-— so every letter `n` in the recorded output became a space, on the one screen whose whole job was
-being compared with `docker ps` line by line. And `docker ps --format '{{.Names}}'` never ran at all:
-a step's text goes through `fill()`, which reads `{.Names}` as a parameter nobody supplied and throws.
-Neither is visible in the tape or the exit code; both are obvious in the pixels. Which is the argument
-for opening the frame, not an argument about escaping.
+**A `Type` step loses a backslash, and a `{…}` inside one is read as a parameter.** *(Both fixed —
+see the entry at the end of this section. Kept because the way it was FOUND is the point.)* A step
+typing `tr '\n' ' '` reached the shell as `tr '\\n' ' '` — a tape has no escapes inside a `Type`
+string, so `JSON.stringify` doubling the backslash typed two characters — and `tr` maps every `n` AND
+every backslash to a space, on the one screen whose whole job was being compared with `docker ps` line
+by line. And `docker ps --format '{{.Names}}'` never ran at all: a step's text goes through `fill()`,
+which read `{.Names}` as a parameter nobody supplied and threw. Neither was visible in the tape or the
+exit code; both were obvious in the pixels. Which is the argument for opening the frame, not an
+argument about escaping.
 
 ---
 

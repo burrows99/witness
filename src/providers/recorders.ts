@@ -115,9 +115,25 @@ export function asTape(steps: StepConfig[], values: Params, out: string, opts: R
   return lines.join("\n") + "\n";
 }
 
-/** A tape has no escape for a double quote inside one, so a backtick string is used where needed. */
+/**
+ * Text a tape types **exactly**, in a quote character the text does not use.
+ *
+ * A tape has no escapes inside a `Type` string at all. `\"` is a parse error, and a `\\` is typed as
+ * two characters — so `JSON.stringify` doubling a backslash is not neutral: `tr '\n' ' '` reached the
+ * shell as `tr '\\n' ' '`, which maps every `n` AND every backslash to a space, on a frame whose whole
+ * job was a line-by-line comparison with `docker ps`. The tape was valid, the exit code was 0, and
+ * the recording was of a different command from the one the description asked for. A recorder that
+ * silently alters what it records is the worst thing this tool can do, so nothing is escaped here:
+ * the delimiter moves instead, and where no delimiter is free it says so rather than mangling.
+ */
 function quote(value: string): string {
-  return value.includes('"') ? `\`${value.replace(/`/g, "'")}\`` : JSON.stringify(value);
+  // The plain case, and the only one where `"` is safe: no quote to end the string early, no
+  // backslash for the doubling to touch.
+  if (!/["\\]/.test(value)) return JSON.stringify(value);
+  const mark = ["`", "'"].find(candidate => !value.includes(candidate));
+  // Replacing the clash — a backtick became an apostrophe — is the same defect one layer down.
+  if (!mark) throw new Error(`a tape cannot type ${value}: it uses every quote character VHS has`);
+  return `${mark}${value}${mark}`;
 }
 
 function escapeRegex(value: string): string {
