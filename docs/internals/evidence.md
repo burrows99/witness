@@ -5,7 +5,7 @@
 | file | |
 |---|---|
 | `paths.ts` (88) | the path scheme, derived rather than typed |
-| `evidence.ts` (307) | frames, files, `manual-verification.md`, the run `README.md` |
+| `evidence.ts` (325) | frames, files, `manual-verification.md`, the run `README.md` |
 | `recording.ts` (69) | rasterise each slide at the size of the finished frame |
 | `render.ts` (28) | after the run: recordings → MP4 |
 | `catalogue.ts` (76) | everything the run left on disk, listed in one file |

@@ -18,9 +18,6 @@ docker compose up -d
 open http://localhost:3020 — witness-admin
 ```
 
-## Where to look
-
-
 ## What the run saw
 
 - Registered witness-admin through the web UI; Gitea made it an administrator.
