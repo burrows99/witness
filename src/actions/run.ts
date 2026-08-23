@@ -85,6 +85,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   return {
     ok: !failure,
     results,
+    // Gathered to the top: what an agent reads is this object, and a warning buried one level down in
+    // an action's own result is a warning nobody sees.
+    warnings: results.flatMap(result => (result.warnings ?? []).map(warning => `${result.action}: ${warning}`)),
     error: failure?.message,
     // Where everything landed, so the answer to "and then what" is in the answer.
     evidence: { dir, recordings: outputDir, videos },
@@ -144,6 +147,8 @@ export type RunDeps = { launch?: () => Promise<Browser> };
 export type RunResult = {
   ok: boolean;
   results: ActionResult[];
+  /** What the run got away with — true, and worth reading, even when `ok`. */
+  warnings: string[];
   error?: string;
   evidence: { dir: string; recordings: string; videos: string[] };
 };

@@ -1,14 +1,26 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { normalise } from "./normalise.ts";
+import { normalise, unfilled } from "./normalise.ts";
 import type { SystemConfig } from "./schema.ts";
 
 /** Read and parse a config file. Relative paths resolve against the working directory. */
 export function loadConfig(file: string): SystemConfig {
   const resolved = path.isAbsolute(file) ? file : path.join(process.cwd(), file);
+  const config = JSON.parse(withoutComments(fs.readFileSync(resolved, "utf8"))) as SystemConfig;
+  // Said here, where the file is, rather than three layers down as `no client provider "…"` — an
+  // error about a registry, naming neither the field nor the file, as the first thing a new project
+  // sees. The template is meant to be cut down to what a product has; this says what is left.
+  const blank = unfilled(config);
+  if (blank.length) {
+    throw new Error(
+      `${resolved} is still the generated template: ${blank.length} field${blank.length === 1 ? "" : "s"} ` +
+        `still say "…" — ${blank.slice(0, 5).join(", ")}${blank.length > 5 ? `, and ${blank.length - 5} more` : ""}. ` +
+        `Cut it down to what this product actually has, and delete the rest.`,
+    );
+  }
   // Hoisted here, once, so nothing downstream ever sees the shape it was written in.
-  return normalise(JSON.parse(withoutComments(fs.readFileSync(resolved, "utf8"))) as SystemConfig);
+  return normalise(config);
 }
 
 /**

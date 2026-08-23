@@ -468,7 +468,8 @@ test("an action can leave the note a person re-walks it by", when, async () => {
           written.title = opts.title;
           written.slot = opts.subject?.slot ?? "";
           written.notes = (opts.notes ?? []).join("|");
-          // A subject naming something no step stored is dropped, not an error: a note is a courtesy.
+          // A subject naming something no step stored keeps its line and says what is missing from
+          // it: a note is a courtesy, but a silent one is worse than none.
           written.missing = String(opts.subject?.missing);
           return "manual-verification.md";
         },
@@ -479,7 +480,7 @@ test("an action can leave the note a person re-walks it by", when, async () => {
   equal(written.title, "The booking");
   equal(written.slot, "Tuesday, 3pm");
   equal(written.notes, "they picked Tuesday, 3pm");
-  equal(written.missing, "undefined");
+  equal(written.missing, "«nothing.stored — nothing stored that»");
 });
 
 test("an action with no verify writes no note", when, async () => {
@@ -537,4 +538,78 @@ test("a system with no way to resolve secrets says so", when, async () => {
     () => engine({ a: { steps: [{ fill: { on: "input", value: "{secret.token}" } }] } }).run("a", fakePage().page),
     /\{secret\.token\} — this system was built without any way to resolve secrets/,
   );
+});
+
+test("a note whose template names nothing stored is a warning, not a silence", when, async () => {
+  // Dropping the line left three of four notes missing from a run that reported `ok: true` — in the
+  // one file whose whole job is being trustworthy to somebody who did not watch the run.
+  let written: { notes?: string[] } = {};
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: {
+      a: {
+        steps: [{ store: { from: { testId: "x" }, as: "repo" } }],
+        verify: { title: "T", notes: ["made {repo}", "owned by {owner}"] },
+      },
+    } as never,
+    url: () => "http://app/",
+    evidence: () =>
+      ({
+        actionFrame: async () => "f.png",
+        manualVerification: (opts: { notes?: string[] }) => ((written = opts), "manual-verification.md"),
+      }) as unknown as Evidence,
+  });
+  const result = await actions.run("a", fakePage({ text: "the-repo" }).page);
+  ok(result.ok, "a note is a courtesy and must not fail a run that worked");
+  // The line stays, and says what is missing from it.
+  deepEqual(written.notes, ["made the-repo", "owned by «owner — nothing stored that»"]);
+  equal(result.warnings.length, 1);
+  match(result.warnings[0], /verify: missing \{owner\}/);
+});
+
+test("a run with nothing to report has nothing to say", when, async () => {
+  const result = await engine({ a: { steps: [{ press: "Enter" }] } }).run("a", fakePage().page);
+  deepEqual(result.warnings, []);
+});
+
+test("what `verify` says the run was about is available to its own notes", when, async () => {
+  // `subject` names who the run was about, and a note saying so is the commonest thing anybody writes.
+  let written: { notes?: string[] } = {};
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: {
+      a: { steps: [], verify: { title: "T", subject: { user: "ada" }, notes: ["signed in as {user}"] } },
+    } as never,
+    url: () => "http://app/",
+    evidence: () =>
+      ({ actionFrame: async () => "f.png", manualVerification: (opts: { notes?: string[] }) => ((written = opts), "m.md") }) as unknown as Evidence,
+  });
+  const result = await actions.run("a", fakePage().page);
+  deepEqual(written.notes, ["signed in as ada"]);
+  deepEqual(result.warnings, []);
+});
+
+test("a value a step stored beats one the subject named", when, async () => {
+  // The step read it off the screen, which is the more specific answer.
+  let written: { notes?: string[] } = {};
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: {
+      a: {
+        steps: [{ store: { from: { testId: "who" }, as: "user" } }],
+        verify: { title: "T", subject: { user: "whoever the config guessed" }, notes: ["it was {user}"] },
+      },
+    } as never,
+    url: () => "http://app/",
+    evidence: () =>
+      ({ actionFrame: async () => "f.png", manualVerification: (opts: { notes?: string[] }) => ((written = opts), "m.md") }) as unknown as Evidence,
+  });
+  await actions.run("a", fakePage({ text: "ada, off the screen" }).page);
+  deepEqual(written.notes, ["it was ada, off the screen"]);
 });
