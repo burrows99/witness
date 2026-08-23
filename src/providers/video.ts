@@ -73,8 +73,9 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
     for (const dir of fs.readdirSync(from)) {
       const at = path.join(from, dir);
       if (!fs.statSync(at).isDirectory()) continue;
-      // `panel-NN.webm` when the spec fixed an order, otherwise whatever the runner named them.
-      // Sorting by filename alone puts panels in page-id order, which is nobody's intended reading.
+      // `panel-<lane>-<attempt>.webm` when the run fixed an order — a lane per action driven in
+      // parallel, an attempt per retry — otherwise whatever the browser named them. Sorting by
+      // filename alone puts panels in page-id order, which is nobody's intended reading.
       const all = fs.readdirSync(at).filter(f => f.endsWith(".webm")).sort();
       const ordered = all.filter(f => f.startsWith("panel-"));
       const recordings = (ordered.length ? ordered : all).map(f => path.join(at, f));

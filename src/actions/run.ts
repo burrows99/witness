@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import type { Browser, Page } from "@playwright/test";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import type { ActionResult, Params } from "./engine.ts";
 import type { EvidenceContext } from "../evidence/paths.ts";
@@ -21,7 +21,7 @@ import { slug } from "../evidence/paths.ts";
  * A spec is still the place for assertions, branching and narration. This is for the sequence itself.
  */
 export async function runActions(system: RunnableSystem, request: RunRequest, deps: RunDeps = {}): Promise<RunResult> {
-  const { names, inputs = {}, headed = false, keep = false } = request;
+  const { names, inputs = {}, headed = false, keep = false, parallel = false, retries = 0 } = request;
   // Injectable so this can be tested without downloading a browser: a unit test that pulls Chromium is
   // not a unit test, and a CI job that fails for want of one stops publishing without stopping merging.
   const launch = deps.launch ?? (() => requirePlaywright("running an action from the command line").chromium.launch({ headless: !headed }));
@@ -37,18 +37,18 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
   const context: EvidenceContext = { source: "cli", test: label, cut, group, outputDir };
 
   const browser = await launch();
-  const browserContext = await browser.newContext({
-    viewport: { width: 1280, height: 900 },
-    recordVideo: { dir: outputDir, size: { width: 1280, height: 900 } },
-  });
-  // What the config says the system can BE. The same cookies a spec gets, for the same reason.
   const cookies = request.cookies ?? [];
-  if (cookies.length) await browserContext.addCookies(cookies);
-  // Playwright's trace: the DOM at every action, the network with bodies, the sources. It is a better
-  // debugger for a PERSON than anything written here, and it used to arrive only through the runner —
-  // so removing the runner would have quietly taken it away.
-  await browserContext.tracing.start({ screenshots: true, snapshots: true, sources: true }).catch(() => undefined);
-  const page = await browserContext.newPage();
+
+  /** A lane: its own context, its own page, its own recording. One of these per pane. */
+  const lane = async (): Promise<Lane> => {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      recordVideo: { dir: outputDir, size: { width: 1280, height: 900 } },
+    });
+    // What the config says the system can BE. The same cookies a spec gets, for the same reason.
+    if (cookies.length) await context.addCookies(cookies);
+    return { context, page: await context.newPage() };
+  };
 
   system.pinEvidence(context);
   const evidence = system.evidence();
@@ -59,21 +59,97 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
 
   const results: ActionResult[] = [];
   let failure: Error | undefined;
+
+  /**
+   * One action, and the attempts it takes.
+   *
+   * A retry is a fresh lane: a browser left on the screen the failure happened on is not a place to
+   * start again from. Every attempt keeps its own evidence — the one that FAILED is the interesting
+   * one, and a retry that quietly overwrote it would leave a green run with nothing to explain it.
+   */
+  const attempt = async (name: string, at: string, values: Params, on?: Lane, dir?: string): Promise<ActionResult> => {
+    for (let n = 1; n <= retries + 1; n += 1) {
+      // A chain shares one lane, because it is one story and should be one continuous recording. A
+      // retry always gets a fresh one: a browser left on the screen the failure happened on is not a
+      // place to start again from.
+      const own = on && n === 1 ? undefined : await lane();
+      const using = own ?? on!;
+      // `checkout`, then `checkout-retry-2` — so the tree says how many goes it took without anybody
+      // having to diff two directories to find out.
+      const into = n === 1 ? dir : `${dir ?? slug(name, 56)}-retry-${n}`;
+      try {
+        const result = await system.run(name, using.page, values, { at: into });
+        if (own) await finish(own.context, at, n);
+        return result;
+      } catch (err) {
+        if (own) await finish(own.context, at, n);
+        // The last go: the caller sees the failure, as it would with no retries at all.
+        if (n === retries + 1) throw err;
+        process.stderr.write(`[retry] ${name} failed on attempt ${n} of ${retries + 1} — going again\n`);
+      }
+    }
+    throw new Error("unreachable");
+  };
+
+  /** Close a lane and name its recording, so the panes come out in the order they were asked for. */
+  const finish = async (lanes: BrowserContext, at: string, attemptNumber: number): Promise<void> => {
+    const video = lanes.pages()[0]?.video();
+    const only = at === "01" && attemptNumber === 1;
+    await lanes.tracing.stop({ path: path.join(outputDir, `trace${only ? "" : `-${at}-${attemptNumber}`}.zip`) }).catch(() => undefined);
+    // The video is written when the CONTEXT closes, so this happens before anything reads for it.
+    await lanes.close();
+    // `panel-NN.webm` is what the video provider orders panes by; without it they come out in
+    // page-id order, which is nobody's intended reading. `saveAs` COPIES — the original stays where
+    // the browser put it, and every one left behind is a pane stitched in twice.
+    const saved = await video
+      ?.saveAs(path.join(outputDir, `panel-${at}-${String(attemptNumber).padStart(2, "0")}.webm`))
+      .then(() => true)
+      .catch(() => false);
+    // Only once the copy is definitely there. Deleting regardless turned a recording that failed to
+    // copy into no recording at all — silently, because both halves swallow their errors.
+    if (saved) await video?.delete().catch(() => undefined);
+  };
+
   try {
-    for (const name of names) {
-      // Each action starts from where the last one left off: a sequence is why more than one is allowed.
-      results.push(await system.run(name, page, { ...inputs, ...lastValues(results) }));
+    if (parallel) {
+      // Side by side, in one recording, because that is the whole point of running them together: the
+      // video provider stitches every `.webm` in this directory into panels of one frame.
+      const lanes = await Promise.allSettled(
+        names.map((name, index) => {
+          const lane = String(index + 1).padStart(2, "0");
+          // `01-grafana-signin` beside `panel-01`: the directory says which pane it is, and two lanes
+          // running the SAME action no longer write their evidence over each other.
+          return attempt(name, lane, { ...inputs }, undefined, `${lane}-${slug(name, 52)}`);
+        }),
+      );
+      for (const [index, settled] of lanes.entries()) {
+        if (settled.status === "fulfilled") results.push(settled.value);
+        else {
+          const attached = (settled.reason as { result?: ActionResult })?.result;
+          if (attached) results.push(attached);
+          // The first failure is the one reported; the rest are in their own results and stories.
+          failure ??= settled.reason instanceof Error ? settled.reason : new Error(String(settled.reason));
+          process.stderr.write(`[parallel] ${names[index]} failed\n`);
+        }
+      }
+    } else {
+      // One lane for the whole chain: each action starts from where the last one left off, which is
+      // why more than one is allowed — and it comes out as ONE continuous recording rather than as
+      // panes of things that were never happening at once.
+      const only = await lane();
+      try {
+        for (const name of names) {
+          results.push(await attempt(name, "01", { ...inputs, ...lastValues(results) }, only));
+        }
+      } finally {
+        await finish(only.context, "01", 1);
+      }
     }
   } catch (err) {
     failure = err instanceof Error ? err : new Error(String(err));
     const attached = (failure as { result?: ActionResult }).result;
     if (attached) results.push(attached);
   } finally {
-    // Where the story already says it will be, and written before the context closes: after that there
-    // is nothing left to write it from.
-    await browserContext.tracing.stop({ path: path.join(outputDir, "trace.zip") }).catch(() => undefined);
-    // The video is written when the CONTEXT closes, so this happens before anything reads for it.
-    await browserContext.close();
     if (!keep) await browser.close();
     system.pinEvidence(undefined);
   }
@@ -146,9 +222,22 @@ export type RunRequest = {
   headed?: boolean;
   /** Leave the browser open — for looking at what the last step left on the screen. */
   keep?: boolean;
+  /**
+   * Drive every named action at once, each in its own browser, stitched into panels of one video.
+   *
+   * They cannot thread values into each other when they run together, so each gets the inputs the
+   * caller passed and nothing else. Off by default: a chain that signs in and then does something is
+   * the commoner case, and running THAT in parallel signs in twice and does the thing signed out.
+   */
+  parallel?: boolean;
+  /** How many more goes a failing action gets. Each is a fresh browser, and keeps its own evidence. */
+  retries?: number;
   /** Turn the recording into an MP4. On by default: that is the point of recording it. */
   render?: boolean;
 };
+
+/** One browser, one page, one recording: a pane, or the whole of a sequential run. */
+type Lane = { context: BrowserContext; page: Page };
 
 /** What the runner needs from the outside world, handed in so a test can hand in something else. */
 export type RunDeps = { launch?: () => Promise<Browser> };
@@ -165,7 +254,7 @@ export type RunResult = {
 /** The part of a system this needs, so the runner does not depend on the whole composite root. */
 type RunnableSystem = {
   workspace: { resolve: (target?: string) => string };
-  run: (action: string, page: Page, inputs: Params) => Promise<ActionResult>;
+  run: (action: string, page: Page, inputs: Params, within?: { at?: string }) => Promise<ActionResult>;
   evidence: () => { dir: string; writeManifest: (context: EvidenceContext) => void; readme: () => string | undefined };
   pinEvidence: (context: EvidenceContext | undefined) => void;
   renderVideos: () => string[];
