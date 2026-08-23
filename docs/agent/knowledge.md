@@ -10,8 +10,9 @@ somebody disagrees with it.
 ## Verifying
 
 **Read the exit code, never the tail of the output.** `npm run check | grep …` and
-`gh pr checks --watch | tail -3` both hide a non-zero exit. Twice: once merging on a red check, once
-shipping with an undeclared binary that CI then caught. If a pipeline is needed, capture `${PIPESTATUS[0]}`.
+`gh pr checks --watch | tail -3` both hide a non-zero exit — a pipeline reports the code of its last
+command, which is the one you added. Twice: once merging on a red check, once shipping with an
+undeclared binary that CI then caught. Do not pipe: redirect, then read the file.
 
 **A green run can produce evidence that contradicts its own caption.** Twice in one session: a
 caption over the wrong scroll position, and "two ways back" written over a frame showing one. Open
@@ -58,6 +59,26 @@ what the bug leaves intact. The test that catches it runs vhs for real on a step
 argument to a file, and asserts on the file: the shell is the only witness to what the shell received.
 Same family as building a fixture in the shape the code expects — and it generalises past this repo, to
 anything whose output is a rendering of an instruction rather than the instruction.
+
+**The idiom this file used to recommend for pipelines is one an agent cannot type.**
+`${PIPESTATUS[0]}` is the textbook answer to a pipeline hiding an exit code, and three agents reported
+that their harness refuses to run any command containing a `${…[0]}` subscript — the whole command,
+before it runs. So the headline verification rule came with a fallback that fails on arrival, and what
+is left is eyeballing the output, which is the habit the rule exists to prevent. Redirect instead:
+`cmd > /tmp/x.log 2>&1; echo "exit=$?"`, then grep the file. No pipeline, no array, and the code still
+belongs to the command that was run. An instruction the reader cannot execute is worse than none —
+it does not fail loudly, it fails back to the old habit.
+
+**`gh pr checks` answers about the checks that EXIST, which is not the question.** For the first
+minute or two after a push ours have not been created, so the rollup holds whichever third-party app
+answered first: nothing red, nothing pending, exit `0`. `--watch` cannot help — there is nothing to
+wait for, so it returns immediately. On a pull request GitHub calls `CONFLICTING` this is not a race
+but a settled state: `check` and `analyze` are never queued at all, and the `0` is permanent. Three
+agents read that as "the tests passed" in one day, and phase 7 was telling them to. The exit code was
+honest about the question it was asked. Ask a better one: `.claude/pr-green.sh <n>` requires the jobs
+this repository's workflows define, by name, waits for them to be created, and only then watches. Same
+family as reading the tail of a pipe — a green from a command that was never asked what you wanted to
+know.
 
 ---
 
@@ -123,6 +144,17 @@ repository settings drift with nothing to catch them. A dozen files under `src/`
 justified a design decision by what an agent cannot do, while every front door still described a
 config-driven test harness. Change the sentence, grep the repository for the old one, and set the two
 that live in repository settings over the API in the same run.
+
+**A browser upload tool takes a path inside the project, and refuses every other one.** "Mint the URL
+through a logged-in browser" is the right instruction with a constraint missing from it, and the
+constraint cost two agents an afternoon each: the tool accepts what the session was started on and
+rejects the rest, so a frame under `/tmp` — or in the worktree the change was made in, beside the
+project rather than in it — cannot be uploaded from where it was recorded, however correct the path
+is. Copy it in first and upload the copy. Note that this puts two of our own rules in tension:
+`require-evidence.sh` requires the image to have been Read before it goes anywhere, and it will
+approve a path the uploader then refuses. And there is no way round it from inside the page — GitHub's
+CSP blocks a `fetch` of a local server and of a `data:` URI, a synthetic `⌘V` carries no clipboard, and
+its own uploader ignores a synthetic `drop`. A file the upload tool will accept is the only door.
 
 ---
 

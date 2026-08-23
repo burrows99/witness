@@ -313,6 +313,23 @@
       ]
     },
 
+    // The other half of what an agent reads before it has run anything: where a run puts what it
+    // produced, and what it takes to get one of those files in front of a person. Both are claims
+    // the skill makes about the world outside this tool, and nothing type-checks either.
+    "theEvidenceItDescribes": {
+      "summary": "what the generated skill says a run leaves behind, and how to attach it",
+      "records": "terminal",
+      "pane": { "height": 1100, "fontSize": 16 },
+      "steps": [
+        { "caption": { "text": "what witness skill says a run leaves behind" } },
+        {
+          "type": { "on": "prompt", "value": "clear; ./bin/witness skill | sed -n '/^## What a run leaves behind/,/^## The description/p' | sed '$d'" }
+        },
+        { "press": "Enter" },
+        { "wait": 8000, "note": "the description loads first and the section arrives in one write; the last `sed` drops the heading the range ran on to" }
+      ]
+    },
+
     // The one action about the DESCRIPTION rather than the product: generate one off this repo's own
     // compose file and read the board off it. Every row on that board is a claim about a container
     // `docker ps` can be asked about, which is why both end up on the same final screen — a board
