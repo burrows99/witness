@@ -62,3 +62,69 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+
+  # --- Third-party OSS, deliberately not chosen for convenience -------------------------------
+  # Six applications nobody here designed, picked so each one stresses a different part of reading a
+  # description off a running system. A stack we built ourselves can only tell us what we already
+  # assumed.
+
+  # Server-rendered PHP with no JavaScript at all: a login form, and not one XHR to observe.
+  adminer:
+    image: adminer:4.8.1
+    container_name: witness-adminer
+    ports:
+      - "${ADMINER_PORT:-8091}:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+
+  # A Vue single-page app behind a setup wizard: almost no server-rendered links to crawl.
+  uptime-kuma:
+    image: louislam/uptime-kuma:1.23.16
+    container_name: witness-uptime-kuma
+    ports:
+      - "${KUMA_PORT:-3011}:3001"
+
+  # An identity provider. The one thing the description language cannot express is a sign-in that
+  # LEAVES the app, and this is that sign-in, on a second origin, on purpose.
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: witness-keycloak
+    command: ["start-dev", "--http-port=8080"]
+    ports:
+      - "${KEYCLOAK_PORT:-8092}:8080"
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+
+  # API-first: the screens are a thin client over its own REST API, so exploring it should yield
+  # operations rather than routes.
+  directus:
+    image: directus/directus:11.1.1
+    container_name: witness-directus
+    ports:
+      - "${DIRECTUS_PORT:-8093}:8055"
+    environment:
+      KEY: witness-demo-only-key
+      SECRET: witness-demo-only-secret
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: witness-demo-only
+      DB_CLIENT: sqlite3
+      DB_FILENAME: /directus/database/data.db
+
+  # A SECOND database, so the multi-database case is in our own stack rather than only in somebody
+  # else's. No container_name on purpose: compose names it, and something has to work that out.
+  mariadb:
+    image: mariadb:11.4
+    ports:
+      - "${MARIADB_PORT:-3307}:3306"
+    environment:
+      MARIADB_DATABASE: witness
+      MARIADB_USER: witness
+      MARIADB_PASSWORD: ${MARIADB_CREDENTIAL:-witness-demo-only}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_CREDENTIAL:-witness-demo-only}
+
+  # Not HTTP, and no container_name either: two ways a probe can be got wrong at once.
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
