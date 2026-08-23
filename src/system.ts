@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { Actions, type ActionResult, type Params } from "./actions/engine.ts";
 import { appSurface, type RouteMap, type Screens } from "./browser/surface.ts";
 import { Cli, type Noun } from "./cli/cli.ts";
-import { fill, type SystemConfig, loadConfig } from "./config/index.ts";
+import { fill, type SystemConfig, loadConfig, scoped } from "./config/index.ts";
 import { locate } from "./browser/locator.ts";
 import { resolveSecret } from "./providers/secrets.ts";
 import { Evidence } from "./evidence/evidence.ts";
@@ -99,7 +99,9 @@ export class System {
           container: () => this.stack.containers[config.database!.service],
           user: config.database.user,
           database: config.database.database,
-          password: config.database.password,
+          // Resolved here rather than passed through: `containerEnv` reads the running container,
+          // which is not a thing a database driver should know how to do.
+          password: resolveSecret(config.database.password as Parameters<typeof resolveSecret>[0], this.stack),
           trace: this.trace,
         })
       : undefined;
@@ -117,7 +119,7 @@ export class System {
       evidence: () => this.evidence(),
       // So an action can sign in without the caller typing a password on the command line — which is
       // the whole reason `secrets` exists, and was unreachable from a description until now.
-      secret: (name: string) => this.secret(name),
+      secret: (name: string, scope?: string) => this.secret(name, scope),
     });
 
     this.apps = {};
@@ -277,10 +279,16 @@ export class System {
    * The config says which file or which container holds it; the value never appears in the repo, and
    * nothing that logs (the trace included) ever prints it.
    */
-  secret(name: string): string {
-    const spec = this.config.secrets?.[name];
-    if (spec === undefined) throw new Error(`no secret "${name}" in the config`);
-    return resolveSecret(spec as Parameters<typeof resolveSecret>[0], this.stack);
+  secret(name: string, scope?: string): string {
+    // The service's own first, then a shared one: `{secret.password}` in grafana's action means
+    // grafana's password, and two services with a `password` is the normal case.
+    for (const candidate of scoped(name, scope?.includes(".") ? scope.slice(0, scope.indexOf(".")) : scope)) {
+      const spec = this.config.secrets?.[candidate];
+      if (spec !== undefined) return resolveSecret(spec as Parameters<typeof resolveSecret>[0], this.stack);
+    }
+    throw new Error(
+      `no secret "${name}"${scope ? ` for ${scope}` : ""} — declared: ${Object.keys(this.config.secrets ?? {}).join(", ") || "none"}`,
+    );
   }
 
   /** A container's environment — the running process, never the file it was created from. */

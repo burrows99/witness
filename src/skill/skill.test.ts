@@ -173,3 +173,8 @@ test("it says where a description comes from, which nothing generated can", () =
   match(out, /\*\*A locator you have not run is a guess\.\*\*/);
   match(out, /five of nine/);
 });
+
+test("it says where a thing belongs, which is the question a config asks first", () => {
+  const out = Skill.for().render();
+  match(out, /\*\*A service owns what is true about it\.\*\*/);
+});

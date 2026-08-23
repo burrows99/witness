@@ -35,8 +35,8 @@ export class Actions {
   private readonly config: Record<string, ActionConfig>;
   private readonly appUrl: (app: string, route: string, params: Params) => string;
   private readonly evidence: () => Evidence;
-  /** A declared credential, resolved when a step actually asks for one. */
-  private readonly secret: (name: string) => string;
+  /** A declared credential, resolved when a step actually asks for one, in its service's scope first. */
+  private readonly secret: (name: string, scope?: string) => string;
   /** Something the last step got away with that a reader should know about. */
   private warning?: string;
 
@@ -48,7 +48,7 @@ export class Actions {
     url: (app: string, route: string, params: Params) => string;
     evidence: () => Evidence;
     /** Optional: without it, `{secret.x}` says the config declares no secrets. */
-    secret?: (name: string) => string;
+    secret?: (name: string, scope?: string) => string;
   }) {
     this.operations = opts.operations;
     this.queries = opts.queries;
@@ -71,8 +71,22 @@ export class Actions {
    * Lazily, through a proxy, because a config declares secrets it does not always use — and reading
    * one means an exec into a running container, which fails when that container is not the point.
    */
-  private bag(values: Params): Params {
-    return { ...values, secret: new Proxy({}, { get: (_, name) => (typeof name === "string" ? this.secret(name) : undefined) }) };
+  private bag(values: Params, scope?: string): Params {
+    return {
+      ...values,
+      // `{secret.password}` in one of grafana's actions means grafana's, and falls back to a shared
+      // one — which is how a description says "this service's password" and "our one CI token"
+      // without inventing a naming convention for either.
+      secret: new Proxy({}, { get: (_, name) => (typeof name === "string" ? this.secret(name, scope) : undefined) }),
+    };
+  }
+
+  /** `signIn` inside `grafana.openDashboards` is `grafana.signIn`, if there is one. */
+  private resolveName(name: string, from?: string): string {
+    if (this.config[name] || !from) return name;
+    const service = from.includes(".") ? from.slice(0, from.indexOf(".")) : undefined;
+    const scoped = service ? `${service}.${name}` : name;
+    return this.config[scoped] ? scoped : name;
   }
 
   get names(): string[] {
@@ -85,9 +99,18 @@ export class Actions {
    * `inputs` fill `{placeholders}` in every step; anything a step stores becomes available to the steps
    * after it, so a value read off the screen (a chosen time, a created id) can be asserted or returned.
    */
-  async run<T = unknown>(name: string, page: Page, inputs: Params = {}): Promise<ActionResult<T>> {
-    const action = this.config[name];
-    if (!action) throw new Error(`no such action "${name}" — see the config's actions`);
+  async run<T = unknown>(name: string, page: Page, inputs: Params = {}, from?: string): Promise<ActionResult<T>> {
+    // A service's own action reaches its siblings by bare name — being under the same service is what
+    // says which `signIn` is meant, and repeating the prefix inside it says nothing new.
+    const resolved = this.resolveName(name, from);
+    const action = this.config[resolved];
+    if (!action) {
+      throw new Error(
+        `no such action "${name}"${from && resolved !== name ? ` (tried "${resolved}" too)` : ""} — ` +
+          `declared: ${this.names.join(", ") || "none"}`,
+      );
+    }
+    name = resolved;
 
     // Checked before anything is launched: an action that declares what it needs should say so at the
     // start, not fail on an unfilled `{placeholder}` three steps in, after a browser has opened and a
@@ -123,7 +146,7 @@ export class Actions {
         // of a walk all reading "run" is that promise not kept.
         inspector.mark(label === "run" ? `run ${Actions.about(step)}` : label, index);
         try {
-          await this.step(step, page, values, action.app);
+          await this.step(step, page, values, action.app, name);
         } catch (err) {
           error = err instanceof Error ? err.message : String(err);
         }
@@ -185,9 +208,9 @@ export class Actions {
   }
 
   /** One step. Every branch is a verb a config can use; there is deliberately no escape into code. */
-  private async step(step: StepConfig, page: Page, values: Params, defaultApp?: string): Promise<void> {
-    const at = (spec: LocatorSpec): ReturnType<typeof locate> => locate(page, this.resolve(spec, values) as LocatorSpec);
-    const text = (s?: string): string => (s === undefined ? "" : fill(s, this.bag(values)));
+  private async step(step: StepConfig, page: Page, values: Params, defaultApp?: string, owner?: string): Promise<void> {
+    const at = (spec: LocatorSpec): ReturnType<typeof locate> => locate(page, this.resolve(spec, values, owner) as LocatorSpec);
+    const text = (s?: string): string => (s === undefined ? "" : fill(s, this.bag(values, owner)));
 
     if (step.goto) {
       const { app, route, url, params } = step.goto;
@@ -302,7 +325,7 @@ export class Actions {
       const call = typeof step.run === "string" ? { action: step.run } : step.run;
       // Without `with`, the composed action could only ever be run on the values that happened to be
       // lying around — so an action taking an input could be composed once and never twice.
-      const nested = await this.run(call.action, page, { ...values, ...this.resolveParams(call.with, values) });
+      const nested = await this.run(call.action, page, { ...values, ...this.resolveParams(call.with, values, owner) }, owner);
       Object.assign(values, nested.values);
     }
     if (step.query) {
@@ -312,7 +335,7 @@ export class Actions {
     // The claim one layer makes against another: what the API answered against what the screen shows,
     // what a list holds against what was counted. `expect` can only see the screen, so this was the
     // last thing a description could not say and a program had to.
-    if (step.check) Actions.assert(step.check, this.bag(values));
+    if (step.check) Actions.assert(step.check, this.bag(values, owner));
     // A still worth keeping on its own, beside the automatic one per step: the frames a person is
     // actually shown, named for what they show rather than for the verb that happened to take them.
     if (step.frame) await this.evidence().frame(page, text(step.frame), { fullPage: step.fullPage });
@@ -437,21 +460,21 @@ export class Actions {
    * A string that is EXACTLY one placeholder resolves to the value itself rather than its text, so a
    * step can be handed a whole object (`"fillFields": "{fields}"`) and not the string "[object Object]".
    */
-  private resolve(value: unknown, values: Params): unknown {
+  private resolve(value: unknown, values: Params, owner?: string): unknown {
     if (typeof value === "string") {
       const whole = value.match(/^\{(\w+)\}$/);
       if (whole && values[whole[1]] !== undefined) return values[whole[1]];
-      return fill(value, this.bag(values));
+      return fill(value, this.bag(values, owner));
     }
-    if (Array.isArray(value)) return value.map(v => this.resolve(v, values));
+    if (Array.isArray(value)) return value.map(v => this.resolve(v, values, owner));
     if (value && typeof value === "object") {
-      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.resolve(v, values)]));
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.resolve(v, values, owner)]));
     }
     return value;
   }
 
-  private resolveParams(params: Record<string, string> | undefined, values: Params): Params {
-    return params ? (this.resolve(params, values) as Params) : {};
+  private resolveParams(params: Record<string, string> | undefined, values: Params, owner?: string): Params {
+    return params ? (this.resolve(params, values, owner) as Params) : {};
   }
 
   /**
