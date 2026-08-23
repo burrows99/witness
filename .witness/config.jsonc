@@ -212,6 +212,20 @@
             { "goto": { "route": "inbox" } },
             { "wait": 800, "note": "the inbox is a client-side app; the list arrives after the document" }
           ]
+        },
+
+        "describeItself": {
+          "summary": "what `config explore` writes down about an app whose every page is one row of live data",
+          "records": "terminal",
+          // Mailpit is the app in this stack whose screens are DATA — a message id in the path, a
+          // spam score in a tab. Grafana's fragment cannot show that; this one is the whole of it.
+          "pane": { "height": 1900, "fontSize": 12 },
+          "steps": [
+            { "caption": { "text": "asking witness what Mailpit says about itself" } },
+            { "type": { "on": "prompt", "value": "./bin/witness config explore mailpit --pages=2" } },
+            { "press": "Enter" },
+            { "wait": 25000, "note": "two pages, each waited on before it is read, and a browser has to start first" }
+          ]
         }
       }
     },

@@ -22,9 +22,53 @@ const REGISTER = `- navigation "Navigation Bar":
     - /url: /user/login
 `;
 
-const page = (path: string, yaml: string, placeholders: string[] = []): PageFacts => {
+/**
+ * The real thing again, from Mailpit: an inbox and one message, with the two live values that made
+ * two runs of the same command disagree — the id in the path, and the score in the tab.
+ *
+ * Taken off the running stack rather than written here, because a fixture invented alongside the
+ * code it feeds only proves the two agree. The `/view/false` links are Mailpit's own disabled
+ * previous/next buttons; the `/search?q=…` ones are its From and To addresses.
+ */
+const INBOX = (id: string) => `- link "MailpitMailpit":
+  - /url: /
+  - img "Mailpit"
+  - text: Mailpit
+- textbox "Search":
+  - /placeholder: Search mailbox
+- button " Inbox"
+- button " Delete all"
+- link "gitea@witness.example To: witness-admin@example.com Recover your account 2.2 kB 4 hours ago":
+  - /url: /view/${id}
+`;
+
+const MESSAGE = (id: string, score: number) => `- link "MailpitMailpit":
+  - /url: /
+- button " Mark unread"
+- link "":
+  - /url: /view/false
+- link "":
+  - /url: /view/false
+- button " Return to inbox"
+- table:
+  - row "From <gitea@witness.example>":
+    - cell "<gitea@witness.example>":
+      - link "gitea@witness.example":
+        - /url: /search?q=gitea%40witness.example
+  - row "To <witness-admin@example.com>":
+    - cell "<witness-admin@example.com>":
+      - link "witness-admin@example.com":
+        - /url: /search?q=witness-admin%40example.com
+- tablist:
+  - tab "HTML" [selected]
+  - tab "Raw"
+  - tab "HTML Check ${score}%"
+  - tab "Link Check"
+`;
+
+const page = (path: string, yaml: string, fields: PageFacts["fields"] = []): PageFacts => {
   const nodes = Explore.parse(yaml);
-  return { path, nodes, placeholders, links: Explore.links(nodes, new URL("http://localhost:3020")), title: Explore.title(nodes) };
+  return { path, nodes, fields, links: Explore.links(nodes, new URL("http://localhost:3020")), title: Explore.title(nodes) };
 };
 
 test("an aria snapshot becomes nodes that remember their depth", () => {
@@ -102,8 +146,48 @@ test("a locator that matches twice is not offered as one", () => {
 test("forms carry the placeholder that finds the input, not the label", () => {
   // `forms` is consumed with getByPlaceholder. An accessible name is the LABEL wherever there is
   // one, so reading these off the aria tree would produce a form that cannot fill anything.
-  const forms = Explore.forms([page("/user/sign_up", REGISTER, ["Username", "Email Address"])]);
-  deepEqual(forms.register, { username: "Username", emailAddress: "Email Address" });
+  const forms = Explore.forms([
+    page("/user/sign_up", REGISTER, [
+      { name: "user_name", placeholder: "Username" },
+      { name: "email", placeholder: "Email Address" },
+    ]),
+  ]);
+  deepEqual(forms.register, { userName: "Username", email: "Email Address" });
+});
+
+test("a field is named for what it is, not for the example data in it", () => {
+  // From a real signup form: the email box was called `youOrganisationCh` and the name box
+  // `adaLovelace`, because both were named from the sample value a designer had typed into the mock.
+  // The placeholder is the right thing to MATCH on and the wrong thing to NAME from.
+  const forms = Explore.forms([
+    page("/register", '- main "Create your account"\n', [
+      { name: "full_name", placeholder: "Ada Lovelace" },
+      { name: "email", placeholder: "you@organisation.ch" },
+    ]),
+  ]);
+  deepEqual(forms.createYourAccount, { fullName: "Ada Lovelace", email: "you@organisation.ch" });
+  // And a `name` attribute that is not an identifier falls back to the placeholder rather than to
+  // nothing: a form named from example data beats no form at all, which is what dropping it means.
+  deepEqual(Explore.forms([page("/x", '- main "Search"\n', [{ name: "2", placeholder: "Find a repository" }])]).search, {
+    findARepository: "Find a repository",
+  });
+});
+
+test("the same form on three pages is one form", () => {
+  // `welcomeBack`, `welcomeBack2`, `welcomeBack3` — one sign-in box seen on three routes. The rule
+  // that stops a name collision from silently dropping an entry cannot tell a collision from a
+  // repeat, so it renamed rather than recognised.
+  const signIn = [
+    { name: "user", placeholder: "email or username" },
+    { name: "password", placeholder: "password" },
+  ];
+  const forms = Explore.forms([
+    page("/login", '- main "Welcome back"\n', signIn),
+    page("/settings", '- main "Welcome back"\n', signIn),
+    page("/reports", '- main "Welcome back"\n', signIn),
+    page("/reset", '- main "Forgot your password"\n', [{ name: "user", placeholder: "Email or username" }]),
+  ]);
+  deepEqual(Object.keys(forms), ["welcomeBack", "forgotYourPassword"]);
 });
 
 test("paths that differ in one segment are one operation with a parameter", () => {
@@ -273,4 +357,98 @@ test("a crawl starts from the routes the config already declares", () => {
   // A route with a parameter cannot be visited without a value, so it is not a starting point.
   deepEqual(Explore.startingRoutes(loaded, "grafana"), ["/login", "/"]);
   deepEqual(Explore.startingRoutes(loaded, "postgres"), []);
+});
+
+/**
+ * The check nothing here was doing: run it twice and diff.
+ *
+ * Every other test in this file asks one question of one function. This one asks the question a
+ * person asks — is what it wrote down last week what it writes down today — and it is the only shape
+ * that could have caught what it catches, which is why three separate defects survived a green suite.
+ *
+ * The two runs are the same app with its data moved on: a different message on top, a different
+ * spam score in the tab. Nothing about the product changed, so nothing about the description may.
+ */
+test("two runs against the same app write down the same thing", async () => {
+  const run = async (id: string, score: number): Promise<string> =>
+    Explore.render(
+      await Explore.crawl({
+        origin: "http://localhost:8025",
+        maxPages: 4,
+        maxDepth: 2,
+        requests: [
+          { method: "GET", url: `http://localhost:8025/api/v1/message/${id}` },
+          { method: "GET", url: `http://localhost:8025/api/v1/message/${id}/html-check` },
+          { method: "GET", url: "http://localhost:8025/api/v1/messages" },
+        ],
+        read: async url => {
+          const path = new URL(url).pathname;
+          return { ...(path === "/" ? page("/", INBOX(id)) : page(path, MESSAGE(id, score))), url };
+        },
+      }),
+      "mailpit",
+    );
+
+  const first = await run("m8Ms2n2xDXX2JUyFCX8v5E", 95);
+  const second = await run("kQ1p7Zz9RRt4VbnMLc3xW2", 71);
+  equal(first, second);
+  // And it is the honest version that is stable, not an empty one: the screens are still there, the
+  // message just is not.
+  match(first, /"\/view\/\{id\}"/);
+  match(first, /"htmlCheck"/);
+  match(first, /"\/api\/v1\/message\/\{id\}\/html-check"/);
+});
+
+test("a route with an id in it describes the screen, not the row", () => {
+  const routes = Explore.routes([page("/", INBOX("m8Ms2n2xDXX2JUyFCX8v5E"))]);
+  // `/view/m8Ms2n2xDXX2JUyFCX8v5E` describes one message that will be gone tomorrow.
+  equal(routes.view, "/view/{id}");
+  // `operations` has collapsed paths like this since it was written; routes never did, and the two
+  // now do it with the same function. Digits and UUIDs were all it knew, which is why Mailpit's ids
+  // went through untouched — most id schemes are neither.
+  equal(Explore.templated("/api/v1/repos/7/issues"), "/api/v1/repos/{id}/issues");
+  equal(Explore.templated("/orgs/9f1c2b3a-4d5e-6f70-8192-a3b4c5d6e7f8/edit"), "/orgs/{id}/edit");
+  // And a word with a number in it is not an id: a real path must survive this untouched.
+  equal(Explore.templated("/connections/datasources"), "/connections/datasources");
+  equal(Explore.templated("/user/password/send-reset-email"), "/user/password/send-reset-email");
+});
+
+test("a malformed href never becomes a route", () => {
+  // A stray quote in an href on a real page produced `"welcomeBack2": "/%22"`, and a template with
+  // no id behind it produced `/view/false`. `new URL()` accepts both, and nothing else asked.
+  const junk = '- link "Sign in":\n  - /url: "\n- link "Next":\n  - /url: /view/false\n- link "Home":\n  - /url: /\n';
+  deepEqual(Object.values(Explore.routes([page("/", junk)])).sort(), ["/"]);
+  // Nor is either of them requested: a path nobody meant is not a page to walk.
+  deepEqual(Explore.links(Explore.parse(junk), new URL("http://localhost:8025")), ["/"]);
+});
+
+test("a locator is not named after a number the app rendered", () => {
+  // Two runs hours apart against an unchanged app: lost `htmlCheck` and `inbox1`, gained
+  // `htmlCheck95`. The name is also what RESOLVES it, so `HTML Check 95%` stops finding the tab the
+  // moment the score is not 95 — the stable part has to replace the name, not just name it.
+  const locators = Explore.locators([page("/view/x", MESSAGE("x", 95))]);
+  deepEqual(locators.htmlCheck, { role: "tab", name: "HTML Check" });
+  equal("htmlCheck95" in locators, false);
+  // A name that is nothing but its number has no stable part, and a volatile locator is worse than
+  // an ambiguous one — which is already dropped.
+  deepEqual(Explore.locators([page("/x", '- button "95%"\n- button "Save"\n')]), {
+    save: { role: "button", name: "Save" },
+  });
+});
+
+test("a page is recorded where it landed, not where it was asked for", async () => {
+  // Signed out, Grafana answers `/` and `/connections/datasources` with the same login screen. Asked
+  // for rather than landed on, that was two routes named for a title belonging to neither, and four
+  // copies of one form.
+  const login = '- main "Welcome to Grafana":\n  - link "Forgot your password?":\n    - /url: /user/password/send-reset-email\n';
+  const found = await Explore.crawl({
+    origin: "http://localhost:3010",
+    from: ["/login", "/", "/connections/datasources"],
+    maxPages: 6,
+    maxDepth: 0,
+    read: async url => ({ ...page(new URL(url).pathname, login), url: "http://localhost:3010/login" }),
+  });
+  deepEqual(found.visited, ["/login"]);
+  match(found.skipped.join("\n"), /\/connections\/datasources — landed on \/login, which was already walked/);
+  deepEqual(Object.values(found.routes).sort(), ["/login", "/user/password/send-reset-email"]);
 });

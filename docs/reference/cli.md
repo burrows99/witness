@@ -59,6 +59,14 @@ and prints a JSONC fragment: `routes` and `locators` from each page's aria snaps
 placeholder attributes, `api.operations` from the XHR the app made while being walked. It never
 writes the config. What the caps left out is printed, not dropped silently.
 
+**A fragment is meant to be committed, so it describes screens rather than rows.** A path segment
+that is an id collapses to `{id}` — in routes now as well as in operations — a page is recorded where
+it **landed** rather than where it was asked for, a form found twice is written once, a field is named
+for what it IS (`name`, `aria-label`, its label) and valued with the placeholder that finds it, and a
+locator is not named after a number the app rendered. Two runs against an unchanged app produce the
+same bytes; anything less and `check drift` inherits the wobble and a regenerated fragment diffs as
+churn.
+
 Each page is read once it has **settled**, not once its document is done — a client-rendered app is an
 empty shell at `domcontentloaded`. A page that still offers nothing is named in the fragment: an empty
 page is nearly always one behind a sign-in, not one with nothing on it.

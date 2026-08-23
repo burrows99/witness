@@ -66,25 +66,30 @@ export class Explore {
 
     while (queue.length) {
       const next = queue.shift()!;
-      if (seen.has(next.path)) continue;
+      // Seen, said and remembered as the SCREEN rather than the row: `/view/aB3…` and `/view/xQ9…`
+      // are one page a description should carry once, and the id in either of them is data that will
+      // be gone next week. The queue keeps the real path — that is what gets fetched — and everything
+      // written down uses this one.
+      const route = Explore.templated(next.path);
+      if (seen.has(route)) continue;
       // Marked seen even when it is skipped. Without this a path still in the queue behind several
       // pages was reported once per page that linked to it — three identical lines about
       // `/user/login`, in a list whose whole job is to be read.
-      seen.add(next.path);
+      seen.add(route);
       if (Explore.handoff.test(next.path)) {
-        skipped.push(`${next.path} — hands off to an identity provider; walking it would send a third party a request`);
+        skipped.push(`${route} — hands off to an identity provider; walking it would send a third party a request`);
         continue;
       }
       if (pages.length >= input.maxPages) {
         // Counted and named rather than truncated in silence: a fragment that stopped early looks
         // exactly like one that found everything.
-        skipped.push(`${next.path} — past the ${input.maxPages}-page limit`);
+        skipped.push(`${route} — past the ${input.maxPages}-page limit`);
         continue;
       }
 
       const facts = await input.read(new URL(next.path, origin).toString());
       if (!facts) {
-        skipped.push(`${next.path} — could not be read`);
+        skipped.push(`${route} — could not be read`);
         continue;
       }
       // Where a link POINTS is not where it lands, and only the second one is same-origin in any
@@ -94,17 +99,28 @@ export class Explore {
       // on the URL that ended up in the bar, and the page dropped rather than read.
       const landed = facts.url ? Explore.elsewhere(facts.url, origin) : undefined;
       if (landed) {
-        skipped.push(`${next.path} — left this origin for ${landed}`);
+        skipped.push(`${route} — left this origin for ${landed}`);
         continue;
       }
-      pages.push({ ...facts, path: next.path });
+      // The path it LANDED on, not the one it asked for. Signed out, Grafana answers `/` and
+      // `/connections/datasources` with the same login screen — recorded as asked, that was two
+      // routes named after a title belonging to neither and four copies of one form. It is also
+      // where the crawl was non-deterministic: whether a redirect's shell rendered a link before the
+      // client-side bounce decided how many pages got walked.
+      const path = Explore.templated((facts.url && Explore.samePath(facts.url, origin)) || next.path);
+      if (path !== route && seen.has(path)) {
+        skipped.push(`${route} — landed on ${path}, which was already walked`);
+        continue;
+      }
+      seen.add(path);
+      pages.push({ ...facts, path });
       // A page that offered nothing is reported rather than counted. `Walked 1 page` reads exactly
       // like "your app has one page", and for three apps in seven it meant the opposite.
-      if (Explore.barren(facts)) empty.push(next.path);
+      if (Explore.barren(facts)) empty.push(path);
 
       if (next.depth >= input.maxDepth) continue;
       for (const link of facts.links) {
-        if (!seen.has(link)) queue.push({ path: link, depth: next.depth + 1 });
+        if (!seen.has(Explore.templated(link))) queue.push({ path: link, depth: next.depth + 1 });
       }
     }
 
@@ -222,13 +238,31 @@ export class Explore {
    * Two sources, each used for what it actually knows: the accessibility tree for what a person can
    * see and name, and the DOM for placeholder attributes — because a config's `forms` finds an input
    * BY PLACEHOLDER, and an accessible name is the label whenever there is one.
+   *
+   * Each field comes back as two strings rather than one. The placeholder is the right thing to
+   * MATCH on and the wrong thing to NAME from: it is example data, and a designer's example data at
+   * that. `id` is asked last on purpose — Grafana's login inputs carry `_r_0_` and `_r_1_`, which
+   * React writes fresh, so a description named from those would name a different field every render.
    */
   static async readPage(page: Page, origin: URL): Promise<Omit<PageFacts, "path">> {
     const nodes = Explore.parse(await page.ariaSnapshot());
-    const placeholders = await page.$$eval("input[placeholder], textarea[placeholder]", found =>
-      found.map(el => (el as HTMLInputElement).placeholder).filter(Boolean),
+    const fields = await page.$$eval("input[placeholder], textarea[placeholder]", found =>
+      found
+        .map(el => {
+          const input = el as HTMLInputElement;
+          return {
+            placeholder: input.placeholder,
+            name:
+              input.getAttribute("name") ||
+              input.getAttribute("aria-label") ||
+              input.labels?.[0]?.textContent?.trim() ||
+              input.id ||
+              input.placeholder,
+          };
+        })
+        .filter(field => field.placeholder),
     );
-    return { nodes, placeholders, links: Explore.links(nodes, origin), title: Explore.title(nodes) };
+    return { nodes, fields, links: Explore.links(nodes, origin), title: Explore.title(nodes) };
   }
 
   /**
@@ -283,16 +317,22 @@ export class Explore {
   static routes(pages: PageFacts[]): Record<string, string> {
     const byPath = new Map<string, string>();
     for (const page of pages) {
-      if (!byPath.has(page.path)) byPath.set(page.path, Explore.name(page.title ?? "", page.path));
+      const own = Explore.templated(page.path);
+      if (!byPath.has(own)) byPath.set(own, Explore.pageName(page));
       for (let i = 0; i < page.nodes.length; i += 1) {
         const node = page.nodes[i];
         if (node.role !== "/url" || !node.value) continue;
         const path = Explore.pathOnly(node.value);
         if (!page.links.includes(path)) continue;
-        // The link a `/url` belongs to is the nearest node above it that is shallower.
-        const named = Explore.name(Explore.owner(page.nodes, i)?.name ?? "", path);
-        const existing = byPath.get(path);
-        if (existing === undefined || named.length < existing.length) byPath.set(path, named);
+        const route = Explore.templated(path);
+        // The link a `/url` belongs to is the nearest node above it that is shallower — and its
+        // words only name the route when the route is a screen rather than a row.
+        const named = Explore.name(
+          route.includes("{") ? "" : Explore.label(Explore.owner(page.nodes, i), node.value),
+          Explore.spelled(route),
+        );
+        const existing = byPath.get(route);
+        if (existing === undefined || named.length < existing.length) byPath.set(route, named);
       }
     }
     const routes: Record<string, string> = {};
@@ -314,36 +354,53 @@ export class Explore {
     const out: Record<string, LocatorSpec> = {};
     const already = new Set<string>();
     for (const page of pages) {
+      // Counted on the STEADY name, because that is the one being offered: two tabs reading
+      // "Inbox 1" and "Inbox 25" are one locator that matches twice, and it is the emitted spec that
+      // has to be unique rather than whatever the app rendered this minute.
       const counts = new Map<string, number>();
       for (const node of page.nodes) {
-        if (node.name) counts.set(`${node.role} ${node.name}`, (counts.get(`${node.role} ${node.name}`) ?? 0) + 1);
+        const steady = node.name && Explore.steady(node.name);
+        if (steady) counts.set(`${node.role} ${steady}`, (counts.get(`${node.role} ${steady}`) ?? 0) + 1);
       }
       for (const node of page.nodes) {
         if (!node.name || !Explore.worth.has(node.role)) continue;
-        const key = `${node.role} ${node.name}`;
-        if (counts.get(key) !== 1 || already.has(key)) continue;
-        const name = Explore.name(node.name, "");
+        const steady = Explore.steady(node.name);
+        const key = `${node.role} ${steady}`;
+        if (!steady || counts.get(key) !== 1 || already.has(key)) continue;
+        const name = Explore.name(steady, "");
         if (!name) continue;
         already.add(key);
-        out[Explore.unique(out, name)] = { role: node.role, name: node.name };
+        out[Explore.unique(out, name)] = { role: node.role, name: steady };
       }
     }
     return out;
   }
 
-  /** Forms: the placeholders that find the inputs, grouped by the page they were found on. */
+  /**
+   * Forms: the placeholders that find the inputs, grouped by the page they were found on.
+   *
+   * Named from what the field IS and valued with what FINDS it, which are two different strings.
+   * Naming from the placeholder called an email box `youOrganisationCh` and a name box `adaLovelace`
+   * — the sample values a designer had typed into a mock, on a real application's real signup form.
+   */
   static forms(pages: PageFacts[]): Record<string, Record<string, string>> {
     const out: Record<string, Record<string, string>> = {};
+    const already = new Set<string>();
     for (const page of pages) {
-      if (!page.placeholders.length) continue;
+      if (!page.fields.length) continue;
       const fields: Record<string, string> = {};
-      for (const placeholder of page.placeholders) {
-        const field = Explore.name(placeholder, "");
-        if (field) fields[Explore.unique(fields, field)] = placeholder;
+      for (const field of page.fields) {
+        const name = Explore.name(field.name, "") || Explore.name(field.placeholder, "");
+        if (name) fields[Explore.unique(fields, name)] = field.placeholder;
       }
-      if (Object.keys(fields).length) {
-        out[Explore.unique(out, Explore.name(page.title ?? "", page.path) || "form")] = fields;
-      }
+      if (!Object.keys(fields).length) continue;
+      // The same form found on three routes is one form. The rule that stops a name collision from
+      // silently dropping an entry cannot tell a collision from a repeat, so one sign-in box seen on
+      // three pages arrived as `welcomeBack`, `welcomeBack2` and `welcomeBack3`.
+      const shape = JSON.stringify(fields);
+      if (already.has(shape)) continue;
+      already.add(shape);
+      out[Explore.unique(out, Explore.pageName(page) || "form")] = fields;
     }
     return out;
   }
@@ -368,10 +425,7 @@ export class Explore {
       // first fragment that got far enough to collect any operations at all offered four SVGs as the
       // API — and a generated block whose every entry has to be deleted is one nobody reads.
       if (/\.(svg|png|jpe?g|gif|webp|ico|woff2?|css|js|mjs|map)$/i.test(path)) continue;
-      const templated = path
-        .split("/")
-        .map(segment => (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment) ? "{id}" : segment))
-        .join("/");
+      const templated = Explore.templated(path);
       const key = `${request.method} ${templated}`;
       if (!seen.has(key)) seen.set(key, { method: request.method, path: templated });
     }
@@ -431,11 +485,35 @@ export class Explore {
       const url = new URL(href, origin);
       if (url.origin !== origin.origin) return undefined;
       // The query is state, not a route: `/user/login?redirect_to=%2f…` is the login screen.
-      return url.pathname;
+      return Explore.plausible(url.pathname) ? url.pathname : undefined;
     } catch {
       return undefined;
     }
   }
+
+  /**
+   * Is this a path somebody meant, or something that fell out of the markup?
+   *
+   * `new URL()` accepts anything, so a stray quote in an `href` on a real page became the route
+   * `/%22`, and a template rendering an id it did not have became `/view/false` — both harvested,
+   * named, walked, and written into a description with nothing between them and the file. Two rules,
+   * both from pages in this stack: characters no href should contain, and a last segment that is a
+   * JavaScript value somebody printed rather than a word.
+   */
+  private static plausible(path: string): boolean {
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(path);
+    } catch {
+      return false;
+    }
+    if (/["'<>`\\\s]/.test(decoded)) return false;
+    const last = decoded.split("/").filter(Boolean).pop();
+    return !last || !Explore.printed.has(last.toLowerCase());
+  }
+
+  /** What a template prints where an id should have been. */
+  private static readonly printed = new Set(["true", "false", "null", "undefined", "nan"]);
 
   /** The origin a navigation ended up on, when that is not this one — otherwise nothing. */
   private static elsewhere(landed: string, origin: URL): string | undefined {
@@ -449,6 +527,96 @@ export class Explore {
 
   private static pathOnly(href: string): string {
     return href.split("?")[0].split("#")[0];
+  }
+
+  /**
+   * A path with its moving parts named rather than baked in: `/view/m8Ms2n2xDXX2JUyFCX8v5E` becomes
+   * `/view/{id}`.
+   *
+   * One function with two callers, because it was written for {@link operations} and {@link routes}
+   * never got it — so one fragment folded eleven observed API calls back into the single declared
+   * operation they came from while, four lines above, writing down a route to one message that will
+   * be gone tomorrow. What makes `{id}` right for a request path makes it right for a screen's: the
+   * screen is what lasts, and a description is meant to be committed.
+   */
+  static templated(path: string): string {
+    return path
+      .split("/")
+      .map(segment => (Explore.value(segment) ? "{id}" : segment))
+      .join("/");
+  }
+
+  /**
+   * A segment that is a value rather than a word.
+   *
+   * Digits and UUIDs were all this knew, which is why Mailpit's `m8Ms2n2xDXX2JUyFCX8v5E` went
+   * through untouched — most id schemes are neither. The third rule is for those: long, mixing
+   * letters with digits, and unbroken by the hyphen or dot a slug somebody wrote would have.
+   */
+  private static value(segment: string): boolean {
+    if (/^\d+$/.test(segment)) return true;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment)) return true;
+    return segment.length >= 12 && /\d/.test(segment) && /[A-Za-z]/.test(segment) && !/[-.]/.test(segment);
+  }
+
+  /** A templated path with its parameters taken out, so `/view/{id}` reads as `view` and not `viewId`. */
+  private static spelled(route: string): string {
+    return route
+      .split("/")
+      .filter(segment => !segment.startsWith("{"))
+      .join("/");
+  }
+
+  /**
+   * What to call a page: what it calls itself, unless what it calls itself is one row's data.
+   *
+   * A path with a parameter in it IS a row — the message, that repository — so its heading is the
+   * subject of whichever one happened to be open. `/view/{id}` describes the screen forever;
+   * "Recover your account" describes an email somebody will delete.
+   */
+  private static pageName(page: PageFacts): string {
+    const route = Explore.templated(page.path);
+    return Explore.name(route.includes("{") ? "" : (page.title ?? ""), Explore.spelled(route));
+  }
+
+  /**
+   * A name with the moving parts taken out: `HTML Check 95%` is `HTML Check`, `Inbox 1` is `Inbox`.
+   *
+   * Two runs of the same command against an unchanged Mailpit disagreed by three locators, all of
+   * them named after a number the app had rendered. `htmlCheck95` also stops RESOLVING the moment
+   * the score is not 95, so the stable part replaces the name as well as naming it — locators match
+   * by substring, and "HTML Check" finds the tab whatever it scored. A name that is nothing but its
+   * number has no stable part and is dropped: an ambiguous locator is already dropped, and a
+   * volatile one is worse than ambiguous.
+   */
+  static steady(text: string): string {
+    return text
+      .split(/\s+/)
+      .filter(word => !/\d/.test(word) || /[A-Za-z]/.test(word.replace(/[^A-Za-z0-9]/g, "")))
+      .join(" ")
+      .trim();
+  }
+
+  /**
+   * A link's words, unless those words are the thing being linked TO.
+   *
+   * `gitea@witness.example` pointing at `/search?q=gitea%40witness.example` is a row of data wearing
+   * a link, and it named Mailpit's search screen after whoever sent the last message. A nav link
+   * whose text is in its PATH — "Explore" for `/explore/repos` — is the opposite and the good case,
+   * which is why this asks only about the query.
+   */
+  private static label(owner: AriaNode | undefined, href: string): string {
+    const name = owner?.name;
+    if (!name) return "";
+    const query = href.split("?")[1];
+    if (!query) return name;
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(query);
+    } catch {
+      decoded = query;
+    }
+    return decoded.toLowerCase().includes(name.toLowerCase()) ? "" : name;
   }
 
   /** The node a `/url` belongs to: the nearest one above it that is shallower. */
@@ -508,7 +676,8 @@ export type SeenRequest = { method: string; url: string };
 export type PageFacts = {
   path: string;
   nodes: AriaNode[];
-  placeholders: string[];
+  /** One per input with a placeholder: what the field is called, and the placeholder that finds it. */
+  fields: { name: string; placeholder: string }[];
   links: string[];
   title?: string;
   /** Where the read actually landed. Absent when nothing navigated — a fixture, or a page read in place. */
