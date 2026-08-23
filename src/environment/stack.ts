@@ -75,12 +75,15 @@ export class Stack {
         const container = this.containers[name];
         const containerUp = container ? running.includes(container) : undefined;
         const probe = this.probes[name];
-        let reachable: boolean;
+        let reachable: boolean | undefined;
         let answering: string | undefined;
 
         // No URL to ask, so docker is the only thing that can answer — whether or not anyone said so.
+        // And with no container to ask about either, the honest answer is `undefined`: that is a
+        // third state, and reporting it as DOWN makes it indistinguishable from a service that really
+        // is down. A status board's entire job is being believed.
         if (probe === "container" || !url) {
-          reachable = containerUp ?? false;
+          reachable = containerUp;
         } else {
           const spec = typeof probe === "object" ? probe : {};
           try {
@@ -194,7 +197,8 @@ export type StackSpec = {
 export type StackStatus = {
   name: string;
   url: string;
-  reachable: boolean;
+  /** `undefined` is "cannot tell" — asked to judge this by its container, with no container named. */
+  reachable: boolean | undefined;
   container?: string;
   containerUp?: boolean;
   /** Why we believe something OTHER than this service is answering. Human-readable. */

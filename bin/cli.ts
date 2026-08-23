@@ -140,7 +140,7 @@ const init: Parameters<Cli["command"]>[1] = {
       written.length
         ? `${written.map(f => `wrote ${path.relative(process.cwd(), f)}`).join("\n")}\n` +
             (fromCompose
-              ? `\nRead ${Object.keys(fromCompose).length} service(s) off ${path.basename(Compose.fileIn(root) ?? "compose")}. Next:\n` +
+              ? `\nRead ${Object.keys(fromCompose.services).length} service(s) off ${path.basename(Compose.fileIn(root) ?? "compose")}. Next:\n` +
                 `  witness stack status\n  witness config explore\n`
               : `\nEdit ${path.relative(process.cwd(), workspace.configFile)} down to what your product has, then:\n` +
                 `  witness stack status\n  witness action list\n`)

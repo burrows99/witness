@@ -120,6 +120,16 @@ test("status: a database is asked of docker, not of HTTP", async () => {
   equal((await stack.status())[0].reachable, true);
 });
 
+test("status: judged by a container it has not got, the answer is 'cannot tell'", async () => {
+  // Not `false`. A board that says DOWN when nothing was asked is indistinguishable from one saying
+  // DOWN about something that really is down, and a status board's entire job is being believed.
+  globalThis.fetch = () => {
+    throw new Error("a container probe must not make a request");
+  };
+  const stack = new Stack({ root: root(), docker: fakeDocker(), services: { redis: { port: 6380, probe: "container" } } });
+  equal((await stack.status())[0].reachable, undefined);
+});
+
 test("status: another project's container on our port is neither up nor down", async () => {
   answering(200);
   const stack = new Stack({

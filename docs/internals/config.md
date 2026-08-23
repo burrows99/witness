@@ -52,7 +52,15 @@ claims it makes, cannot be read off an app sitting still.
 YAML: the CLI is always present and always agrees with what compose just did (the same reasoning
 `Docker` gives), it normalises the several shapes compose accepts, and JSON needs no dependency.
 `--no-interpolate` is load-bearing — without it `${GITEA_PORT:-3020}` arrives as `3020` and the
-variable name, which is what `portVar` exists to keep, is gone.
+variable name, which is what `portVar` exists to keep, is gone. It is right for ports and wrong for
+`container_name`, where the same flag leaves `acme-api${WT:-}` — a container that has never existed —
+so a trailing `${VAR}` is stripped back into `suffixVar`, which is the knob already expressing it.
+
+Four things the file says that a transcription misses, and each one made a running service read as
+DOWN: compose NAMES a container nobody named (`<project>-<service>-1`, off the project in the same
+document); a published port is not an HTTP port, so a database or a broker needs the container probe
+however many ports it publishes; `mysql` and `mariadb` are databases; and `build:` is evidence of
+in-house while its absence is evidence of nothing, so `kind` is omitted rather than guessed.
 
 ## explore: the other generator
 

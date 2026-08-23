@@ -61,6 +61,7 @@ export function normalise(config: SystemConfig): SystemConfig {
   const apps = { ...config.apps };
   const secrets = { ...config.secrets };
   const clients = { ...config.clients };
+  const databases = { ...config.databases };
   let api = config.api;
   let database = config.database;
 
@@ -89,8 +90,12 @@ export function normalise(config: SystemConfig): SystemConfig {
       else clients[name] = { service: name, ...service.api };
     }
     if (service.database) {
+      // Exactly what happens to a second API: the first is the default — what `witness db sql` runs
+      // against — and every other is a named one, reached by the service that runs it. This threw,
+      // and a stack with an app database and an authz database is completely ordinary, so a config
+      // generated off such a compose file broke every command including `help`.
       if (!database) database = { service: name, ...service.database };
-      else throw new Error(`services "${database.service}" and "${name}" both declare a database, and this drives one`);
+      else databases[name] = { service: name, ...service.database };
     }
   }
 
@@ -105,6 +110,7 @@ export function normalise(config: SystemConfig): SystemConfig {
     clients,
     ...(api ? { api } : {}),
     ...(database ? { database } : {}),
+    ...(Object.keys(databases).length ? { databases } : {}),
   };
 }
 

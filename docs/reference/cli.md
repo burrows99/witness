@@ -25,7 +25,7 @@ tutorial say.
 | command | present when |
 |---|---|
 | `api <get\|post\|put\|patch\|delete> <path> [json]` | any service declares an `api` — authenticated the way a declared operation is |
-| `db sql "<query>"` | a `database` is declared |
+| `db sql "<query>" [--on=<service>]` | a `database` is declared — `--on` names one of the others |
 | `video render` | rebuild the MP4s from the last run's recordings |
 | `action list` / `action show <a>` / `action run <a…>` | any action is declared |
 | `stub list` / `stub show <s>` | any `stubs` are declared |

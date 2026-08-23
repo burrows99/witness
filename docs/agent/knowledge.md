@@ -172,6 +172,14 @@ before any browser is opened; drift never learned to, so the red says "your acti
 what it means is "this checker is the wrong one for this action". True of every terminal action on
 `main` — check it against an action you did not touch before believing it about yours.
 
+**A `Type` step loses a backslash, and a `{…}` inside one is read as a parameter.** A step typing
+`tr '\n' ' '` reached the shell as `tr 'n' ' '` — VHS drops the escape out of a double-quoted `Type`
+— so every letter `n` in the recorded output became a space, on the one screen whose whole job was
+being compared with `docker ps` line by line. And `docker ps --format '{{.Names}}'` never ran at all:
+a step's text goes through `fill()`, which reads `{.Names}` as a parameter nobody supplied and throws.
+Neither is visible in the tape or the exit code; both are obvious in the pixels. Which is the argument
+for opening the frame, not an argument about escaping.
+
 ---
 
 ## Gates
@@ -235,6 +243,14 @@ not the request. And the check that arrives too late is not the whole fix — an
 a same-origin link on the login page of a very large number of applications, so the shapes that begin
 a handoff are skipped before anything is sent. A tool that walks a stack on request must reach nobody
 the person did not point it at.
+
+**A compose file copied somewhere else is a different project.** `docker compose config` reports
+`name` from the DIRECTORY it runs in, and that name is the prefix compose puts on every container it
+names itself. So a description generated from a copy of the compose file in `/tmp/scratch` derives
+`scratch-redis-1` — a correct description of a project nobody is running, which reads on the board
+exactly like a wrong one. Generate where the stack was brought up, or name the directory after the
+project. The same fact is why nine services in a nineteen-service stack had no `container` at all: the
+name is only ever in the compose file when somebody typed it there, and most of the time nobody did.
 
 ---
 

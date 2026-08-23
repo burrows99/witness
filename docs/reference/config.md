@@ -15,6 +15,8 @@ here; the harness holds no product knowledge at all.
 | `cast` | the real rows a scenario is pinned to, and why that one |
 | `stubs` | local stand-ins for third parties the app calls **server-side** |
 | `clients` | extra API clients beyond a service's own |
+| `databases` | extra databases beyond the default one, by the service that runs each |
+| `suffixVar` | the `.env` variable holding the suffix on every container name (default `WT`) |
 | `video` | how recordings become MP4s |
 | `evidence` | `{ dir?, links? }` |
 | `cli` | your own nouns and verbs — see [cli.md](cli.md) |
@@ -47,8 +49,9 @@ second checkout with its own ports needs no wrapper. `container` is the name *wi
 suffix (`WT` by default). `probe` is `"http"`, `"container"`, or an object — the object form is how
 `stack status` tells "something is listening" from "**our** thing is listening".
 
-**`kind`** — `in-house` or `third-party`. A third party is not restartable, not resettable, usually
-shared, and the likeliest source of a flake that is nobody's fault.
+**`kind`** — `in-house` or `third-party`, or absent. A third party is not restartable, not resettable,
+usually shared, and the likeliest source of a flake that is nobody's fault — so a wrong one is worse
+than none, and `init` leaves it out unless the compose file actually says (a `build:`).
 
 **`records: "terminal"`** — for a service with no screen. `pane` is the size it is filmed at
 (`width`, `height`, `fontSize`; 1280x900 at 20pt by default, which is about thirty rows) and can be
@@ -80,6 +83,11 @@ name from a step (`{ "api": { "client": "mailpit", … } }`).
 
 `user`, `database`, `credential` (a secret source, or a bare string), `queries` (named SQL with
 `{param}` placeholders — one place to read what we assert).
+
+The first service to declare one is the default — what bare `witness db sql "…"` runs against. Every
+one of them, that one included, is also reachable by the service that runs it: `--on=<service>` from
+the command line, `app.database("<service>")` in code. An app database plus an authz, queue or metrics
+database is the ordinary case, not a shape to describe your way around.
 
 ## Say a thing once
 

@@ -299,6 +299,30 @@
       ]
     },
 
+    // The one action about the DESCRIPTION rather than the product: generate one off this repo's own
+    // compose file and read the board off it. Every row on that board is a claim about a container
+    // `docker ps` can be asked about, which is why both end up on the same final screen — a board
+    // nobody can compare against the machine is a board nobody can disbelieve.
+    "theGeneratedDescription": {
+      "summary": "a description read off the compose file, and the status board it produces",
+      "records": "terminal",
+      "steps": [
+        { "caption": { "text": "generating a description from this repo's own compose file" } },
+        { "type": { "on": "prompt", "value": "rm -rf /tmp/witness-board && mkdir -p /tmp/witness-board/witness && cp docker-compose.yml .env /tmp/witness-board/witness/ && (cd /tmp/witness-board/witness && git init -q .)" }, "note": "a directory named for the compose project, because that is what names the containers" },
+        { "press": "Enter" },
+        { "wait": 2000 },
+        { "type": { "on": "prompt", "value": "./bin/witness init /tmp/witness-board/witness | tail -4" } },
+        { "press": "Enter" },
+        { "wait": 9000, "note": "`docker compose config` shells out, and it is not quick on a machine running four stacks" },
+        { "type": { "on": "prompt", "value": "clear; echo 'docker ps:'; docker ps | awk 'NR>1 {print $NF}' | grep ^witness | sort; echo" }, "note": "neither `--format '{{.Names}}'` nor a backslash: a step's text is interpolated, so a brace pair reads as a missing parameter, and VHS drops a backslash out of a `Type` string" },
+        { "press": "Enter" },
+        { "wait": 2500, "note": "the ground truth every row below is a claim about" },
+        { "type": { "on": "prompt", "value": "./bin/witness --config /tmp/witness-board/witness/.witness/config.jsonc stack status --quiet" } },
+        { "press": "Enter" },
+        { "wait": 25000, "note": "an HTTP probe waits 4s before giving up, and three of these are pointed at things that never answer one" }
+      ]
+    },
+
     "theApp": {
       "summary": "the app a person uses",
       "steps": [

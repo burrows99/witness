@@ -30,6 +30,13 @@ export type SystemConfig = {
   root?: string[];
   services: Record<string, ServiceConfig>;
   /**
+   * The variable holding the suffix every container name in this checkout carries. Defaults to `WT`.
+   *
+   * The same idea as `portVar`, one level along: a second checkout runs the same stack under
+   * `hesta-api-583`, and the compose file already says so as `container_name: hesta-api${WT:-}`.
+   */
+  suffixVar?: string;
+  /**
    * Who the system can be. An identity with `cookies` is injected into every browser context the
    * system opens — the dev-auth blob a staff app trusts locally, and the reason a run needs no login.
    */
@@ -71,6 +78,14 @@ export type SystemConfig = {
   stubs?: Record<string, StubConfig>;
   /** Extra API clients beyond the default one — a third party's GraphQL, say. */
   clients?: Record<string, ClientConfig>;
+  /**
+   * Extra databases beyond the default one, by the service that runs each.
+   *
+   * The same model as `clients`, for the same reason: an app database plus an authz, queue or metrics
+   * one is completely ordinary, and a description that could hold only one refused to LOAD when a
+   * generated config named two — taking every command with it, `help` included.
+   */
+  databases?: Record<string, DatabaseConfig>;
   cli?: Record<string, CliGroupConfig>;
 };
 
