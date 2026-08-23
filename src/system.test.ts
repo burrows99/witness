@@ -69,7 +69,7 @@ test("an undeclared client, cast member, identity or secret each say what is mis
   throws(() => system.client("billing"), /no client "billing" — declared: none/);
   throws(() => system.cast("NOBODY"), /no cast member "NOBODY" in the config/);
   throws(() => system.identity("nobody"), /no identity "nobody" in the config/);
-  throws(() => system.secret("nothing"), /no secret "nothing" in the config/);
+  throws(() => system.secret("nothing"), /no secret "nothing" — declared:/);
   deepEqual(system.cast("REGULAR"), { id: "1" });
   deepEqual(system.identity("staff"), { cookies: [] });
 });
@@ -127,4 +127,17 @@ test("the command line is built from the config, without an entry point to write
   match(usage, /action\s+run one of the declared actions/);
   match(usage, /stub\s+the local stand-ins/);
   match(usage, /api\s+any route on the API/);
+});
+
+test("a database credential is a source, not a string the config has to hold", () => {
+  // It was a bare string only, which made this the one credential the description FORCED into the
+  // file. "There is nowhere else to put it" is the wrong reason for a credential to be in a repo.
+  const system = new System({
+    name: "t",
+    services: { postgres: { port: 5432, container: "c" } },
+    database: { service: "postgres", user: "u", database: "d", credential: { env: "WITNESS_TEST_DB_CREDENTIAL_SOURCE" } },
+  } as never);
+  // Nothing is set in the environment and nothing needs to be: what this asserts is that the config
+  // can NAME a source instead of holding a value, which is the whole point of the change.
+  ok(system.db, "the database is built without the password being written down");
 });

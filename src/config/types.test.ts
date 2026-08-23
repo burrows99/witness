@@ -133,3 +133,28 @@ test("witness's own schema reads cleanly", () => {
   deepEqual(config.fields.slice(0, 3).map(f => f.name), ["name", "root", "services"]);
   ok(config.fields.every(f => f.type.kind !== "opaque"), "no top-level field of SystemConfig should be unmodelled");
 });
+
+test("Omit is read as the type minus what its position already says", () => {
+  // `Omit<AppConfig, "service">` is how a service's own `app` says "and you need not name the service
+  // again". Read as opaque, the generated template showed `{}` and the TypeScript source of the very
+  // field an author is meant to fill in.
+  const types = new TypeSource().read(`
+    export type AppConfig = { service: string; routes?: Record<string, string>; title: string };
+    export type ServiceConfig = { app?: Omit<AppConfig, "service"> };
+  `);
+  const service = types.declaration("ServiceConfig");
+  ok(service.kind === "object");
+  const app = service.fields[0].type;
+  ok(app.kind === "object", `expected an object, got ${app.kind}`);
+  deepEqual(app.fields.map(f => f.name), ["routes", "title"]);
+});
+
+test("Omit of more than one key drops all of them", () => {
+  const types = new TypeSource().read(`
+    export type Thing = { a: string; b: string; c: string };
+    export type Less = Omit<Thing, "a" | "b">;
+  `);
+  const less = types.declaration("Less");
+  ok(less.kind === "object");
+  deepEqual(less.fields.map(f => f.name), ["c"]);
+});
