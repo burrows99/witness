@@ -29,7 +29,8 @@ viewport, same journey — a before and after that differ in two ways prove noth
 
 **5. Read what you recorded.** Open the frames. Every claim a caption makes has to be visible in the
 frame it captions. This is where green runs get caught producing evidence that contradicts the
-sentence written over them.
+sentence written over them. A terminal recording has no `frames/` — its still is `video.png` beside
+the video, the last frame, because that is where a shell's output is.
 
 **6. Check.** `npm run check` — types, lint, unused, tests. And `npx witness check drift` if the
 change touched anything a description claims.

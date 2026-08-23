@@ -240,9 +240,13 @@
         "describeItself": {
           "summary": "what `config explore` reads off a client-rendered app — no browser, just the CLI",
           "records": "terminal",
+          // A whole fragment is about seventy rows, and the default pane holds thirty — so this used
+          // to be piped through `head -30`, which truncated the thing being demonstrated to fit the
+          // thing filming it. The pane is the part that was wrong.
+          "pane": { "height": 1350, "fontSize": 14 },
           "steps": [
             { "caption": { "text": "asking witness what Grafana says about itself" } },
-            { "type": { "on": "prompt", "value": "./bin/witness config explore grafana --pages=6 | head -30" }, "note": "the fragment is longer than the pane once it finds anything — without the head, the line that says how many pages were walked scrolls off before the recording ends" },
+            { "type": { "on": "prompt", "value": "./bin/witness config explore grafana --pages=6" } },
             { "press": "Enter" },
             { "wait": 30000, "note": "the crawl waits for each page to settle, so this has to outlast six of them" }
           ]

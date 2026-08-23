@@ -69,6 +69,10 @@ about either.
 
 **Open the frames.** Read them — a Read on an image returns the pixels; the run does not.
 
+A terminal recording has no `frames/`; its still is `video.png`, beside the video, and it is the
+**last** frame — where a shell's output is. If it shows the tail of something longer than the pane,
+the pane is what to change: `"pane": { "height": …, "fontSize": … }`, not a `head -N` in the step.
+
 For each one you are going to show anybody: does the frame contain the thing your caption claims?
 Twice in this project's history a green run produced evidence that contradicted the sentence written
 over it. No hook can check this; it is the one rule that stays yours.

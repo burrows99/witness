@@ -84,7 +84,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
     const recorder = recorderProviders.get(action.records!);
     const started = Date.now();
     const wrote = recorder.available()
-      ? recorder.record(action.steps ?? [], inputs, path.join(outputDir, `panel-${at}-01.mp4`), { shell: action.shell, label })
+      // Spread, so the pane the description asks for reaches the recorder that has honoured `width`,
+      // `height` and `fontSize` since it was written — and left them unreachable for want of this line.
+      ? recorder.record(action.steps ?? [], inputs, path.join(outputDir, `panel-${at}-01.mp4`), { ...action.pane, shell: action.shell, label })
       : undefined;
     if (!wrote) process.stderr.write(`[terminal] ${name} was not recorded — is \`vhs\` installed?\n`);
     return {

@@ -72,7 +72,7 @@ export function normalise(config: SystemConfig): SystemConfig {
       // either of which they could get wrong.
       // The service's recorder travels with its actions, so the runner does not have to look the
       // service up again to find out how to film one.
-      actions[qualify(name, actionName)] = { app: name, records: service.records, shell: service.shell, ...action };
+      actions[qualify(name, actionName)] = { app: name, records: service.records, shell: service.shell, pane: service.pane, ...action };
     }
     if (service.app) apps[name] = { service: name, ...service.app };
     for (const [secretName, secret] of Object.entries(service.secrets ?? {})) {

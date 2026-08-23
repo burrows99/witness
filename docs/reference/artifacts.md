@@ -4,6 +4,7 @@
 .witness/artifacts/cli/<the actions you ran>/<cut>/
   README.md                     what is where, and the call tree
   video.mp4                     the whole session, watchable
+  video.png                     its last frame — an MP4 has no pixels to Read
   frames/01-her-dashboard.png   the stills a `frame` step asked for, in order
   manual-verification.md        how to re-walk it by hand
   <action>/NN-<verb>.png        a frame per step, numbered as they happened
@@ -18,6 +19,8 @@ what was run, which cut. Same run, same paths — so a re-run **overwrites** rat
   behaviour as it is; make the change; `EVIDENCE=after …` files the second cut beside the first.
 - **One browser session → one video and one `frames/`**, at the top. A directory below with no video
   of its own is not missing one; it is part of the same recording.
+- **`video.png` is the last frame of `video.mp4`.** A terminal action leaves no other still, and a
+  Read on a video returns nothing — so without it there is nothing to open for a run with no screen.
 - **`--parallel`** adds `panel-<lane>-<attempt>.webm|.mp4`, and names each lane's directory for its
   pane, so two lanes running the same action do not overwrite each other.
 - **`--retries=N`** keeps each attempt: `<action>-retry-2/`.
