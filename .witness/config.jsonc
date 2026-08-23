@@ -331,12 +331,32 @@
         { "type": { "on": "prompt", "value": "./bin/witness init /tmp/witness-board/witness | tail -4" } },
         { "press": "Enter" },
         { "wait": 9000, "note": "`docker compose config` shells out, and it is not quick on a machine running four stacks" },
-        { "type": { "on": "prompt", "value": "clear; echo 'docker ps:'; docker ps | awk 'NR>1 {print $NF}' | grep ^witness | sort; echo" }, "note": "neither `--format '{{.Names}}'` nor a backslash: a step's text is interpolated, so a brace pair reads as a missing parameter, and VHS drops a backslash out of a `Type` string" },
+        { "type": { "on": "prompt", "value": "clear; echo 'docker ps:'; docker ps --format '{{.Names}}' | grep ^witness | sort | tr '\\n' ' '; echo; echo" }, "note": "the command a person would type, which for a long time this could not record: the braces threw as a missing parameter and the backslash reached the shell doubled, so every letter n in the ground truth became a space" },
         { "press": "Enter" },
         { "wait": 2500, "note": "the ground truth every row below is a claim about" },
         { "type": { "on": "prompt", "value": "./bin/witness --config /tmp/witness-board/witness/.witness/config.jsonc stack status --quiet" } },
         { "press": "Enter" },
         { "wait": 25000, "note": "an HTTP probe waits 4s before giving up, and three of these are pointed at things that never answer one" }
+      ]
+    },
+
+    // The checker being checked. Half this description has no screen, and `check drift` is the fast
+    // path over the other half — so what it says about the terminal actions is a claim about the
+    // checker itself, and there is nowhere else in the config to point a browser at it.
+    "theActionsDriftCannotCheck": {
+      "summary": "what `check drift` says about the half of a description that has no screen",
+      "records": "terminal",
+      // Two commands and a JSON blob between them: the default thirty rows ends on the tail, and the
+      // first command's answer is the whole point of the cut.
+      "pane": { "height": 780, "fontSize": 14 },
+      "steps": [
+        { "caption": { "text": "check drift, pointed at an action with no screen" } },
+        { "type": { "on": "prompt", "value": "./bin/witness check drift keycloak.describeItself; echo \"exit=$?\"" } },
+        { "press": "Enter" },
+        { "wait": 38000, "note": "long enough for the 30s Playwright timeout this used to spend before failing" },
+        { "type": { "on": "prompt", "value": "./bin/witness check drift; echo \"exit=$?\"" } },
+        { "press": "Enter" },
+        { "wait": 8000, "note": "a browser start and three routes — measured at 3.2s" }
       ]
     },
 

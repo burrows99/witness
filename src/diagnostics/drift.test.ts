@@ -1,4 +1,4 @@
-import { equal, ok } from "node:assert/strict";
+import { equal, ok, rejects } from "node:assert/strict";
 import { test } from "node:test";
 
 import type { Page } from "@playwright/test";
@@ -154,4 +154,29 @@ test("a route that sends us somewhere else is unchecked, not broken", when, asyn
   equal(report.findings[0]?.verdict, "unchecked");
   ok(report.findings[0]?.detail?.includes("name an action that signs in"), report.findings[0]?.detail);
   ok(report.ok, "not knowing is not the same as broken");
+});
+
+test("an action with no screen is skipped, and the report says how many", when, async () => {
+  // It types at a shell: no route to visit, no locator to count. Left out silently, a green summary
+  // claims to have read a description it only read half of.
+  const report = await check(
+    {
+      onScreen: { app: "a", steps: [{ goto: { route: "list" } }, { expect: { on: { role: "table" } } }] },
+      atAPrompt: { app: "a", records: "terminal", steps: [{ type: { on: "prompt", value: "psql" } }, { press: "Enter" }] },
+    },
+    { "http://app/list": { "role=table": 1 } },
+  );
+  equal(report.checked, 1);
+  equal(report.skipped, 1);
+  ok(report.ok, Drift.render(report));
+  ok(Drift.render(report).includes("1 terminal action skipped"), Drift.render(report));
+});
+
+test("a terminal action cannot be the action that signs in, and is told so before a browser opens", when, async () => {
+  // Driven anyway it spent thirty seconds on `locator('prompt')` and then reported the action as
+  // broken — the checker's own assumption, wearing the words of a finding.
+  await rejects(
+    Drift.sweep({ config: { actions: { atAPrompt: { records: "terminal", steps: [] } } } } as never, "atAPrompt"),
+    /no screen to sign a browser in on/,
+  );
 });

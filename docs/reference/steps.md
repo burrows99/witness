@@ -43,6 +43,11 @@ Every verb an action can use. One object per step; a step object holds one verb 
 Everything stored is available to later steps as `{name}`, dotted for depth (`{order.status}`,
 `{rows.length}`).
 
+A **doubled** brace is not a placeholder — `{{…}}` is left exactly as it stands, which is how
+`docker ps --format '{{.Names}}'` gets into a step. Not every string here was written as a template,
+and reading `{.Names}` out of that one as a parameter nobody supplied made a literal command
+unrecordable.
+
 ## Composing
 
 | verb | shape |

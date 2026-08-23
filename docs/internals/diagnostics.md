@@ -7,7 +7,7 @@
 | `trace.ts` (74) | every request, statement and step the *harness* made |
 | `inspector.ts` (221) | DevTools as data — the *browser's* network, console, exceptions |
 | `story.ts` (358) | all of it, told once, in the order a person wants it |
-| `drift.ts` (271) | verify the claims the description makes, without running it |
+| `drift.ts` (292) | verify the claims the description makes, without running it |
 
 ## inspector
 
@@ -38,3 +38,7 @@ Claims-based on purpose. An earlier version swept every locator across every rou
 point), one matching on a route no step uses it on, one matching nothing because it only exists after
 a click. A checker that cries wolf is worse than none. The rules it settled on are in
 [how-to/check-for-drift.md](../how-to/check-for-drift.md).
+
+The same reasoning skips a `records: "terminal"` action rather than driving a browser at it — and
+**counts** what it skipped into the summary, because a report that quietly read half a description
+and answered "all claims still hold" is the same lie from the other end.

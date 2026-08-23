@@ -1,5 +1,8 @@
-import { deepEqual, equal, match, ok } from "node:assert/strict";
+import { deepEqual, equal, match, ok, throws } from "node:assert/strict";
 import { test } from "node:test";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 
 import { asTape, recorderProviders } from "./recorders.ts";
 import type { StepConfig } from "../actions/engine.ts";
@@ -53,6 +56,40 @@ test("a value with a double quote in it still makes a valid tape", () => {
   // A tape has no escape for one inside a quoted string, and Gitea's own table is `"user"`.
   const lines = tape([{ type: { on: "prompt", value: 'select * from "user"' } }]);
   ok(lines.some(l => l === 'Type `select * from "user"`'), lines.join(" | "));
+});
+
+test("a value with a backslash in it takes a delimiter that does not escape one", () => {
+  // Not `"…"`: a tape has no escapes inside one, so `JSON.stringify` doubling the backslash is typed
+  // as two characters. The tape looked right, which is why this went unnoticed — the assertion that
+  // matters is the one below, on what the shell got.
+  const lines = tape([{ type: { on: "prompt", value: "tr '\\n' ' '" } }]);
+  ok(lines.some(l => l === "Type `tr '\\n' ' '`"), lines.join(" | "));
+});
+
+test("text that uses every quote character is refused rather than mangled", () => {
+  // The backtick fallback used to rewrite a backtick as an apostrophe — the same defect as the
+  // doubled backslash, one layer down. There is no fourth delimiter, so this is the honest answer.
+  throws(() => tape([{ type: { on: "prompt", value: `echo "it's \`date\`"` } }]), /every quote character/);
+});
+
+test("what the tape types is what the shell receives", { skip: recorderProviders.get("terminal").available() ? false : "needs vhs on the path" }, () => {
+  // The only assertion that can catch this class of bug. A test reading the TAPE passes against the
+  // defect it is meant to catch: the tape said `\\n` and looked correct, and the shell got two
+  // characters where the description asked for one — so every letter `n` in the recorded output
+  // became a space, on a frame whose whole job was a comparison with `docker ps`.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "witness-tape-"));
+  const got = path.join(dir, "typed.txt");
+  // Both halves of it: `\n` is an escape a recorder must not touch, and `{{.Names}}` is a brace pair
+  // that was never a parameter. `printf %s` writes back exactly what the shell parsed.
+  const asked = "tr \\n --format {{.Names}}";
+  try {
+    recorderProviders
+      .get("terminal")
+      .record([{ type: { on: "prompt", value: `printf %s '${asked}' > ${got}` } }, { press: "Enter" }, { wait: 1500 }], {}, path.join(dir, "out.mp4"), {});
+    equal(fs.existsSync(got) ? fs.readFileSync(got, "utf8") : "<the command never ran>", asked);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("an unregistered recorder names the ones that exist", () => {
