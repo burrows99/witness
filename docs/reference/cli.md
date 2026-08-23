@@ -84,13 +84,18 @@ and prints a JSONC fragment: `routes` and `locators` from each page's aria snaps
 fields it found, `api.operations` from the XHR the app made while being walked. It never writes the
 config. What the caps left out is printed, not dropped silently.
 
-**`--as` names an action that signs in**, and it is the same argument `check drift` takes, for the same
-reason: a sign-in is already described, as an action, and without one a crawl of an app whose value is
-behind a login describes the login page and stops. It is driven on the page the crawl then walks with,
-so the session it leaves is the session every navigation carries; a `records: "terminal"` action is
-refused, because it has no screen to sign a browser in on. The requests the sign-in itself makes are
-not collected as `operations` — that action is already described, and folding them in would make the
-block depend on whether `--as` was passed.
+**`--as` names an action to run first** — any declared action, resolved the way `action run` resolves a
+name. It is driven on the page the crawl then walks with, so everything it leaves behind is what every
+navigation after it carries: the cookie jar, whatever it wrote on the server, the URL it landed on.
+The one shape refused is a `records: "terminal"` action, because it has no screen to leave the crawl
+on. The requests the action itself makes are not collected as `operations` — that action is already
+described, and folding them in would make the block depend on whether `--as` was passed.
+
+**A sign-in is the commonest one and not the only one.** Anything that leaves the app in the state
+worth describing does the same job: an upload, a seed, a first record. Without one, a crawl of an app
+whose value is behind a gate describes the gate and stops — a login page, or a landing screen that
+links nowhere until a file has been dropped on it and every other route is behind an id the upload
+would have minted. `Walked 1 page` is nearly always a gate rather than a small app.
 
 **A field is found by being a field**, not by carrying a placeholder — `input`, `textarea` or `select`,
 laid out, and inside a `form` where the page has one; a button, a checkbox and a hidden token are not

@@ -1,7 +1,10 @@
-import { deepEqual, equal, match, ok } from "node:assert/strict";
+import { deepEqual, equal, match, ok, rejects } from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 
-import { Explore, type PageFacts } from "./explore.ts";
+import { Explore, type ExplorableSystem, type PageFacts } from "./explore.ts";
 
 /** Reading a real page needs the browser half, which is an optional peer everywhere but CI. */
 const havePlaywright = await import("@playwright/test").then(
@@ -624,4 +627,125 @@ test("a page is recorded where it landed, not where it was asked for", async () 
   deepEqual(found.visited, ["/login"]);
   match(found.skipped.join("\n"), /\/connections\/datasources — landed on \/login, which was already walked/);
   deepEqual(Object.values(found.routes).sort(), ["/login", "/user/password/send-reset-email"]);
+});
+
+/**
+ * The only test that drives `Explore.of`, and it drives it with an action that signs nothing in.
+ *
+ * `--as` has taken any declared action since the day it went in: it is resolved the way `action run`
+ * resolves a name, driven on the page the crawl then walks with, and the only shape it refuses is one
+ * with no screen. Nothing pinned that, and every word around it said sign-in — the usage line, the
+ * help text, the error, this function's own doc comment — so the general lever was documented as a
+ * special case and the general use was invisible. That is not a small cost: a session driving an app
+ * whose landing screen is a dropzone watched `config explore` walk ONE page, concluded in its handoff
+ * notes that the harness could reach exactly one screen of the app unaided, and routed the whole flow
+ * around it through the API. With the action that uploads, the crawl would have carried on into the
+ * five screens behind it.
+ *
+ * So: an app with no authentication anywhere in it, gated by an upload rather than a login. Nothing
+ * links anywhere until a file has been dropped on the landing screen, and every other route is behind
+ * an id the upload mints. The control is the same crawl of the same app with no `--as` at all —
+ * without it this would pass just as well against an app that had been showing those pages all along.
+ */
+test("`--as` runs any action, not only a sign-in, and the crawl walks what that action unlocked", async t => {
+  if (!havePlaywright) return t.skip("needs @playwright/test");
+  const { chromium } = await import("@playwright/test");
+  // The package is not the browser — installing `@playwright/test` downloads none — and `Explore.of`
+  // launches its own rather than taking one, so the binary is asked about instead of probed for.
+  if (!existsSync(chromium.executablePath())) return t.skip("needs a chromium binary — `npx playwright install chromium`");
+
+  const id = "7f3c9ab21d84";
+  const behind: Record<string, string> = {
+    [`/documents/${id}/summary`]: '<h1>Summary</h1><button>Download report</button><a href="/">Home</a>',
+    [`/documents/${id}/pages`]: "<h1>Pages</h1>",
+    [`/documents/${id}/answers`]: "<h1>Answers</h1>",
+  };
+  const landing = `<h1>Ready</h1>${Object.keys(behind)
+    .map(path => `<a href="${path}">${path.split("/").pop()}</a>`)
+    .join("")}`;
+  const dropzone = `<h1>Drop a document</h1>
+    <form method="post" action="/upload" enctype="multipart/form-data">
+      <input type="file" name="file" data-testid="dropzone">
+      <button>Analyse</button>
+    </form>`;
+
+  const server = createServer((req, res) => {
+    if (req.method === "POST" && req.url === "/upload") {
+      let body = "";
+      req.on("data", chunk => (body += String(chunk)));
+      // The id exists BECAUSE a file arrived. A POST with nothing attached gets nowhere, so an action
+      // that clicked the button without attaching anything cannot get past this and call it seeded.
+      req.on("end", () =>
+        /filename="[^"]+"/.test(body)
+          ? res.writeHead(303, { "set-cookie": `document=${id}; path=/`, location: "/" }).end()
+          : res.writeHead(400).end("nothing was attached"),
+      );
+      return;
+    }
+    const uploaded = /(?:^|;\s*)document=/.test(req.headers.cookie ?? "");
+    const body = uploaded ? (req.url === "/" ? landing : behind[String(req.url)]) : req.url === "/" ? dropzone : undefined;
+    res.writeHead(body ? 200 : 404, { "content-type": "text/html" }).end(body ?? "no document yet");
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+  const ran: string[] = [];
+  // Annotated rather than cast: a cast makes an optional field of everything missing, and these are
+  // the fields the composite root hands `of`.
+  const system: ExplorableSystem = {
+    stack: { endpoints: { documents: origin } },
+    config: { actions: { "documents.upload": {}, "documents.tail": { records: "terminal" } } },
+    // What the engine does with an `upload` step, on whatever page it is handed — which here is the
+    // page the crawl is about to walk with.
+    run: async (action, page) => {
+      ran.push(action);
+      await page.goto(origin);
+      await page.setInputFiles("input[type=file]", { name: "quarterly.csv", mimeType: "text/csv", buffer: Buffer.from("region,total\nnorth,12\n") });
+      await page.getByRole("button", { name: "Analyse" }).click();
+      // Waiting for the thing rather than for a time: the link is what the server answering with a
+      // document id looks like from in here.
+      await page.getByRole("link", { name: "Summary" }).waitFor();
+    },
+  };
+
+  try {
+    const unaided = await Explore.of(system, "documents", { maxPages: 6, maxDepth: 2 });
+    deepEqual(ran, []);
+    // One page, and the only route in the description is the page it is standing on: the dropzone
+    // links nowhere at all. This is the fragment a session read as "the harness can reach exactly one
+    // screen of this app".
+    deepEqual(unaided.visited, ["/"]);
+    deepEqual(unaided.routes, { dropADocument: "/" });
+    // And it is not a login it stopped at. There is no password field in this app, so the note that
+    // would have suggested `--as` never fires — the number is the only thing saying anything.
+    equal(unaided.behindSignIn, false);
+
+    const seeded = await Explore.of(system, "documents", { maxPages: 6, maxDepth: 2, as: "upload" });
+    // Resolved the way `action run` resolves a name — the bare one, because one service declares it —
+    // and driven on the page the crawl then walks with. Driven anywhere else, the cookie the upload
+    // minted would be in a context the crawl cannot see and this would read exactly like the control.
+    deepEqual(ran, ["documents.upload"]);
+    deepEqual(seeded.visited, ["/", `/documents/{id}/summary`, `/documents/{id}/pages`, `/documents/{id}/answers`]);
+    deepEqual(Object.values(seeded.routes).sort(), ["/", "/documents/{id}/answers", "/documents/{id}/pages", "/documents/{id}/summary"]);
+    // Down to a locator on a screen that did not exist until a file was attached.
+    deepEqual(seeded.locators.downloadReport, { role: "button", name: "Download report" });
+    // The dropzone is gone once there is a document, which is the other half of "it walked what the
+    // action unlocked": these two crawls did not describe the same app.
+    ok(!("analyse" in seeded.locators));
+    equal(seeded.behindSignIn, false);
+  } finally {
+    server.close();
+  }
+});
+
+test("the one action `--as` refuses is told what it lacks, which is a screen rather than a sign-in", async () => {
+  // Refused before a browser is launched, so nothing here needs one. The message used to say `--as`
+  // takes the action that signs in, which is the wrong half of the sentence twice over: it is not
+  // what the flag takes, and it is not what a terminal action is missing.
+  const system: ExplorableSystem = {
+    stack: { endpoints: { documents: "http://127.0.0.1:1" } },
+    config: { actions: { "documents.tail": { records: "terminal" } } },
+    run: async () => undefined,
+  };
+  await rejects(Explore.of(system, "documents", { as: "tail" }), /no screen to leave the crawl on/);
 });

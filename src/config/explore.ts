@@ -193,14 +193,27 @@ export class Explore {
   /**
    * The same crawl, driven against a whole system — its origin, its identities, its declared routes.
    *
-   * `as` names an action that signs in, and it is the difference between describing a product and
-   * describing its front door. Measured on three applications nobody here chose: grocy — stock,
-   * chores, recipes, equipment — walked ONE page, `/login`, and so did linkding; the only one of the
-   * three that described usefully was the only one with no authentication. Every app the tool had
-   * been pointed at until then happened to have a large anonymous surface, which flattered it.
+   * `as` names an action to run before the walk starts — any declared one, resolved the way
+   * `action run` resolves a name and driven on the page the crawl then walks with, so whatever it
+   * leaves behind is what every later navigation carries. A sign-in, an upload, a seed: anything that
+   * leaves the app in the state worth describing. The one shape refused is an action with no screen.
    *
-   * The same argument `check drift` takes, for the same reason: a sign-in is already described, as an
-   * action, and it is the most commonly written kind there is.
+   * A sign-in is the commonest of those and it is not the definition. Measured on three applications
+   * nobody here chose: grocy — stock, chores, recipes, equipment — walked ONE page, `/login`, and so
+   * did linkding; the only one of the three that described usefully was the only one with no
+   * authentication. Every app the tool had been pointed at until then happened to have a large
+   * anonymous surface, which flattered it.
+   *
+   * A login is not the only gate, and for a while this argument was named, helped and errored as
+   * though it were — which is the same as not having it. An app whose landing screen is a dropzone
+   * walked one page here too, for a reason with no login in it: its submit is bound to a file having
+   * been chosen and its other routes each take an id that only exists once one has been uploaded, so
+   * nothing links anywhere until something has been dropped on it. The session that hit it read the
+   * documentation, concluded the harness could reach exactly one screen of that app unaided, and
+   * routed the whole flow around it through the API. `--as` had been there the whole time.
+   *
+   * Named as an ACTION rather than typed here, because whatever state a crawl needs is already
+   * described as one — the same reason `check drift` takes its sign-in that way.
    */
   static async of(
     system: ExplorableSystem,
@@ -215,11 +228,12 @@ export class Explore {
     // runner uses: `--as` takes the name `action run` takes, and a guard reading the typed name while
     // the run reads the resolved one is two readers disagreeing about which action this is.
     const as = opts.as ? resolveAction(system.config.actions ?? {}, opts.as) : undefined;
-    // The same thing `check drift` says, because `records: "terminal"` means the action has no screen
-    // to sign a browser in on. Said before a browser is launched, rather than after thirty seconds of
-    // waiting for a locator that will never exist.
+    // The only shape of action this refuses, and the same thing `check drift` says about one:
+    // `records: "terminal"` means the steps are typed at a shell, so there is no page for the crawl to
+    // inherit however useful what the action does would be. Said before a browser is launched, rather
+    // than after thirty seconds of waiting for a locator that will never exist.
     if (as && system.config.actions?.[as]?.records === "terminal") {
-      throw new Error(`${as} records a terminal, so it has no screen to sign a browser in on — --as takes the action that signs in`);
+      throw new Error(`${as} records a terminal, so it has no screen to leave the crawl on — --as takes an action with a screen, whatever that action does`);
     }
 
     const browser = await requirePlaywright("exploring an app").chromium.launch({ headless: process.env.HEADED !== "1" });
@@ -229,8 +243,9 @@ export class Explore {
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       if (cookies.length) await context.addCookies(cookies);
       const page = await context.newPage();
-      // Signed in first, on the page the crawl then walks with — a session is a cookie jar on the
-      // context, so whatever the action leaves behind is what every later navigation carries.
+      // Run first, on the page the crawl then walks with — a session is a cookie jar on the context
+      // and an upload is a row on the server, so whatever the action leaves behind is what every
+      // later navigation carries.
       if (as) {
         if (!system.run) throw new Error(`this system cannot run actions, so --as=${as} has nothing to drive`);
         await system.run(as, page, {}, { quiet: true });
@@ -238,9 +253,9 @@ export class Explore {
       // The API half, for free. Every call the app makes while being walked is a declared operation
       // waiting to be named, and a description needs those as much as it needs the screens.
       //
-      // Attached after the sign-in, not before: the sign-in's own calls belong to an action that is
-      // already described, and folding them in would make `operations` differ depending on whether
-      // `--as` was passed.
+      // Attached after the action, not before: whatever `--as` ran makes its own calls, and those
+      // belong to an action that is already described — folding them in would make `operations`
+      // differ depending on whether `--as` was passed.
       page.on("request", request => {
         const type = request.resourceType();
         if (type === "xhr" || type === "fetch") requests.push({ method: request.method(), url: request.url() });
@@ -561,9 +576,9 @@ export class Explore {
   /**
    * The fragment, as JSONC a person can paste into the file they already have.
    *
-   * `as` is only for the notes: what to say to somebody who has not signed in yet is not what to say
-   * to somebody whose sign-in did not take, and telling a reader to do the thing they just did is
-   * how a note gets learned as noise.
+   * `as` is only for the notes: what to say to somebody who has not run anything first is not what to
+   * say to somebody whose action ran and left the app somewhere else, and telling a reader to do the
+   * thing they just did is how a note gets learned as noise.
    */
   static render(found: Discovery, service: string, as?: string): string {
     const block = {
@@ -586,7 +601,10 @@ export class Explore {
             "// Every page walked has a password field on it, so this describes the front door and not the",
             "// product. What is behind the login is the part worth describing.",
             ...(as
-              ? [`// It ran \`${as}\` first and still landed here — check that that action signs THIS service in.`]
+              ? [
+                  `// It ran \`${as}\` first and still landed here, so that action did not leave the app where the`,
+                  `// crawl needed it — not signing THIS service in is the commonest way for that to happen.`,
+                ]
               : [`// Run a declared sign-in first and the crawl carries the session it leaves:`, `//   config explore ${service} --as=<action>`]),
           ]
         : []),
@@ -859,9 +877,9 @@ export type ExplorableSystem = {
     /** Where a screen is declared by the time anything reads a config: a service's `app` is hoisted here. */
     apps?: Record<string, { service?: string; routes?: Record<string, string> }>;
     services?: Record<string, unknown>;
-    /** Asked which action `--as` names, and then whether that one has a screen to sign in on. */
+    /** Asked which action `--as` names, and then whether that one has a screen to leave the crawl on. */
     actions?: Record<string, { records?: string }>;
   };
-  /** How a declared sign-in gets driven, for `--as`. The same signature `check drift` asks for. */
+  /** How the action `--as` names gets driven, whatever it does. The same signature `check drift` asks for. */
   run?: (action: string, page: Page, inputs: Params, within?: { quiet?: boolean }) => Promise<unknown>;
 };
