@@ -20,7 +20,7 @@ export function commandsFor(system: System): Cli {
     renderVideos: () => system.renderVideos(),
     // Authenticated the way a declared operation would be — the client already knows how.
     api: system.hasApi ? (method, path, body) => system.api.request(path, { method, body }) : undefined,
-    sql: system.hasDatabase ? (query: string) => system.db.sql(query) : undefined,
+    sql: system.hasDatabase ? (query: string, on?: string) => (on ? system.database(on) : system.db).sql(query) : undefined,
   });
 
   for (const [noun, group] of Object.entries(system.config.cli ?? {})) {

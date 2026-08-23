@@ -21,6 +21,10 @@ its own containers without a wrapper script.
 `probe` decides "up". The object form (`path`, `status`, `contains`) is what separates *something is
 listening* from *our thing is listening* when two projects share a machine.
 
+`status` answers in three states, not two. `probe: "container"` with no container to ask about means
+**cannot tell** (`reachable: undefined`, printed as `?`) — answering DOWN there is indistinguishable
+from a service that really is down, on the one board whose whole job is being believed.
+
 ## docker
 
 Shells out to the docker CLI rather than talking to the daemon: this runs beside `docker compose`,

@@ -4,7 +4,7 @@ import { Actions, type ActionConfig, type ActionResult, type Params } from "./ac
 import { appSurface, type RouteMap, type Screens } from "./browser/surface.ts";
 import { Cli, type Noun } from "./cli/cli.ts";
 import { commandsFor } from "./cli/commands.ts";
-import { fill, type SystemConfig, loadConfig, scoped } from "./config/index.ts";
+import { fill, type DatabaseConfig, type SystemConfig, loadConfig, scoped } from "./config/index.ts";
 import { locate } from "./browser/locator.ts";
 import { resolveSecret } from "./providers/secrets.ts";
 import { Evidence } from "./evidence/evidence.ts";
@@ -64,6 +64,7 @@ export class System {
   /** Set while something outside a test is driving: the frames belong with ITS recording, not `cli/adhoc`. */
   private pinned?: EvidenceContext;
   private readonly clients = new Map<string, Operations>();
+  private readonly databases = new Map<string, Queries>();
   private readonly running = new Map<string, StubServer>();
 
   constructor(config: SystemConfig, workspace?: Workspace) {
@@ -74,6 +75,7 @@ export class System {
     this.stack = new Stack({
       root: this.workspace.root ?? Stack.findRoot(config.root ?? [".git"]),
       services: config.services,
+      suffixVar: config.suffixVar,
     });
 
     // The default client, plus any others the config declares — a third party's GraphQL is the same
@@ -98,23 +100,19 @@ export class System {
       );
     }
 
-    this.postgres = config.database
-      ? new Postgres({
-          docker: this.stack.docker,
-          container: () => this.stack.containers[config.database!.service],
-          user: config.database.user,
-          database: config.database.database,
-          // Resolved here rather than passed through: `containerEnv` reads the running container,
-          // which is not a thing a database driver should know how to do. Lazily, though — reading it
-          // now would make `witness help` shell into a container, and fail when the stack is down.
-          password: () => resolveSecret(config.database!.credential, this.stack),
-          trace: this.trace,
-        })
-      : undefined;
+    this.postgres = config.database ? this.driverFor(config.database) : undefined;
     this.db = new Queries(
       this.postgres ?? ({ sql: () => "", rows: () => [] } as unknown as Postgres),
       config.database?.queries,
     );
+    // Every database the description names, by the service that runs it — the default one included,
+    // so `--on=<service>` can reach any of them rather than every one except the interesting one. An
+    // app database plus an authz or metrics one is completely ordinary; a second one is a second
+    // database in the same sense a second API is a client, not a shape this refuses to load.
+    if (config.database && this.postgres) this.databases.set(config.database.service, this.db);
+    for (const [databaseName, spec] of Object.entries(config.databases ?? {})) {
+      this.databases.set(databaseName, new Queries(this.driverFor(spec), spec.queries));
+    }
 
     this.actions = new Actions({
       operations: this.api,
@@ -207,6 +205,34 @@ export class System {
     const found = this.clients.get(name);
     if (!found) throw new Error(`no client "${name}" — declared: ${[...this.clients.keys()].join(", ") || "none"}`);
     return found;
+  }
+
+  /**
+   * Another database the config declares, by the service that runs it — `app.database("openfga-db")`.
+   *
+   * The same shape as {@link client}: `db` is the default one, this is every other. An app database
+   * and an authz database is the ordinary case, and having nowhere to put the second was the reason a
+   * generated config for such a stack could not be loaded at all.
+   */
+  database(name: string): Queries {
+    const found = this.databases.get(name);
+    if (!found) throw new Error(`no database "${name}" — declared: ${[...this.databases.keys()].join(", ") || "none"}`);
+    return found;
+  }
+
+  /** The driver for one declared database. Lazily, so building a system never touches a container. */
+  private driverFor(spec: DatabaseConfig): Postgres {
+    return new Postgres({
+      docker: this.stack.docker,
+      container: () => this.stack.containers[spec.service],
+      user: spec.user,
+      database: spec.database,
+      // Resolved here rather than passed through: `containerEnv` reads the running container, which
+      // is not a thing a database driver should know how to do. Lazily, though — reading it now would
+      // make `witness help` shell into a container, and fail when the stack is down.
+      password: () => resolveSecret(spec.credential, this.stack),
+      trace: this.trace,
+    });
   }
 
   /**

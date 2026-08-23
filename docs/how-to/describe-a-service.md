@@ -65,6 +65,9 @@ A service carries everything true about it. The top level carries only what is s
   answering is *ours*.
 - **A second service with an `api`** becomes a named client, reachable from a step as
   `{ "api": { "client": "mailpit", "operation": "messages" } }`.
+- **A second service with a `database`** is the same idea: the first is what bare `witness db sql`
+  runs against, and any of them is reachable as `--on=<service>`. An app database plus an authz one
+  is ordinary — it is not a shape to describe your way around.
 - **A service with no screen** takes `"records": "terminal"` — see
   [record-a-terminal.md](record-a-terminal.md).
 

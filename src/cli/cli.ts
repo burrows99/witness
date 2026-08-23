@@ -38,7 +38,8 @@ export class Cli {
     /** Rendering happens here, not in a subprocess. */
     renderVideos?: () => string[];
     api?: (method: string, path: string, body?: unknown) => Promise<unknown>;
-    sql?: (query: string) => string;
+    /** `on` names one of the extra databases the description declares; omitted means the default. */
+    sql?: (query: string, on?: string) => string;
   }): this {
     this.command("stack", {
       summary: "what is up, on which ports, from which checkout",
@@ -51,18 +52,23 @@ export class Cli {
             return [
               `stack ${this.stack.suffix || "(primary)"} — resolved from ${this.stack.root}/.env`,
               ...rows.map(r => {
-                const state = r.answering ? "NOT OURS" : r.reachable ? "up" : "DOWN";
+                // Three states, not two. `?` is "cannot tell" — nothing was asked, because there was
+                // nothing to ask — and printing DOWN for it makes it indistinguishable from a service
+                // that really is down, on the one board whose whole job is being believed.
+                const state = r.answering ? "NOT OURS" : r.reachable === undefined ? "?" : r.reachable ? "up" : "DOWN";
                 // A declared container that is not running, on a service that IS answering, means somebody
                 // runs it on the host — normal. On one that is NOT answering it means exactly what it says.
                 const where = r.answering
                   ? r.answering
-                  : r.containerUp
-                    ? r.container
-                    : r.container
-                      ? r.reachable
-                        ? "served from the host"
-                        : `${r.container} is not running`
-                      : "";
+                  : r.reachable === undefined
+                    ? "judged by its container, and none is declared"
+                    : r.containerUp
+                      ? r.container
+                      : r.container
+                        ? r.reachable
+                          ? "served from the host"
+                          : `${r.container} is not running`
+                        : "";
                 return `  ${r.name.padEnd(width)}  ${r.url.padEnd(24)} ${state.padEnd(8)} ${where}`;
               }),
             ].join("\n");
@@ -90,8 +96,15 @@ export class Cli {
     if (opts.sql) {
       const sql = opts.sql;
       this.command("db", {
-        summary: "the stack's database",
-        verbs: { sql: { summary: "run a query", run: (args: string[]) => sql(Cli.need(args[0], "query")) } },
+        summary: "the stack's databases",
+        verbs: {
+          sql: {
+            // A stack with two of them is ordinary, so the second is named the way a second API is —
+            // `--on`, not a second command.
+            summary: "<query> [--on=<service>] — run it against the default database, or a named one",
+            run: (args: string[], flags: string[] = []) => sql(Cli.need(args[0], "query"), Cli.flag(flags, "on")),
+          },
+        },
       });
     }
 
@@ -216,6 +229,18 @@ export class Cli {
   /** A required positional argument, or exit 2 saying which one is missing. */
   static need(value: string | undefined, what: string): string {
     return value ?? Cli.die(`missing <${what}>`, 2);
+  }
+
+  /**
+   * A flag's value — `--on=billing` → `billing`.
+   *
+   * The `=` form only, because `run` splits the line into positionals and flags before a verb sees
+   * it: the space form would leave the value sitting in the positional half, where it would be read
+   * as an argument.
+   */
+  static flag(flags: string[], name: string): string | undefined {
+    const found = flags.find(f => f.startsWith(`--${name}=`));
+    return found?.slice(name.length + 3);
   }
 
   static die(message: string, code = 1): never {

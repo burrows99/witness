@@ -17,8 +17,19 @@ const STACK = {
     ports: ["${POSTGRES_PORT:-5441}:5432"],
     environment: { POSTGRES_DB: "gitea", POSTGRES_USER: "gitea", POSTGRES_PASSWORD: "${POSTGRES_CREDENTIAL:-x}" },
   },
+  // A second database, and no `container_name`: both of the things a real stack does that this used
+  // to be silent about.
+  mariadb: {
+    image: "mariadb:11.4",
+    ports: ["${MARIADB_PORT:-3307}:3306"],
+    environment: { MARIADB_DATABASE: "witness", MARIADB_USER: "witness", MARIADB_PASSWORD: "${MARIADB_CREDENTIAL:-x}" },
+  },
+  redis: { image: "redis:7-alpine", ports: ["${REDIS_PORT:-6380}:6379"] },
   worker: { build: { context: "." }, container_name: "witness-worker" },
 };
+
+const translate = (services: Record<string, unknown> = STACK, project = "witness") =>
+  Compose.translate(services as Parameters<typeof Compose.translate>[0], project).services;
 
 test("a port mapping keeps the variable that sets it", () => {
   // `--no-interpolate` exists for this line. With the value substituted the variable name is gone,
@@ -29,36 +40,93 @@ test("a port mapping keeps the variable that sets it", () => {
   equal(Compose.published(undefined), undefined);
 });
 
-test("a service built here is ours; one pulled by tag is not", () => {
-  const services = Compose.translate(STACK);
+test("a service built here is ours; one pulled by tag says nothing either way", () => {
+  const services = translate();
   equal(services.worker.kind, "in-house");
-  equal(services.postgres.kind, "third-party");
+  // NOT `third-party`. A stack that builds its images in CI and pulls them back by tag would be
+  // labelled somebody else's from end to end, which inverts the meaning of the field for all of it.
+  equal(services.postgres.kind, undefined);
 });
 
 test("a service that publishes no port can only be asked of docker", () => {
-  const services = Compose.translate(STACK);
+  const services = translate();
   equal(services.worker.probe, "container");
-  // One that does publish a port answers HTTP, which is already the default.
+  // One that does publish a port, and speaks HTTP on it, answers the default probe.
   equal(services.gitea.probe, undefined);
 });
 
+test("a published port is not an HTTP port", () => {
+  // All three publish one, and nothing at `http://localhost:5441` will ever answer an HTTP request,
+  // so the default probe reports a perfectly healthy database as DOWN forever.
+  const services = translate();
+  equal(services.postgres.probe, "container");
+  equal(services.mariadb.probe, "container");
+  equal(services.redis.probe, "container");
+  ok(Compose.speaksHttp("grafana/grafana:13.2.0"));
+  ok(!Compose.speaksHttp("bitnami/postgresql:16"));
+});
+
 test("where compose runs a service becomes where the description looks for it", () => {
-  const services = Compose.translate(STACK);
+  const services = translate();
   deepEqual(
     { port: services.gitea.port, portVar: services.gitea.portVar, container: services.gitea.container },
     { port: 3020, portVar: "GITEA_PORT", container: "witness-gitea" },
   );
 });
 
+test("a container nobody named is still a container", () => {
+  // Compose names it `<project>-<service>-<n>`, and the project is in the same document — so leaving
+  // `container` unset makes a container probe unanswerable about a service that is running fine.
+  const services = translate();
+  equal(services.mariadb.container, "witness-mariadb-1");
+  equal(services.redis.container, "witness-redis-1");
+  // Without a project name there is nothing to derive from, and inventing one would be worse.
+  equal(Compose.container(undefined, "redis", undefined), undefined);
+});
+
+test("a container name templated by a variable keeps the variable, not the text", () => {
+  // `hesta-api${WT:-}` names no container that has ever existed, so the service reports DOWN whatever
+  // is running. `suffixVar` is the knob that already expresses this, exactly as `portVar` does.
+  deepEqual(Compose.container("hesta-api${WT:-}", "api", "hesta"), { container: "hesta-api", variable: "WT" });
+  deepEqual(Compose.container("hesta-web${WT}", "web", "hesta"), { container: "hesta-web", variable: "WT" });
+  const read = Compose.translate(
+    { api: { image: "acme/api", container_name: "hesta-api${WT:-}" }, web: { image: "acme/web", container_name: "hesta-web${WT:-}" } },
+    "hesta",
+  );
+  equal(read.suffixVar, "WT");
+  equal(read.services.api.container, "hesta-api");
+});
+
+test("two variables suffixing two services is not one convention, so neither is claimed", () => {
+  const read = Compose.translate(
+    { api: { image: "a", container_name: "a${WT:-}" }, web: { image: "b", container_name: "b${BRANCH:-}" } },
+    "acme",
+  );
+  equal(read.suffixVar, undefined);
+});
+
 test("a postgres image brings its database with it", () => {
-  const services = Compose.translate(STACK);
+  const services = translate();
   deepEqual(services.postgres.database, { user: "gitea", database: "gitea", credential: { containerEnv: "POSTGRES_PASSWORD" } });
   // Only where the image says so. Everything else is a service that happens to have env vars.
   equal(services.gitea.database, undefined);
 });
 
+test("so does a mysql or mariadb one", () => {
+  // The image was matched against `postgres` alone, so a MariaDB's database name, user and the
+  // variable holding its password sat in the compose file being ignored.
+  deepEqual(translate().mariadb.database, { user: "witness", database: "witness", credential: { containerEnv: "MARIADB_PASSWORD" } });
+  // The MySQL image reads only its own prefix; the MariaDB one reads either, so both are tried.
+  deepEqual(Compose.database("mysql:8.4", { MYSQL_USER: "acme", MYSQL_DATABASE: "shop", MYSQL_PASSWORD: "x" }), {
+    user: "acme",
+    database: "shop",
+    credential: { containerEnv: "MYSQL_PASSWORD" },
+  });
+  equal(Compose.database("redis:7-alpine", { REDIS_PASSWORD: "x" }), undefined);
+});
+
 test("a credential becomes a source, never a value", () => {
-  const services = Compose.translate(STACK);
+  const services = translate();
   deepEqual(services.postgres.secrets, { postgresPassword: { containerEnv: "POSTGRES_PASSWORD" } });
   // The compose file holds `${POSTGRES_CREDENTIAL:-x}`. Copying that string in would put a credential
   // in a repository for no reason, when the container that has it can simply be asked.
@@ -84,8 +152,8 @@ test("an answer that is not JSON is not an answer", () => {
 });
 
 test("the generated config says what it left out and where to get it", () => {
-  const rendered = Compose.render("acme", Compose.translate(STACK));
-  match(rendered, /3 services below/);
+  const rendered = Compose.render("acme", Compose.translate(STACK, "witness"));
+  match(rendered, /5 services below/);
   // The three things it cannot know, each with the command that answers it.
   match(rendered, /config explore/);
   match(rendered, /config template/);

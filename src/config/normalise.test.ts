@@ -1,4 +1,4 @@
-import { deepEqual, equal, throws } from "node:assert/strict";
+import { deepEqual, equal } from "node:assert/strict";
 import { test } from "node:test";
 
 import { normalise, OLDER_NAME, qualify, scoped, unfilled } from "./normalise.ts";
@@ -64,11 +64,17 @@ test("the first service with an API is the default; the rest are named clients",
   equal(config.clients?.billing.service, "billing");
 });
 
-test("two databases is a description of something this cannot drive", () => {
-  throws(
-    () => of({ a: { database: { user: "a", database: "a", credential: FROM_THE_CONTAINER } }, b: { database: { user: "b", database: "b", credential: FROM_THE_CONTAINER } } }),
-    /both declare a database/,
-  );
+test("the first service with a database is the default; the rest are named", () => {
+  // An app database plus an authz, queue or metrics one is completely ordinary. This threw, and the
+  // throw was in the LOADER — so a config generated off such a compose file broke every command the
+  // tool has, `help` included.
+  const config = of({
+    app: { database: { user: "a", database: "a", credential: FROM_THE_CONTAINER } },
+    "openfga-db": { database: { user: "b", database: "b", credential: FROM_THE_CONTAINER } },
+  });
+  equal(config.database?.service, "app");
+  equal(config.databases?.["openfga-db"].service, "openfga-db");
+  equal(config.databases?.["openfga-db"].user, "b");
 });
 
 test("a service's secrets are scoped, so two services may use the same name", () => {
