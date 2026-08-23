@@ -178,3 +178,12 @@ test("it says where a thing belongs, which is the question a config asks first",
   const out = Skill.for().render();
   match(out, /\*\*A service owns what is true about it\.\*\*/);
 });
+
+test("it points at the Playwright CLI rather than reimplementing it", () => {
+  // `codegen` already generates locators the same way this tool resolves them. The cold agent that
+  // drove Gitea asked for a cheaper locator loop and curled page HTML by hand, because nothing here
+  // said the loop already existed.
+  const out = Skill.for().render();
+  match(out, /npx playwright codegen/);
+  match(out, /--save-storage/);
+});
