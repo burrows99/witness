@@ -18,6 +18,20 @@ Written under the service it is about, so it needs no `app` and no `web.` in its
 `web.cancelOrder` from outside, and `cancelOrder` to its siblings — and to the command line, which
 takes the bare name whenever exactly one service declares it.
 
+**It does not have to be typed into the file by hand.** `action add` takes the action — or just its
+step list — validates every step against the verbs the runner actually dispatches on, and puts it
+where the name says it belongs:
+
+```bash
+npx witness action add web.cancelOrder --from=steps.jsonc
+npx witness action add web.cancelOrder --from=-        # or down a pipe
+npx witness action rm  web.cancelOrder
+```
+
+A refusal leaves `.witness/config.jsonc` byte-identical and says what was wrong with the step list;
+the comments already in that file are left exactly where they are; and adding the same action twice is
+one action. See [reference/cli.md](../reference/cli.md#config-merge-config-set-action-add-action-rm).
+
 ## Get somewhere, do something, claim something
 
 ```jsonc
@@ -97,6 +111,10 @@ Every value is a template filled from what the run gathered, written whether the
 - **A locator you have not run is a guess.** Five of the first nine actions written against Grafana
   here named something that did not exist. Use `npx playwright codegen <url>`, then run it and read
   the frame the story names.
+- **A step verb you misspelled does nothing, silently.** The runner dispatches one `if` per verb, so
+  `{ "clik": … }` is not an error — it is no step at all, and the action runs green having moved
+  nothing. `action add` refuses one before it is written; a step typed straight into the file is not
+  checked by anything until something looks at the frames and cannot see why they are identical.
 - **`expect` passing is not the same as evidence.** A `css` match can succeed on a node that is
   off-screen: the run goes green and the picture shows nothing.
 - **Neither is a run that finishes.** Fourteen steps against a fast local app are over in two

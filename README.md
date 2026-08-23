@@ -138,7 +138,11 @@ A **service** carries everything true about it. The top level carries only what 
 ```
 
 `witness config template` prints every field this version understands, generated from the type
-declarations — so it describes the version you have.
+declarations — so it describes the version you have. And nothing here has to be typed in by hand:
+`witness config explore <service> | witness config merge -` applies the description a walk of the
+running app implies, and `witness config set services.web.port 3001` writes one field. Both validate
+before they write, leave the comments in that file exactly where they are, and write nothing at all
+for a field that already says it.
 
 ## Write an action
 
@@ -171,6 +175,11 @@ The sequence, its narration and its claims, all data:
   out of recorded request bodies.
 - `{waitForUrl: {route}}` resolves through the declared port instead of hardcoding a host.
 
+`witness action add customer.refundAnOrder --from=steps.jsonc` writes one of these into the file,
+under the service its name names, with every step checked against the verbs the runner actually
+dispatches on — a misspelled verb is otherwise not an error but no step at all, and the action runs
+green having moved nothing. `witness action rm` takes it out again.
+
 A third party's client and a stub server stay as code, attached with `use()`. The system is importable
 when a project needs it (`System.find()`, `app.run`, `app.api.call`); nothing here requires that.
 
@@ -182,6 +191,7 @@ npx witness api get <operation|/v1/health>            # a declared operation by 
 npx witness db sql "select 1" [--on=openfga-db]       # the stack's databases, default or named
 npx witness order show 1234                           # the verbs the config declares
 npx witness action list                               # what the product can DO
+npx witness action add web.checkout --from=steps.jsonc  # and how one gets written
 npx witness action run app.signIn email=ada@example.com
 npx witness action run checkout refund --parallel     # side by side, in one video
 npx witness action run flaky --retries=2              # a fresh browser each go

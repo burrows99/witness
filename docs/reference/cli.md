@@ -30,6 +30,8 @@ tutorial say.
 | `action list` / `action show <a>` / `action run <a…>` | any action is declared |
 | `stub list` / `stub show <s>` | any `stubs` are declared |
 | `config explore [<service>] [--as=<action>] [--pages=N] [--depth=N]` | always — walks the app and prints the description it implies |
+| `config merge <file\|->` / `config set <field> <value>` | always — the writing half: a block, or one field |
+| `action add <name> --from=<file\|->` / `action rm <name>` | always — `add` is how a description gets its first action |
 | `init` | always — writes `.witness/`, populated from the compose file when there is one |
 | `skill [--write]` | always — the instructions, generated from what this copy can do; `--write` refreshes `.witness/SKILL.md` in place |
 | *your own nouns* | each entry in the `cli` block |
@@ -82,7 +84,9 @@ npx witness config explore [<service>] [--as=<action>] [--pages=12] [--depth=2]
 Crawls same-origin from the routes already declared (or `/`), carrying the config's identity cookies,
 and prints a JSONC fragment: `routes` and `locators` from each page's aria snapshot, `forms` from the
 fields it found, `api.operations` from the XHR the app made while being walked. It never writes the
-config. What the caps left out is printed, not dropped silently.
+config itself — a generated name is worse than the one you would choose — so rename and trim, then
+apply what is left with `config merge -`, which takes exactly this shape. What the caps left out is
+printed, not dropped silently.
 
 **`--as` names an action to run first** — any declared action, resolved the way `action run` resolves a
 name. It is driven on the page the crawl then walks with, so everything it leaves behind is what every
@@ -123,6 +127,59 @@ turns out to have left this origin is judged on where the navigation **landed**,
 than read: a description that named the third party's screens would be describing somebody else's
 product. Both kinds are named in the fragment, so a route you do want described can be declared by
 hand.
+
+## `config merge`, `config set`, `action add`, `action rm`
+
+```
+npx witness config explore web | npx witness config merge -   # a fragment, applied
+npx witness config merge fragment.jsonc
+npx witness config set services.web.port 3001
+npx witness action add web.checkout --from=steps.jsonc
+npx witness action rm  web.checkout
+```
+
+The half that writes. Everything else here prints or reads, so before these existed the only way to
+change a description that already existed was to edit `.witness/config.jsonc` — which for an agent
+means splicing strings, with the anchor's uniqueness checked by hand, the indentation counted by hand,
+and nothing validating the result until the next command happened to load it.
+
+Three properties, and they matter more than the spelling of the verbs.
+
+**Validated before written.** The result is read back with the same reader every other command uses,
+before anything reaches the disk — so a refusal leaves the file **byte-identical** and says what was
+wrong with the input rather than what broke two minutes into a browser run. A step naming a verb that
+does not exist is the one worth naming: the runner dispatches one `if` per verb and does nothing at all
+with a key it does not know, so `{ "clik": … }` runs green, photographs the screen it did not touch,
+and reports a passing action. `action add` refuses it and lists the verbs there are.
+
+**Comments survive.** The comments in a description are its documentation — `init`'s header,
+`explore`'s notes, whatever you wrote — so nothing is reprinted. The file is edited in place by offset,
+and every byte outside the span actually being changed comes out exactly as it went in, indentation
+and blank lines included. Two things follow, and they are real costs rather than footnotes: a value
+that is **replaced** loses the comments *inside it* (an array, a step list included, is replaced whole
+— nothing can say whether the step at index 3 is the same step), and a **fragment's own comments do
+not travel**, because `explore`'s header is a report about a crawl with nowhere honest to live in the
+file. A description that does not parse is refused rather than spliced at a guess.
+
+**Idempotent and addressable.** A field already saying what you asked for is not rewritten — not even
+identically — so the same `action add` twice is one action, and a regenerated `explore` fragment merged
+a second time is not churn in the diff. You name WHAT to change and never where it sits in the text.
+
+- `config merge` is deep for blocks and wholesale for everything else: a fragment naming
+  `services.web.app.routes` will not delete the `api` it never mentioned.
+- `config set` takes a scalar or a list. A block is refused and pointed at `merge`, because "set this
+  field to this object" has two readings and a verb whose meaning depends on what is already in the
+  file is what this surface exists to stop being. A key with a dot **in its own name** can only be
+  reached with `merge`.
+- `action add <service>.<name>` writes it under that service, where it needs no `app` and no prefix
+  typed into its own name; a bare name goes to the top-level `actions` block. It takes the whole
+  action or the step list on its own.
+- `action rm` takes the note written directly above it — prose about something that is not there is
+  worse than none — and takes the `actions` block too when that was the last thing in it. A bare name
+  is answered for the way `action run` answers one, and refuses to guess between two services.
+- **`config merge` and `config set` answer without a description that loads.** A fresh `init` writes a
+  template that does not load until it is cut down, which is exactly when a writer is worth having.
+  `action add` and `action rm` need one that does.
 
 ## Your own nouns
 

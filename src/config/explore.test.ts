@@ -503,7 +503,9 @@ test("the fragment says it is a starting point and where it came from", () => {
     "web",
   );
   match(rendered, /Walked 1 page: \//);
-  match(rendered, /merge the rest by hand/);
+  // The loop it could not close. This header used to end "merge the rest by hand", which was true and
+  // was the whole of #153: the tool generated exactly the shape it would not accept back.
+  match(rendered, /config explore web \| config merge -/);
   // It is a fragment for a person to paste, so it has to be shaped like the file they already have.
   ok(rendered.includes('"services"') && rendered.includes('"web"'));
 });

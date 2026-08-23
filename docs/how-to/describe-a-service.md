@@ -8,6 +8,7 @@ npx witness config explore            # the service with screens
 npx witness config explore mailpit --pages=20 --depth=3
 npx witness config explore grocy --as=grocy.signIn   # ran that action first, then walked
 npx witness config explore docs --as=docs.upload     # any action: whatever unlocks the app
+npx witness config explore web | npx witness config merge -   # and applied
 ```
 
 `init` reads `docker compose config` and writes the whole `services` block: where each service runs,
@@ -15,9 +16,12 @@ its `portVar`, its container, whether it is yours, its database, and the environ
 its credentials — as **sources**, never values, so the file can be committed. Nothing is retyped from
 the compose file, which is the first thing every description gets wrong.
 
-`config explore` then walks the running app and prints the description it implies — routes, locators, forms, and the
-operations the app called while being walked. Nothing is written: merge and trim by hand, because a
-generated name is worse than the one you would choose.
+`config explore` then walks the running app and prints the description it implies — routes, locators,
+forms, and the operations the app called while being walked. It writes nothing itself, because a
+generated name is worse than the one you would choose: rename and trim first, then apply what is left
+with `config merge -`, which validates before it writes, leaves every comment in the description where
+it is, and writes nothing at all for a field already saying that. Piping the whole fragment straight
+in is the shortcut, and it is a shortcut past the trimming rather than instead of it.
 
 **How much of that you get depends on how the app is built, and the `operations` block most of all.**
 It is read off the XHR the app makes while being walked, so it is rich on an SPA or an API-first
@@ -104,6 +108,10 @@ A service carries everything true about it. The top level carries only what is s
   them together, not the name, so rename either freely.
 - **A service with no screen** takes `"records": "terminal"` — see
   [record-a-terminal.md](record-a-terminal.md).
+- **Nothing here has to be typed into the file by hand.** `config merge <file|->` applies a whole
+  block, `config set <field> <value>` writes one field by the name this page addresses it with, and
+  `action add`/`action rm` take one action. All of them validate before they write and leave the
+  comments alone — see [cli.md](../reference/cli.md#config-merge-config-set-action-add-action-rm).
 
 ## Say a thing once
 
