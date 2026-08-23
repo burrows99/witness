@@ -10,6 +10,7 @@
 | `template.ts` (258) | generate the starter config from the types and registries |
 | `types.ts` (254) | read the config's own types back out of the source |
 | `explore.ts` | read a description off the *running app* |
+| `compose.ts` | read a description off the *compose file* |
 
 ## Why it is read, not imported
 
@@ -34,6 +35,24 @@ by running something says "you have not filled this in" rather than failing on a
 `OLDER_NAME = "password"` is the alias for `credential`. The rename was not cosmetic: the field holds
 a *source*, and a field literally named `password` in a type declaration is something every secret
 scanner is right to ask about — [agent/knowledge.md](../agent/knowledge.md) has the incident.
+
+## Three generators, one job
+
+| from | fills |
+|---|---|
+| `template.ts` | the types | every field, documented — the reference |
+| `compose.ts` | `docker compose config` | where each service *is*: ports, containers, database, secret sources |
+| `explore.ts` | the running app | what a person *sees*: routes, locators, forms, operations |
+
+Between them, `init` writes a config somebody can run in the next minute instead of a file of
+`"<name>": "…"`. What none of them can produce is `actions` — a sequence a person performs, and the
+claims it makes, cannot be read off an app sitting still.
+
+`compose.ts` shells out to `docker compose config --no-interpolate --format json` rather than parsing
+YAML: the CLI is always present and always agrees with what compose just did (the same reasoning
+`Docker` gives), it normalises the several shapes compose accepts, and JSON needs no dependency.
+`--no-interpolate` is load-bearing — without it `${GITEA_PORT:-3020}` arrives as `3020` and the
+variable name, which is what `portVar` exists to keep, is gone.
 
 ## explore: the other generator
 

@@ -120,6 +120,21 @@ character. Both rules came from that first fragment.
 **Say what you left out.** A fragment that stopped at a cap looks exactly like one that found
 everything.
 
+**Generate from what already describes the thing.** The compose file holds the ports, the container
+names, which service is a database and where the credentials live. Walking a browser while ignoring
+the file beside it was a whole afternoon spent producing four fields.
+
+**Run the generated artefact, do not just look at it.** The first config `init` generated was correct
+and broke every command — including `help` — because it named a database. Two real defects, both
+invisible until something loaded the file:
+
+- a `containerEnv` credential was resolved when the System was **built**, so building one shelled
+  into a container that was not running
+- a service that publishes no port got `http://localhost:undefined`, and `new URL()` threw
+
+Both are lazily-resolve-it bugs, and both only exist for configs a person would not have hand-written.
+Generating input is also generating new *shapes* of input.
+
 ---
 
 ## Judgement calls that keep coming back

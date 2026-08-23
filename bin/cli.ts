@@ -2,6 +2,7 @@
 import * as path from "node:path";
 
 import { Cli, System, Workspace } from "../src/index.ts";
+import { Compose } from "../src/config/compose.ts";
 import { Explore } from "../src/config/explore.ts";
 import { Skill } from "../src/skill/skill.ts";
 import { Template } from "../src/config/template.ts";
@@ -108,8 +109,14 @@ const init: Parameters<Cli["command"]>[1] = {
   summary: `make a ${Workspace.DIRECTORY}/ in this directory`,
   passthrough: (args: string[]) => {
     const root = args.find(a => !a.startsWith("--")) ?? process.cwd();
+    // The stack is already described, in the compose file next to this. Handing somebody a blank
+    // template to retype it into is asking them to be wrong later — and it is the first thing every
+    // description gets wrong, because nothing checks a port until something cannot reach it.
+    const fromCompose = Compose.read(root);
     const { workspace, written } = Workspace.create(root, {
-      "config.jsonc": Template.forWitness().render(),
+      "config.jsonc": fromCompose
+        ? Compose.render(path.basename(path.resolve(root)), fromCompose)
+        : Template.forWitness().render(),
       // How to use this, generated from what this copy can actually do — so an agent that opens the
       // directory finds instructions rather than having to infer the tool from its own source.
       "SKILL.md": describe({ quiet: true }),
@@ -120,8 +127,11 @@ const init: Parameters<Cli["command"]>[1] = {
     process.stdout.write(
       written.length
         ? `${written.map(f => `wrote ${path.relative(process.cwd(), f)}`).join("\n")}\n` +
-            `\nEdit ${path.relative(process.cwd(), workspace.configFile)} down to what your product has, then:\n` +
-            `  witness stack status\n  witness action list\n`
+            (fromCompose
+              ? `\nRead ${Object.keys(fromCompose).length} service(s) off ${path.basename(Compose.fileIn(root) ?? "compose")}. Next:\n` +
+                `  witness stack status\n  witness config explore\n`
+              : `\nEdit ${path.relative(process.cwd(), workspace.configFile)} down to what your product has, then:\n` +
+                `  witness stack status\n  witness action list\n`)
         : `${path.relative(process.cwd(), workspace.dir)}/ already has everything — nothing written\n`,
     );
   },

@@ -17,7 +17,7 @@ export class Postgres {
   private readonly container: () => string;
   private readonly user: string;
   private readonly database: string;
-  private readonly password: string;
+  private readonly password: () => string;
 
   private readonly trace?: Trace;
 
@@ -26,7 +26,15 @@ export class Postgres {
     container: string | (() => string);
     user: string;
     database: string;
-    password: string;
+    /**
+     * The credential, asked for when a query runs.
+     *
+     * A thunk for the same reason `container` is one. `containerEnv` reads a RUNNING container, so
+     * resolving it eagerly made building a system fail whenever the stack was down — and building a
+     * system is what `witness help` does. A generated config that named a database broke every
+     * command until the stack came up, which is precisely backwards.
+     */
+    password: string | (() => string);
     trace?: Trace;
   }) {
     this.trace = opts.trace;
@@ -34,7 +42,7 @@ export class Postgres {
     this.container = typeof opts.container === "function" ? opts.container : () => opts.container as string;
     this.user = opts.user;
     this.database = opts.database;
-    this.password = opts.password;
+    this.password = typeof opts.password === "function" ? opts.password : () => opts.password as string;
   }
 
   /** One value, or one column — `-tAc`: no header, no padding. */
@@ -43,7 +51,7 @@ export class Postgres {
     const rows = this.docker.exec(
       this.container(),
       ["psql", "-U", this.user, "-d", this.database, "-tAc", query],
-      { PGPASSWORD: this.password },
+      { PGPASSWORD: this.password() },
     );
     this.trace?.add({
       kind: "sql",

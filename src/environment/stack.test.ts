@@ -193,3 +193,14 @@ test("a service can be declared as somebody else's", () => {
   });
   ok(stack.endpoints.billing.startsWith("https://"));
 });
+
+test("a service that publishes nothing has no URL, and is judged by its container", () => {
+  // A queue worker or a migration container answers no HTTP request ever. Inventing
+  // `http://localhost:undefined` for it made every command that asks the stack anything throw
+  // `Invalid URL` — including `help`, against a config generated straight from a compose file.
+  equal(Stack.endpoint({ container: "acme-worker" }, {}), "");
+  equal(Stack.endpoint({ port: 4000 }, {}), "http://localhost:4000");
+  // The compose `.env` wins over the default, which is the whole point of `portVar`.
+  equal(Stack.endpoint({ port: 4000, portVar: "API_PORT" }, { API_PORT: "4100" }), "http://localhost:4100");
+  equal(Stack.endpoint({ port: 4000, url: "https://staging.example" }, {}), "https://staging.example");
+});

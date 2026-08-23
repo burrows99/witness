@@ -105,8 +105,9 @@ export class System {
           user: config.database.user,
           database: config.database.database,
           // Resolved here rather than passed through: `containerEnv` reads the running container,
-          // which is not a thing a database driver should know how to do.
-          password: resolveSecret(config.database.credential, this.stack),
+          // which is not a thing a database driver should know how to do. Lazily, though — reading it
+          // now would make `witness help` shell into a container, and fail when the stack is down.
+          password: () => resolveSecret(config.database!.credential, this.stack),
           trace: this.trace,
         })
       : undefined;

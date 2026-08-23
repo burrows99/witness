@@ -24,6 +24,7 @@ progress, warnings and the "what broke" pointer go to **stderr**, so `… | jq` 
 | `action list` / `action show <a>` / `action run <a…>` | any action is declared |
 | `stub list` / `stub show <s>` | any `stubs` are declared |
 | `config explore [<service>] [--pages N] [--depth N]` | always — walks the app and prints the description it implies |
+| `init` | always — writes `.witness/`, populated from the compose file when there is one |
 | *your own nouns* | each entry in the `cli` block |
 
 ## `action run`

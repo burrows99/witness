@@ -3,11 +3,17 @@
 ## Do not start from a blank file
 
 ```bash
+npx witness init                      # reads the compose file beside you
 npx witness config explore            # the service with screens
 npx witness config explore mailpit --pages=20 --depth=3
 ```
 
-It walks the running app and prints the description it implies — routes, locators, forms, and the
+`init` reads `docker compose config` and writes the whole `services` block: where each service runs,
+its `portVar`, its container, whether it is yours, its database, and the environment variables holding
+its credentials — as **sources**, never values, so the file can be committed. Nothing is retyped from
+the compose file, which is the first thing every description gets wrong.
+
+`config explore` then walks the running app and prints the description it implies — routes, locators, forms, and the
 operations the app called while being walked. Nothing is written: merge and trim by hand, because a
 generated name is worse than the one you would choose.
 
