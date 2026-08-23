@@ -89,6 +89,16 @@ the caller, and the fix is one size lower: inject the `execFile`, and assert the
 answer, the way `docker.test.ts` already does. Anywhere a default parameter exists so tests can avoid
 the real thing, ask what still covers the real thing.
 
+**A key that repeats is not a key, and a gate keyed on one can be passed with the wrong thing.**
+`require-evidence.sh` matched a frame against its read-back by BASENAME, and every terminal recording
+writes its still as `video.png` — so `<action>/before/video.png` and `<action>/after/video.png` were
+one key, and Reading the before frame satisfied the gate for the after frame. The gate exists to stop
+exactly one failure, a caption placed over the wrong frame, which this repository has committed twice;
+it could be passed with the wrong frame, systematically, for most of its own evidence. Resolve to a
+full path instead — and `realpath`, not `abspath`: on macOS `/tmp` is a symlink to `/private/tmp`, so
+one file arrives spelled two ways and an exact match on the spelling is not one. The general shape:
+before trusting a lookup, ask whether two different things can produce the same key.
+
 ---
 
 ## Changing this repository
