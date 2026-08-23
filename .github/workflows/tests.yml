@@ -20,6 +20,13 @@ jobs:
       - run: npm ci
       - run: npm install --no-save @playwright/test@^1
 
+      # The package is not the browser. Installing @playwright/test downloads no browsers at all —
+      # checked against a scratch prefix rather than against this machine, which had one and had got
+      # it some other way. Without this line the one test that drives `check drift` the way the CLI
+      # drives it skips here, which is the failure it exists to catch, arriving in the place that
+      # matters most.
+      - run: npx playwright install --with-deps chromium
+
       # The types, including the TESTS — `tsconfig.build.json` excludes them because they do not ship,
       # and for a long time that meant nothing checked them at all.
       - run: npm run typecheck

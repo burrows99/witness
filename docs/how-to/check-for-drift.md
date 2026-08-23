@@ -37,7 +37,7 @@ A checker that cries wolf is worse than none. The rules it follows now:
 - more than one match is wrong only where the step needs one
 - the sign-in action's own steps are checked **before** anybody is signed in
 - a route that **redirects** is `unchecked`, not `gone`
-- a `records: "terminal"` action has no screen → it is **skipped**, and the count says so
+- a `records: "terminal"` action has no screen → its claims are **named, not checked**, one line each
 
 Without a sign-in action it says exactly what it could not reach rather than guessing.
 
@@ -45,12 +45,39 @@ Without a sign-in action it says exactly what it could not reach rather than gue
 
 A terminal action types at a shell. There is no route to visit and no locator to count, so a browser
 driven at one waits out a timeout on `locator('prompt')` and reports the action as broken — which is
-the checker's own assumption wearing the words of a finding. Skipped, and said:
+the checker's own assumption wearing the words of a finding. Not checked on a page, then. It is still
+**read**, because a count of actions skipped tells nobody *which* sentence went unverified — and an
+action that asserts nothing had nothing skipped in the first place:
 
 ```
-all 4 claims still hold (1 could not be checked) · 7 terminal actions skipped, having no screen to check
+all 4 claims still hold (1 could not be checked)
 ```
 
-Naming one as the *sign-in* action is refused before a browser opens, because a shell cannot sign one
-in. Their claims are not checked at all yet — an `expect` becomes a `Wait+Screen` in the tape, and
-verifying those needs a different checker than this one.
+That is this repository's own description: ten terminal actions, and not one of them asserts anything.
+They type, wait, and let the frame speak.
+
+One that *does* assert is named, with what would have to happen to judge it:
+
+```
+all 4 claims still hold · 1 claim made in a tape rather than on a screen
+
+Not checked:
+  atAPrompt · expect  "1 row" is claimed in a tape as `Wait+Screen` — only a recording can judge whether it still appears
+```
+
+`expect: { text }` becomes `Wait+Screen /…/` in the tape: the same claim a browser step makes, held
+against the pane by VHS instead of against the DOM by Playwright. What it matches exists only once the
+command has run, so checking it *is* a run — and being faster than a run is the whole of what this is
+for. Never guessed at, therefore, and never counted as holding.
+
+The one thing here that **can** be judged without vhs is a claim VHS is never told about. Only
+`expect.text` reaches a tape; an `expect` carrying a `state`, a `count` or nothing but a locator
+describes a screen a terminal does not have and is dropped on the way in — and a terminal action does
+not go through the engine either, so nothing else reads it:
+
+```
+  atAPrompt · expect  a tape carries an `expect` only as `text`, and this one has none — nothing asserts it, here or in the recording
+```
+
+Naming a terminal action as the *sign-in* action is refused before a browser opens, because a shell
+cannot sign one in.

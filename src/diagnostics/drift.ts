@@ -73,12 +73,13 @@ export class Drift {
   }
 
   static async check(input: CheckInput): Promise<Report> {
-    // An action with no screen is not this checker's to check. Its steps type at a shell, so there is
-    // no route to visit and no locator to count — and a browser driven at one waits out a timeout on
-    // a locator that will never exist. Left out, and SAID: a report that quietly read half a
-    // description and answered "all claims still hold" is the same lie as one that cries wolf.
+    // An action with no screen is not this checker's to check on a page. Its steps type at a shell, so
+    // there is no route to visit and no locator to count — and a browser driven at one waits out a
+    // timeout on a locator that will never exist. It is still READ, rather than counted and dropped:
+    // an action that asserts nothing had nothing skipped, and one that asserts something is entitled
+    // to have that sentence named rather than folded into a number.
     const onScreen = Object.entries(input.actions).filter(([, action]) => action.records !== "terminal");
-    const skipped = Object.keys(input.actions).length - onScreen.length;
+    const inATape = Drift.inATape(Object.entries(input.actions).filter(([, action]) => action.records === "terminal"));
     const claims = Drift.claims(Object.fromEntries(onScreen), input.routeOf, input.signInAction);
     const findings: Finding[] = [];
 
@@ -136,11 +137,47 @@ export class Drift {
       : `all ${claims.length} claims still hold${findings.length ? ` (${findings.length} could not be checked)` : ""}`;
     return {
       ok: !broken.length,
-      findings,
+      findings: [...findings, ...inATape],
       checked: claims.length,
-      skipped,
-      summary: skipped ? `${headline} · ${skipped} terminal action${skipped === 1 ? "" : "s"} skipped, having no screen to check` : headline,
+      skipped: inATape.length,
+      summary: inATape.length
+        ? `${headline} · ${inATape.length} claim${inATape.length === 1 ? "" : "s"} made in a tape rather than on a screen`
+        : headline,
     };
+  }
+
+  /**
+   * What a terminal action claims, and which of it can be judged from here.
+   *
+   * Its assertions are made in a tape rather than on a page: `expect: { text }` becomes
+   * `Wait+Screen /…/`, which holds the recording until that text is on the pane and fails it if it
+   * never arrives — the same claim a browser step makes, checked by VHS instead of by Playwright.
+   * Judging one means producing the pane, which means running the command, which is a run and not a
+   * check. So it is not checked. It is SAID, per claim: a count of actions skipped tells nobody WHICH
+   * sentence of their description went unverified, and the whole design here is that a reader can tell
+   * a finding from a silence.
+   *
+   * One thing can be judged without vhs, because it is a claim VHS is never told about. Only
+   * `expect.text` reaches the tape (`asTape`); an `expect` carrying a `state`, a `count` or nothing
+   * but a locator describes a screen a terminal does not have, and is dropped on the way in. The
+   * engine is not the other reader either — a terminal action does not go through it — so that
+   * assertion is made by the description and checked by nothing that runs. Certain rather than
+   * heuristic: it reads the same field `asTape` reads, and `drift.test.ts` holds the two together.
+   */
+  private static inATape(actions: [string, ActionConfig][]): Finding[] {
+    const findings: Finding[] = [];
+    for (const [action, spec] of actions) {
+      for (const step of spec.steps ?? []) {
+        if (!step.expect) continue;
+        const where = { kind: "locator", action, step: Drift.label(step), verdict: "unchecked" } as const;
+        findings.push(
+          step.expect.text
+            ? { ...where, detail: `"${step.expect.text}" is claimed in a tape as \`Wait+Screen\` — only a recording can judge whether it still appears` }
+            : { ...where, detail: "a tape carries an `expect` only as `text`, and this one has none — nothing asserts it, here or in the recording" },
+        );
+      }
+    }
+    return findings;
   }
 
   /**
@@ -286,7 +323,7 @@ export type Report = {
   ok: boolean;
   findings: Finding[];
   checked: number;
-  /** Actions this could not check: a terminal one has no screen, and its claims are made in a tape. */
+  /** Claims this could not check: a terminal action asserts in a tape, and only a recording judges one. */
   skipped: number;
   summary: string;
 };
