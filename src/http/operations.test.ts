@@ -43,6 +43,31 @@ test("an operation nobody declared lists the ones that exist", () => {
   throws(() => operations({ operations: { a: {} } }).operation("nope"), /no such operation "nope" — declared: a/);
 });
 
+test("a name the config declares is called as the operation it is, not joined onto the base URL", async () => {
+  // What the command line hands over is one argument that could be either, and the names are the half
+  // the config exists to declare. Sent as a path, `orders.show` became `http://apiorders.show`.
+  const { seen } = answering({ id: "4" });
+  const ops = operations({ operations: { "orders.show": { path: "/v1/orders/{id}", method: "POST" } } });
+  deepEqual(await ops.callOrRequest("orders.show", { id: 4 }), { id: "4" });
+  // The declared method too: the verb typed at the prompt is how the command is reached, not a second
+  // opinion about what goes on the wire.
+  deepEqual(seen, [{ url: "http://api/v1/orders/4", method: "POST" }]);
+});
+
+test("…and a path is still a path, with the verb the caller asked for", async () => {
+  const { seen } = answering({ ok: true });
+  await operations({ operations: { a: {} } }).callOrRequest("/v1/health", {}, { method: "DELETE" });
+  deepEqual(seen, [{ url: "http://api/v1/health", method: "DELETE" }]);
+});
+
+test("something that is neither says which it could have been", async () => {
+  // `Failed to parse URL from http://localhost:5001health` describes a string the caller never typed.
+  await rejects(
+    () => operations({ operations: { listProjects: {}, getReport: {} } }).callOrRequest("health"),
+    /no such operation "health" — declared: listProjects, getReport… \(paths start with \/\)/,
+  );
+});
+
 test("url says where an operation would go, without going there", () => {
   equal(operations({ operations: { show: { path: "/v1/orders/{id}" } } }).url("show", { id: 4 }), "http://api/v1/orders/4");
 });

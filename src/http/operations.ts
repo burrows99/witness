@@ -47,8 +47,29 @@ export class Operations {
 
   operation(name: string): OperationConfig {
     const op = this.config.operations?.[name];
-    if (!op) throw new Error(`no such operation "${name}" — declared: ${this.names.slice(0, 12).join(", ")}…`);
+    if (!op) throw new Error(this.noSuchOperation(name));
     return op;
+  }
+
+  /**
+   * Whichever of the two the command line was handed.
+   *
+   * A name and a path arrive at the same argument and only one of them is declared anywhere, so the
+   * declared list is asked first: that list is what the block is FOR, and `api get listProjects` is the
+   * obvious first thing to type after writing ten operations with summaries. It used to be concatenated
+   * onto the base URL as though it were a route, which is how a config's whole vocabulary came to be
+   * unreachable from the surface most likely to want it. A leading `/` still means the escape hatch, so
+   * nothing that worked stops working, and anything that is neither is named as neither.
+   *
+   * `method` decides a path's verb only. A declared operation carries its own, which is the point of
+   * declaring it — `get` is how a reader types the command, not a second opinion about what to send.
+   */
+  async callOrRequest<T = unknown>(target: string, params: Params = {}, init: { method?: string; body?: unknown } = {}): Promise<T> {
+    if (target.startsWith("/") || target.startsWith("http")) return this.request<T>(target, init);
+    // Said here rather than left to `operation()`, because only this caller had a second thing it could
+    // have meant: `no such operation "health"` alone invites the reader to look for a missing operation.
+    if (!this.names.includes(target)) throw new Error(`${this.noSuchOperation(target)} (paths start with /)`);
+    return this.call<T>(target, params, init.body);
   }
 
   /** The URL an operation would hit, for the specs that navigate to it or name it in a note. */
@@ -131,6 +152,11 @@ export class Operations {
     const scheme = Object.values(this.config.auth ?? {}).find(a => a.from || a.fromContainerEnv || a.value);
     const headers = scheme ? await authHeaders(scheme, { stack: this.stack, params: {}, declared: this.declared }) : {};
     return this.http.request<T>(path, { ...init, headers: { ...headers, ...(init.headers ?? {}) } });
+  }
+
+  /** What there IS, for either way of naming an operation that is not one. */
+  private noSuchOperation(name: string): string {
+    return `no such operation "${name}" — declared: ${this.names.slice(0, 12).join(", ")}…`;
   }
 
   private context(): ClientContext {

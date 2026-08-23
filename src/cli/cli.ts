@@ -37,7 +37,16 @@ export class Cli {
   withDefaults(opts: {
     /** Rendering happens here, not in a subprocess. */
     renderVideos?: (opts?: { force?: boolean }) => string[];
-    api?: (method: string, path: string, body?: unknown) => Promise<unknown>;
+    /**
+     * An operation the description declares, by name, or any route on the same API — told apart by
+     * whoever holds the list of names, which is not this class.
+     *
+     * The positional line arrives whole: the target, its `key=value` parameters and an optional JSON
+     * body. `key=value` is already how `action run` takes an action's inputs, and that parser lives
+     * with the action runner — reaching into it from here would pull a browser runner in behind the
+     * class that prints `--help`.
+     */
+    api?: (method: string, args: string[]) => Promise<unknown>;
     /** `on` names one of the extra databases the description declares; omitted means the default. */
     sql?: (query: string, on?: string) => string;
   }): this {
@@ -80,13 +89,15 @@ export class Cli {
     if (opts.api) {
       const call = opts.api;
       this.command("api", {
-        summary: "any route on the API, authenticated the way a declared operation is",
+        summary: "any operation this description declares, by name — or any other route, authenticated the same way",
         verbs: Object.fromEntries(
           ["get", "post", "patch", "delete"].map(method => [
             method,
             {
-              summary: `${method.toUpperCase()} <path> [json]`,
-              run: (args: string[]) => call(method.toUpperCase(), Cli.need(args[0], "path"), args[1] ? JSON.parse(args[1]) : undefined),
+              // A named operation brings its own method, so the verb is how this is typed rather than a
+              // second opinion about what goes on the wire. `get` is what anyone reaches for first.
+              summary: `${method.toUpperCase()} <operation|/path> [key=value…] [json]`,
+              run: (args: string[]) => call(method.toUpperCase(), args),
             },
           ]),
         ),

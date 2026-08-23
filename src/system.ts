@@ -504,21 +504,6 @@ export class System {
   cli(): Cli {
     return commandsFor(this);
   }
-
-  /**
-   * `<tool> api get /v1/whatever` — any route, authenticated the way a declared operation would be.
-   *
-   * This hand-rolled its own headers, looking for a `header`/`value`/`fromContainerEnv` scheme — the
-   * shape auth had before it became providers. A `basic` or `bearer` scheme has none of those fields,
-   * so it matched nothing and the request went out with NO Authorization at all, while the help text
-   * said "authenticated". On a public route that reads as proof the credential works; the first route
-   * that needs one comes back 401 and looks like the app's fault.
-   *
-   * The client already knows how to do this. There is no second way of doing it now.
-   */
-  private callByPath(method: string, path: string, body?: unknown): Promise<unknown> {
-    return this.api.request(path, { method, body });
-  }
 }
 
 /** An app the config declared: its routes as screens, its forms, and its sign-in if it has one. */

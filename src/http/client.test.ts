@@ -25,6 +25,21 @@ test("a path is resolved against the base URL, and an absolute one is left alone
   equal(api.url("https://elsewhere.example/x"), "https://elsewhere.example/x");
 });
 
+test("the separator is put in, whether the argument brought one or the base URL did", () => {
+  // Concatenation is right for one shape of argument and produces something unparseable for the other
+  // two: `http://localhost:3002health` cannot be fetched, and `Failed to parse URL from` it names a
+  // string nobody typed — which reads as a bad base URL rather than as a path missing its slash.
+  equal(new HttpApi("http://localhost:3002").url("v1/health"), "http://localhost:3002/v1/health");
+  equal(new HttpApi("http://localhost:3002/").url("/v1/health"), "http://localhost:3002/v1/health");
+  for (const url of ["v1/health", "/v1/health"]) ok(new URL(new HttpApi("http://localhost:3002/").url(url)));
+});
+
+test("an empty path is the base URL itself — what a GraphQL client asks for", () => {
+  // The operation lives in the document there, so every call posts to the endpoint with no route. A
+  // slash appended to it would change the URL every one of those calls reports.
+  equal(new HttpApi("http://api").url(""), "http://api");
+});
+
 test("a JSON answer comes back parsed", async () => {
   answering('{"status":"ok"}');
   deepEqual(await new HttpApi("http://api").get("/v1/health"), { status: "ok" });
