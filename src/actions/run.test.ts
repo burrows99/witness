@@ -50,7 +50,7 @@ test("it runs each action in turn, passing what one stored to the next", async (
       ran.push({ name, inputs });
       return { action: name, ok: true, ms: 1, inputs, value: {}, values: { from: name }, steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
     },
-    evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined }),
+    evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
     pinEvidence: (context: unknown) => {
       pinned = context;
     },
@@ -83,7 +83,7 @@ test("a failing action comes back with its own evidence rather than a stack trac
       if (name === "second") throw Object.assign(new Error(`action "second" failed at step 1: no such button`), { result: attached });
       return { action: name, ok: true, ms: 1, inputs: {}, value: {}, values: {}, steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
     },
-    evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined }),
+    evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
     pinEvidence: () => undefined,
     renderVideos: () => [],
   };

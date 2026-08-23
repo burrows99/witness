@@ -360,7 +360,9 @@ export class System {
           if (cookies.length) await context.addCookies(cookies);
           return context.newPage();
         },
-        signIn: as ? async (page: Page) => void (await this.run(as, page, {})) : undefined,
+        // Quiet: this is a read-only check, and it used to leave a whole `cli/adhoc/run/actions/`
+        // tree of frames and stories behind from the sign-in it drives to get in.
+        signIn: as ? async (page: Page) => void (await this.actions.run(as, page, {}, { quiet: true })) : undefined,
         signInAction: as,
       });
       return { ...report, rendered: Drift.render(report) };

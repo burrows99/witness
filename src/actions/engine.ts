@@ -8,6 +8,7 @@ import { requirePlaywright } from "../browser/playwright.ts";
 import { fill, reach } from "../config/index.ts";
 import type { Evidence } from "../evidence/evidence.ts";
 import { describe, type LocatorSpec, locate } from "../browser/locator.ts";
+import { slug } from "../evidence/paths.ts";
 import { caption as drawCaption, slide as drawSlide } from "../browser/narration.ts";
 import type { Operations } from "../http/operations.ts";
 import type { Queries } from "../database/queries.ts";
@@ -39,6 +40,8 @@ export class Actions {
   private readonly secret: (name: string, scope?: string) => string;
   /** Something the last step got away with that a reader should know about. */
   private warning?: string;
+  /** Where the last `run` step's action filed its evidence, so the step list can point into it. */
+  private ran?: string;
   /** Whatever else this run got away with — collected per run, and returned with it. */
   private notices: string[] = [];
 
@@ -101,7 +104,8 @@ export class Actions {
    * `inputs` fill `{placeholders}` in every step; anything a step stores becomes available to the steps
    * after it, so a value read off the screen (a chosen time, a created id) can be asserted or returned.
    */
-  async run<T = unknown>(name: string, page: Page, inputs: Params = {}, from?: string): Promise<ActionResult<T>> {
+  async run<T = unknown>(name: string, page: Page, inputs: Params = {}, within: Within = {}): Promise<ActionResult<T>> {
+    const { from, quiet } = within;
     // A service's own action reaches its siblings by bare name — being under the same service is what
     // says which `signIn` is meant, and repeating the prefix inside it says nothing new.
     const resolved = this.resolveName(name, from);
@@ -113,6 +117,10 @@ export class Actions {
       );
     }
     name = resolved;
+    // Where this action's evidence goes. A composed action lives INSIDE the step that ran it, so the
+    // directory tree is the call tree — which is the one thing a flat `actions/` folder could not say,
+    // and the reason nothing on disk showed that `theWholeProduct` ran the eight beside it.
+    const into = within.at ?? slug(name, 64);
 
     // Checked before anything is launched: an action that declares what it needs should say so at the
     // start, not fail on an unfilled `{placeholder}` three steps in, after a browser has opened and a
@@ -148,14 +156,17 @@ export class Actions {
         // of a walk all reading "run" is that promise not kept.
         inspector.mark(label === "run" ? `run ${Actions.about(step)}` : label, index);
         try {
-          await this.step(step, page, values, action.app, name);
+          await this.step(step, page, values, action.app, name, { at: into, index, quiet });
         } catch (err) {
           error = err instanceof Error ? err.message : String(err);
         }
-        const shot = await this.frame(page, name, index, label);
+        // Not for a `run` step: the action it ran ends with a frame of that same screen, and the
+        // extra one was 8 of this walk's 58 — the same page, one blog panel later.
+        const shot = step.run || quiet ? undefined : await this.frame(page, into, index, label);
         if (shot) screenshots.push(shot);
-        steps.push({ step: label, detail: Actions.about(step), ms: Date.now() - at, error, warning: this.warning, screenshot: shot });
+        steps.push({ step: label, detail: Actions.about(step), ms: Date.now() - at, error, warning: this.warning, screenshot: shot, ran: this.ran });
         this.warning = undefined;
+        this.ran = undefined;
         this.trace.add({
           kind: "step",
           action: name,
@@ -185,7 +196,7 @@ export class Actions {
         : (values as unknown as T);
     // Before the result is built, so what it got away with is IN the result — and before the story,
     // so the story carries it too.
-    this.note(name, action, values);
+    if (!quiet) this.note(name, action, values);
     const result: ActionResult<T> = {
       action: name,
       // Emptied per run: what an earlier action got away with is not this one's news.
@@ -208,13 +219,13 @@ export class Actions {
 
     // Written whether it passed or failed, because the run that passed is the one somebody compares
     // against when the next one does not.
-    result.debug = this.tell(result);
+    result.debug = quiet ? undefined : this.tell(result, into);
     if (error) throw Object.assign(new Error(`action "${name}" failed at step ${steps.length}: ${error}`), { result });
     return result;
   }
 
   /** One step. Every branch is a verb a config can use; there is deliberately no escape into code. */
-  private async step(step: StepConfig, page: Page, values: Params, defaultApp?: string, owner?: string): Promise<void> {
+  private async step(step: StepConfig, page: Page, values: Params, defaultApp?: string, owner?: string, where: StepPlace = {}): Promise<void> {
     const at = (spec: LocatorSpec): ReturnType<typeof locate> => locate(page, this.resolve(spec, values, owner) as LocatorSpec);
     const text = (s?: string): string => (s === undefined ? "" : fill(s, this.bag(values, owner)));
 
@@ -331,7 +342,16 @@ export class Actions {
       const call = typeof step.run === "string" ? { action: step.run } : step.run;
       // Without `with`, the composed action could only ever be run on the values that happened to be
       // lying around — so an action taking an input could be composed once and never twice.
-      const nested = await this.run(call.action, page, { ...values, ...this.resolveParams(call.with, values, owner) }, owner);
+      // `18-browseconnections`, beside the frames of the step that ran it. The number ties the child
+      // to the parent's own step list without anybody having to hold two orderings in their head.
+      const step18 = String((where.index ?? 0) + 1).padStart(2, "0");
+      const child = call.action.includes(".") ? call.action.slice(call.action.indexOf(".") + 1) : call.action;
+      const nested = await this.run(call.action, page, { ...values, ...this.resolveParams(call.with, values, owner) }, {
+        from: owner,
+        at: where.at ? `${where.at}/${step18}-${slug(child, 40)}` : undefined,
+        quiet: where.quiet,
+      });
+      this.ran = where.at ? `${where.at}/${step18}-${slug(child, 40)}` : undefined;
       Object.assign(values, nested.values);
     }
     if (step.query) {
@@ -488,7 +508,7 @@ export class Actions {
    *
    * Best-effort — a story that cannot be written must not fail the action it is about.
    */
-  private tell(result: ActionResult): { markdown?: string; json?: string } {
+  private tell(result: ActionResult, at: string): { markdown?: string; json?: string } {
     try {
       const evidence = this.evidence();
       const story = new Story({
@@ -503,8 +523,8 @@ export class Actions {
         artefacts: evidence.artefacts(),
       });
       return {
-        markdown: evidence.write(`actions/${result.action}/debug.md`, story.markdown()),
-        json: evidence.write(`actions/${result.action}/debug.json`, JSON.stringify(story.json(), null, 2)),
+        markdown: evidence.write(`${at}/debug.md`, story.markdown()),
+        json: evidence.write(`${at}/debug.json`, JSON.stringify(story.json(), null, 2)),
       };
     } catch {
       return {};
@@ -561,14 +581,32 @@ export class Actions {
    * Filed with the TEST that ran the action, not in a pile of action names — the same action run by two
    * specs would otherwise overwrite itself, and the frames would belong to nothing in particular.
    */
-  private async frame(page: Page, action: string, index: number, label: string): Promise<string | undefined> {
+  private async frame(page: Page, at: string, index: number, label: string): Promise<string | undefined> {
     try {
-      return await this.evidence().actionFrame(page, action, index + 1, label);
+      return await this.evidence().actionFrame(page, at, index + 1, label);
     } catch {
       return undefined;
     }
   }
 }
+
+/**
+ * Where an action is being run from, and where its evidence goes.
+ *
+ * Internal: a caller says `run(name, page, inputs)` and gets the top of a tree. Everything here is
+ * what the tree keeps track of as it goes down.
+ */
+export type Within = {
+  /** The action whose step ran this one — how a bare name finds its sibling. */
+  from?: string;
+  /** The directory its frames and story go in. A composed action's is inside its caller's. */
+  at?: string;
+  /** Write no frames and no story: a read-only check drives the browser and should leave nothing. */
+  quiet?: boolean;
+};
+
+/** What a step needs to know about its own position, to file what it runs underneath itself. */
+type StepPlace = { at?: string; index?: number; quiet?: boolean };
 
 /** Action inputs and stored values: whatever the caller passes, and whatever steps read back. */
 export type Params = Record<string, unknown>;
@@ -704,6 +742,8 @@ export type StepResult = {
   /** It passed, and something about how it passed is worth saying — see `offScreen`. */
   warning?: string;
   screenshot?: string;
+  /** For a `run` step: where the action it ran put its own frames and story. */
+  ran?: string;
 };
 export type NetworkRecord = { method: string; url: string; status: number; resourceType: string };
 
