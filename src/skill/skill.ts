@@ -1,6 +1,7 @@
 import * as path from "node:path";
 
 import { Cli } from "../cli/cli.ts";
+import type { Noun } from "../cli/cli.ts";
 import { slug } from "../evidence/paths.ts";
 import { Stack } from "../environment/stack.ts";
 import { Template } from "../config/template.ts";
@@ -75,31 +76,44 @@ export class Skill {
    * outright: a package script sets `npm_lifecycle_event` to its own name, so an invocation through one
    * is `npm run <that> --`, which is exactly what the reader has to type.
    */
-  static invocation(env: Record<string, string | undefined> = process.env): string {
+  static invocation(env: Record<string, string | undefined> = process.env, entry: string = process.argv[1] ?? ""): string {
     const script = env.npm_lifecycle_event;
     // `npm test` and `npm start` take no `--`, and neither is how this gets driven.
     // `npx` is npm's own launcher and sets this too, which made `npx witness skill` generate a file
     // telling its reader to type `npm run npx --`.
-    return script && !["test", "start", "install", "prepare", "npx", "exec"].includes(script) ? `npm run ${script} --` : "npx witness";
+    if (script && !["test", "start", "install", "prepare", "npx", "exec"].includes(script)) return `npm run ${script} --`;
+    // Running out of the SOURCE entry point means a checkout, and in one of those `npx witness` is not
+    // a command: npm never links a package's own `bin` into its own `node_modules/.bin`, so `npx` goes
+    // to the registry for an unrelated package — which is worse than failing. This file said
+    // `npx witness` twenty-seven times in the copy committed to this repository.
+    return entry.endsWith(`${path.sep}bin${path.sep}cli.ts`) ? "./bin/witness" : "npx witness";
   }
 
-  static for(opts: { system?: SystemLike; sourceDir?: string } = {}): Skill {
+  /**
+   * `extra` is the nouns the entry point registers that no description generates — `config`, `init`,
+   * `skill`. They have to be handed in, and they matter more than the generated ones: a fresh System
+   * described the command line MINUS exactly the three commands somebody reaches for before they have
+   * a description, so `config template`, `config explore`, `config where` and `init` appeared in no
+   * verb list anywhere. Both halves need them — the generic instructions are what a reader gets when
+   * there is no description yet, which is precisely when `init` is the answer.
+   */
+  static for(opts: { system?: SystemLike; sourceDir?: string; extra?: Record<string, Noun> } = {}): Skill {
     const types = TypeSource.fromDirectory(opts.sourceDir ?? Template.sourceDir());
     const system = opts.system;
-    if (!system) {
-      // A real stack over no services: enough to register the built-in nouns and ask them their names.
-      const stack = new Stack({ root: process.cwd(), services: {} });
-      const cli = new Cli({ name: "witness", stack }).withDefaults({
-        api: async () => ({}),
-        sql: () => "",
-        renderVideos: () => [],
-      });
-      return new Skill({ commands: cli.commands, types, providers: Template.providers() });
-    }
+    const cli = system
+      ? system.cli()
+      : // A real stack over no services: enough to register the built-in nouns and ask them their names.
+        new Cli({ name: "witness", stack: new Stack({ root: process.cwd(), services: {} }) }).withDefaults({
+          api: async () => ({}),
+          sql: () => "",
+          renderVideos: () => [],
+        });
+    for (const [noun, spec] of Object.entries(opts.extra ?? {})) cli.command(noun, spec);
+    if (!system) return new Skill({ commands: cli.commands, types, providers: Template.providers() });
     return new Skill({
       name: system.config.name,
       at: system.workspace ? path.join(path.relative(process.cwd(), system.workspace.dir) || ".", "SKILL.md") : undefined,
-      commands: system.cli().commands,
+      commands: cli.commands,
       types,
       providers: Template.providers(),
       product: {
@@ -136,9 +150,14 @@ export class Skill {
       "",
       "```bash",
       ...Skill.aligned([
-        [`${tool} --help`, "every command this project actually has"],
+        // `help` rather than `--help`: both are registered, one form is less to remember, and npm eats
+        // a leading `--help` before a script ever sees it.
+        [`${tool} help`, "every command this project actually has"],
         [`${tool} action list`, "every action, with what it is for"],
-        [`${tool} skill > ${this.at}`, "rewrite this file from what is true now"],
+        // `> ${this.at}` was the instruction here, and it is wrong twice: the redirect truncates the
+        // file before the command runs, so a describe that fails destroys the copy it was refreshing,
+        // and the path is relative to wherever the reader happens to be. `--write` finds the workspace.
+        [`${tool} skill --write`, `rewrite ${this.at} from what is true now`],
       ]),
       "```",
       "",
@@ -229,6 +248,14 @@ export class Skill {
     ];
   }
 
+  /**
+   * The verb list, and — the half that matters more — where to get it when this one is wrong.
+   *
+   * A transcription can be stale; a command cannot. The list is still worth having, because an agent
+   * reads this file BEFORE it has run anything and a list it can read now beats a command it has to
+   * run. But it stops being the only source: told that a verb does not exist, a reader that knows
+   * about `help` asks the tool instead of concluding the tool cannot do it.
+   */
   private commandSection(): string[] {
     const lines = ["## Commands", ""];
     for (const command of this.commands) {
@@ -239,6 +266,16 @@ export class Skill {
       "",
       "Add `--quiet` for the bare answer. Exit codes: `0` it worked · `1` it ran and failed · `2` you",
       "asked for something that does not exist.",
+      "",
+      "**That list is a copy; these two are not.** If a command here is missing or a verb is refused, ask",
+      "the tool rather than believing this file — it was generated by a version that has since moved on:",
+      "",
+      "```bash",
+      ...Skill.aligned([
+        [`${this.run} help`, "every noun and verb THIS copy registers"],
+        [`${this.run} <noun>`, "one noun's verbs, when you know the noun"],
+      ]),
+      "```",
       "",
     );
     return lines;

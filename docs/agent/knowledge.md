@@ -59,6 +59,13 @@ threaded now. Anything that must be per-*run* rather than per-*object* has to sa
 perfectly and threw at runtime, because `"browser"` was never registered. The type said one thing and
 the registry another.
 
+**Two constructions of the same thing will disagree, and the second one is the one nobody runs.**
+`bin/cli.ts` built the command line twice — once for `Cli.main` and once, freshly, inside `describe()`
+— so the instructions handed to an agent described the CLI minus the three nouns the entry point adds
+itself. Both were correct in isolation and neither was checked against the other. Build it once and
+pass it, or write the test that compares them; a comment saying they must stay in step is not either
+of those.
+
 **Evidence and the `finally` block.** Slide cards, the catalogue and the render all belong in
 `finally`. A failing run is exactly when the evidence matters; cards spliced only on success was a
 real bug.
@@ -117,6 +124,27 @@ it is nowhere. Pipe the step through `head -N`, and pipe BOTH cuts the same way.
 
 **Progress on stdout breaks the consumer.** Results are stdout, progress and warnings are stderr, or
 `| jq` fails for reasons nobody can see.
+
+**`npx witness` is not a command in this checkout.** npm links a package's own `bin` for whatever
+DEPENDS on it, never for the package itself — so there is no `node_modules/.bin/witness` here and
+`npx` goes to the registry looking for an unrelated package named `witness`, which is worse than
+failing. `./bin/witness` is what /flow, `docs/agent/` and the tutorial say; `npx witness` stays right
+in `README.md`, `docs/how-to/` and `docs/reference/`, which are written for somebody whose project has
+this as a dependency. Two audiences, one string, and the only way to keep both honest is to know which
+document is addressed to which.
+
+**Generated instructions can carry a bug the generator has no idea about.** The skill's own examples
+came from `Skill.invocation()`, which asks npm how it was launched — and answers `npx witness` for
+anything npm did not launch. So `./bin/witness skill` produced a file telling this checkout's reader
+to type the one command that does not work here, twenty-seven times, and the copy committed to the
+repository had been saying it since PR #56. A generator only removes the staleness it was told to look
+for.
+
+**Do not transcribe what the tool can be asked.** The `## Commands` section is a copy of a list
+`witness help` prints from the registry, and the copy is what drifted — three nouns missing, in the
+file that is the only thing an agent reads. The list is still worth keeping (it is read before
+anything has been run) but it must say where the real one is, or a reader told a verb does not exist
+concludes the tool cannot do it rather than asking.
 
 ---
 
