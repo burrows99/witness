@@ -17,21 +17,21 @@ is inferring a cause from a symptom and shipping it: the fix that *sounds* right
 and deployed, and the real payload says something else. Pull the real thing — the config, the API
 response, the frame, the file — first.
 
-**2. Record the before.** `EVIDENCE=before npx witness action run <action>`. Before the change,
+**2. Record the before.** `EVIDENCE=before ./bin/witness action run <action>`. Before the change,
 because after it there is nothing left to record. If no existing action shows the behaviour, write
 one — that is not overhead, it is the deliverable that outlives the ticket.
 
 **3. Change it.** Smallest diff that actually fixes the cause. If the symptom shows up in one caller
 but the bug is in the shared function, fix the shared function.
 
-**4. Record the after.** `EVIDENCE=after npx witness action run <same action>`. Same action, same
+**4. Record the after.** `EVIDENCE=after ./bin/witness action run <same action>`. Same action, same
 viewport, same journey — a before and after that differ in two ways prove nothing about either.
 
 **5. Read what you recorded.** Open the frames. Every claim a caption makes has to be visible in the
 frame it captions. This is where green runs get caught producing evidence that contradicts the
 sentence written over them.
 
-**6. Check.** `npm run check` — types, lint, unused, tests. And `npx witness check drift` if the
+**6. Check.** `npm run check` — types, lint, unused, tests. And `./bin/witness check drift` if the
 change touched anything a description claims.
 
 **7. Raise it.** Branch, commit, PR. The body carries the before and the after. Watch the checks by

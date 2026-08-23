@@ -14,8 +14,12 @@ docker compose up -d
 Four containers: a git forge (Gitea), the database it writes to (Postgres), the mail it sends
 (Mailpit), and something watching (Grafana).
 
+Every command below is `./bin/witness`, because you are standing in the checkout. In your own project
+— where this is a dependency and npm has linked the bin — it is `npx witness`, which is how the rest
+of `docs/` is written.
+
 ```bash
-npx witness stack status
+./bin/witness stack status
 ```
 
 ```
@@ -32,8 +36,8 @@ another project on 3010 reads as `NOT OURS` rather than as a healthy Grafana.
 ## 2. Ask it something, without a browser
 
 ```bash
-npx witness accounts count --quiet     # 0
-npx witness mail list --quiet          # what the stack has sent
+./bin/witness accounts count --quiet     # 0
+./bin/witness mail list --quiet          # what the stack has sent
 ```
 
 Those are not built in. They come from the `cli` block of `.witness/config.jsonc`, which maps a verb
@@ -43,7 +47,7 @@ and writing a test to answer them is how an afternoon disappears.
 ## 3. Drive it
 
 ```bash
-npx witness action run tour
+./bin/witness action run tour
 ```
 
 A browser opens, registers an account, checks Postgres holds the row, makes a repository, asks Gitea's
@@ -75,7 +79,7 @@ Open `.witness/config.jsonc`, find `gitea.createRepo`, and change the repository
 `witness-demo` to `witness-demo-x`. Then:
 
 ```bash
-npx witness check drift
+./bin/witness check drift
 ```
 
 It re-checks every claim the description makes without driving anything, and names the ones that no

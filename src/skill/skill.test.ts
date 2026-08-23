@@ -49,6 +49,14 @@ test("the commands are the command line's own, not a list somebody kept", () => 
   match(out, / {2}- `order show` — <orderId>/);
 });
 
+test("the list says where to get a better one, because a copy can be stale and a command cannot", () => {
+  // The reason the transcription drifted at all: it was the only source. An agent told a verb does
+  // not exist should ask the tool, not conclude the tool cannot do it.
+  const out = skill();
+  match(out, /npx witness help\s+# every noun and verb THIS copy registers/);
+  match(out, /npx witness <noun>\s+# one noun's verbs/);
+});
+
 test("the loop only offers commands this copy actually has", () => {
   const bare = skill();
   ok(!/witness api get/.test(bare), "no api noun, no api line");
@@ -120,6 +128,20 @@ test("the part that cannot be generated is the part worth reading", () => {
   match(out, /\*\*There are no test files to write\*\*/);
 });
 
+test("the nouns the entry point registers are described too, with no description loaded", () => {
+  // The generic instructions are what a reader gets when there is no config yet — which is exactly
+  // when `init` and `config template` are the answer, and they were in no verb list anywhere. They
+  // are not generated from a description, so they have to be handed in.
+  //
+  // This is the fixture-built half; the one that cannot agree with the bug is in `bin/cli.test.ts`,
+  // which asks the real binary for its registry and compares it against the real skill.
+  const out = Skill.for({
+    extra: { init: { summary: "make a .witness/ here" }, config: { summary: "the description", verbs: { where: { summary: "which one is in force", run: () => "" } } } },
+  }).render();
+  match(out, /- `npx witness init` — make a \.witness\/ here/);
+  match(out, / {2}- `config where` — which one is in force/);
+});
+
 test("witness's own features describe themselves", () => {
   // The guarantee: no list in here is written twice.
   const out = Skill.for().render();
@@ -163,6 +185,11 @@ test("what a reader types is read off how the tool was run, not guessed", () => 
   equal(Skill.invocation({ npm_lifecycle_event: "test" }), "npx witness");
   // `npx witness skill` sets it to `npx`, which produced a file telling its reader to type `npm run npx --`.
   equal(Skill.invocation({ npm_lifecycle_event: "npx" }), "npx witness");
+  // Out of a checkout's own source entry point, `npx witness` is not a command at all — npm does not
+  // link a package's own bin into its own node_modules/.bin, so it goes to the registry for something
+  // else entirely. The file this repository had committed told its reader to type it anyway.
+  equal(Skill.invocation({}, "/somewhere/witness/bin/cli.ts"), "./bin/witness");
+  equal(Skill.invocation({}, "/somewhere/node_modules/@burrows99/witness/dist/bin/cli.js"), "npx witness");
 });
 
 test("it says where a description comes from, which nothing generated can", () => {
