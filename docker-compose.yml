@@ -1,0 +1,64 @@
+# The stack this repository describes.
+#
+# A typical full-stack app is not one service: it is a thing people use, the database it writes to,
+# the mail it sends, and something watching all of it. Each of these is here because the description
+# beside it needs a different half of the vocabulary — a UI with routes and locators, a REST API, real
+# rows to query, a second UI on a second service.
+#
+#   docker compose up -d
+#   npx witness stack status
+#   npx witness action run tour
+services:
+  # The app: a git forge with a web UI, a REST API, and a database it actually writes to.
+  gitea:
+    image: gitea/gitea:1.21.11
+    container_name: witness-gitea
+    depends_on: [postgres, mailpit]
+    ports:
+      - "${GITEA_PORT:-3020}:3000"
+    environment:
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__server__ROOT_URL: http://localhost:${GITEA_PORT:-3020}/
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__HOST: postgres:5432
+      GITEA__database__NAME: gitea
+      GITEA__database__USER: gitea
+      GITEA__database__PASSWD: ${POSTGRES_CREDENTIAL:-witness-demo-only}
+      # The account the description registers through the UI. Gitea refuses anything under 8
+      # characters, which the frame from the failing step said and nothing else would have.
+      WITNESS_ACCOUNT_CREDENTIAL: ${GITEA_CREDENTIAL:-witness-demo-only}
+      # So registering a user sends a real message a real mail catcher receives.
+      GITEA__mailer__ENABLED: "true"
+      GITEA__mailer__PROTOCOL: smtp
+      GITEA__mailer__SMTP_ADDR: mailpit
+      GITEA__mailer__SMTP_PORT: "1025"
+      GITEA__mailer__FROM: gitea@witness.example
+
+  # What it writes to. Real tables, real rows — the layer a screen can disagree with.
+  postgres:
+    image: postgres:17
+    container_name: witness-postgres
+    ports:
+      - "${POSTGRES_PORT:-5441}:5432"
+    environment:
+      POSTGRES_DB: gitea
+      POSTGRES_USER: gitea
+      POSTGRES_PASSWORD: ${POSTGRES_CREDENTIAL:-witness-demo-only}
+
+  # What it sends. A UI of its own and an API of its own — a second of each, which is the point.
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: witness-mailpit
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+
+  # What watches it. Somebody else's software, described the same way as our own.
+  grafana:
+    image: grafana/grafana:13.2.0
+    container_name: witness-grafana
+    ports:
+      - "${GRAFANA_PORT:-3010}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"

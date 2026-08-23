@@ -1,0 +1,267 @@
+// A whole stack, described.
+//
+// Not one service: a thing people use, the database it writes to, the mail it sends, and something
+// watching all of it. Each is here because describing it needs a different half of the vocabulary —
+// a UI with routes and locators, a REST API, real rows to query, a second UI on a second service.
+//
+//   docker compose up -d
+//   npx witness stack status
+//   npx witness action run tour        # the whole stack, walked once, narrated, recorded
+{
+  "name": "stack",
+
+  "services": {
+    // The app. A git forge: a web UI, a REST API, and a database it actually writes to.
+    "gitea": {
+      "kind": "in-house",
+      "port": 3020,
+      "portVar": "GITEA_PORT",
+      "container": "witness-gitea",
+      "probe": { "path": "/user/login", "contains": "Sign In" },
+
+      "secrets": {
+        "user": { "literal": "witness-admin" },
+        "email": { "literal": "witness-admin@example.com" },
+        "credential": { "containerEnv": { "service": "gitea", "key": "WITNESS_ACCOUNT_CREDENTIAL" } }
+      },
+
+      // Its REST API — the default one, so `witness api get /api/v1/version` talks to it.
+      "api": {
+        "auth": {
+          "admin": {
+            "provider": "basic",
+            "username": { "literal": "witness-admin" },
+            "from": { "containerEnv": { "service": "gitea", "key": "WITNESS_ACCOUNT_CREDENTIAL" } }
+          }
+        },
+        "operations": {
+          "version": { "path": "/api/v1/version", "summary": "which Gitea this is" },
+          "repo": { "path": "/api/v1/repos/{owner}/{repo}", "auth": "admin", "summary": "one repository, as the API sees it" },
+          "repos": { "path": "/api/v1/users/{owner}/repos", "auth": "admin", "summary": "everything an account owns" }
+        }
+      },
+
+      "app": {
+        "routes": {
+          "home": "/",
+          "signUp": "/user/sign_up",
+          "login": "/user/login",
+          "newRepo": "/repo/create",
+          "forgotPassword": "/user/forgot_password",
+          "explore": "/explore/repos"
+        },
+        "locators": {
+          "signInLink": { "role": "link", "name": "Sign In" },
+          "repoHeading": { "role": "heading", "name": "witness-demo" }
+        }
+      },
+
+      "actions": {
+        "register": {
+          "summary": "the first account, made the way a person makes one",
+          "steps": [
+            { "goto": { "route": "signUp" } },
+            { "caption": { "text": "Registering the first account", "sub": "which Gitea makes an administrator" } },
+            { "type": { "on": { "label": "Username", "exact": true }, "value": "{secret.user}" } },
+            { "type": { "on": { "label": "Email Address", "exact": true }, "value": "{secret.email}" } },
+            { "type": { "on": { "label": "Password", "exact": true }, "value": "{secret.credential}" } },
+            { "type": { "on": { "label": "Confirm Password", "exact": true }, "value": "{secret.credential}" } },
+            { "click": { "role": "button", "name": "Register Account" } },
+            { "waitForUrl": { "url": "localhost:3020/(\\?.*)?$", "timeout": 20000 } },
+            { "expect": { "on": { "text": "Account was successfully created" }, "because": "registering the first user signs them straight in" } }
+          ]
+        },
+
+        "askForAReset": {
+          "summary": "the one thing a fresh install will actually send mail about",
+          "steps": [
+            { "caption": { "text": "Asking it to send something", "sub": "an account recovery email" } },
+            { "goto": { "route": "forgotPassword" } },
+            { "type": { "on": { "label": "Email Address", "exact": true }, "value": "{secret.email}" } },
+            { "click": { "role": "button", "name": "Send Account Recovery Email" } },
+            { "wait": 600 }
+          ]
+        },
+
+        "createRepo": {
+          "summary": "a repository, through the screen a person uses",
+          "steps": [
+            { "caption": { "text": "Creating a repository", "sub": "witness-demo" } },
+            { "goto": { "route": "newRepo" } },
+            { "type": { "on": { "label": "Repository Name" }, "value": "witness-demo" } },
+            { "click": { "role": "button", "name": "Create Repository" } },
+            { "waitForUrl": { "url": "witness-admin/witness-demo$", "timeout": 20000 } },
+            { "expect": { "on": { "role": "heading", "name": "witness-demo" }, "because": "the repository page should show what was just made" } }
+          ]
+        }
+      }
+    },
+
+    // What it writes to. The layer a screen can disagree with.
+    "postgres": {
+      "kind": "in-house",
+      "port": 5441,
+      "portVar": "POSTGRES_PORT",
+      "container": "witness-postgres",
+      "probe": "container",
+      "database": {
+        "user": "gitea",
+        "database": "gitea",
+        "credential": { "containerEnv": { "service": "postgres", "key": "POSTGRES_PASSWORD" } },
+        "queries": {
+          "accounts": "select count(*) from \"user\"",
+          "account.byName": "select name, email, is_admin from \"user\" where name = '{name}'",
+          "repositories": "select count(*) from repository"
+        }
+      }
+    },
+
+    // What it sends. A second UI and a second API, which is the point of it being here.
+    "mailpit": {
+      "kind": "in-house",
+      "port": 8025,
+      "portVar": "MAILPIT_PORT",
+      "container": "witness-mailpit",
+      "probe": { "path": "/api/v1/messages", "contains": "messages" },
+      "api": { "operations": { "messages": { "path": "/api/v1/messages", "summary": "everything the stack has sent" } } },
+      "app": {
+        "routes": { "inbox": "/" },
+        "locators": { "empty": { "text": "No results" } }
+      },
+      "actions": {
+        "openInbox": {
+          "summary": "what the stack has actually sent, on the screen a person reads it on",
+          "steps": [
+            { "caption": { "text": "The mail it sent", "sub": "caught before it left the machine" } },
+            { "goto": { "route": "inbox" } },
+            { "wait": 800, "note": "the inbox is a client-side app; the list arrives after the document" }
+          ]
+        }
+      }
+    },
+
+    // What watches it. Somebody else's software, described the same way as our own.
+    "grafana": {
+      "kind": "in-house",
+      "port": 3010,
+      "portVar": "GRAFANA_PORT",
+      "container": "witness-grafana",
+      "probe": { "path": "/api/health", "contains": "database" },
+      "secrets": {
+        "adminUser": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
+        "adminPassword": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
+      },
+      "api": {
+        "auth": {
+          "admin": {
+            "provider": "basic",
+            "username": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
+            "from": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
+          }
+        },
+        "operations": { "health": { "path": "/api/health", "summary": "up, and is its database reachable" } }
+      },
+      "app": {
+        "routes": { "login": "/login", "home": "/", "dataSources": "/connections/datasources" },
+        "locators": { "welcome": { "text": "Welcome to Grafana" } }
+      },
+      "actions": {
+        "signIn": {
+          "summary": "sign in, and get past the password prompt",
+          "steps": [
+            { "goto": { "route": "login" } },
+            { "type": { "on": { "placeholder": "email or username" }, "value": "{secret.adminUser}" } },
+            { "type": { "on": { "placeholder": "password" }, "value": "{secret.adminPassword}" }, "note": "the declared secret, read out of the running container" },
+            { "click": { "role": "button", "name": "Log in" } },
+            { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
+            { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
+            { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin" } }
+          ]
+        },
+        "openDataSources": {
+          "summary": "what it can query — nothing yet, which is what a fresh install looks like",
+          "steps": [
+            { "caption": { "text": "What is watching", "sub": "Grafana, with nothing connected yet." } },
+            { "goto": { "route": "dataSources" } },
+            { "wait": 600 }
+          ]
+        }
+      }
+    }
+  },
+
+  // About more than one service, so it lives here rather than under any of them.
+  "actions": {
+    "tour": {
+      "summary": "the whole stack, walked once: the app, the database it wrote to, the mail it sent, and what watches it",
+      "steps": [
+        {
+          "slide": {
+            "title": "One stack, one description",
+            "lines": [
+              "An app, the database it writes to, the mail it sends, and what watches it.",
+              "Four services in one config file. No test file.",
+              "Every claim below is checked against the layer it is about."
+            ]
+          }
+        },
+
+        { "slide": { "title": "1 · The app", "lines": ["Registering the first account, through the screen a person uses."] } },
+        { "run": "gitea.register" },
+        { "frame": "registered, and signed in" },
+
+        { "slide": { "title": "2 · The database", "lines": ["The screen says there is an account.", "Postgres is the layer that can disagree."] } },
+        { "query": { "name": "accounts", "as": "accounts" } },
+        { "check": { "that": "{accounts}", "contains": "1", "because": "the account the screen just made should be a row" } },
+        { "query": { "name": "account.byName", "params": { "name": "witness-admin" }, "as": "account" } },
+        { "check": { "that": "{account}", "contains": "witness-admin@example.com", "because": "and it should be the account we registered, not some other one" } },
+
+        { "slide": { "title": "3 · The app again", "lines": ["A repository, made on screen —", "then asked of Gitea's own API."] } },
+        { "run": "gitea.createRepo" },
+        { "frame": "the repository, on screen" },
+        { "api": { "operation": "repo", "params": { "owner": "witness-admin", "repo": "witness-demo" }, "as": "repo" } },
+        { "check": { "that": "{repo.full_name}", "equals": "witness-admin/witness-demo", "because": "the screen and the API should agree that it exists" } },
+        { "query": { "name": "repositories", "as": "repositories" } },
+        { "check": { "that": "{repositories}", "contains": "1", "because": "and so should the database underneath both" } },
+
+        { "slide": { "title": "4 · The mail", "lines": ["The app sends a message.", "It never leaves the machine — this is where it lands."] } },
+        { "run": "gitea.askForAReset" },
+        { "run": "mailpit.openInbox" },
+        { "frame": "the inbox" },
+        { "api": { "client": "mailpit", "operation": "messages", "as": "mail" }, "note": "a second service answering — `client` says which" },
+        { "check": { "that": "{mail.messages_count}", "atLeast": 1, "because": "registering an account sends a message, and this is where it lands" } },
+
+        { "slide": { "title": "5 · What watches it", "lines": ["Somebody else's software, described the same way as our own."] } },
+        { "run": "grafana.signIn" },
+        { "run": "grafana.openDataSources" },
+        { "frame": "nothing connected yet" },
+
+        { "slide": { "title": "Four services, one run", "lines": ["Screen, database, API and mail — each checked against the others.", "It is all in .witness/config.jsonc."] } }
+      ],
+      "verify": {
+        "title": "The whole stack, walked once",
+        "subject": { "app": "http://localhost:3020", "mail": "http://localhost:8025", "watching": "http://localhost:3010", "account": "witness-admin" },
+        "signIn": ["docker compose up -d", "open http://localhost:3020 — witness-admin"],
+        "notes": [
+          "Registered witness-admin through the web UI; Gitea made it an administrator.",
+          "Postgres held {accounts} account and {repositories} repository afterwards.",
+          "Gitea's own API agreed the repository exists: {repo.full_name}.",
+          "The mail it sent was caught by Mailpit rather than delivered.",
+          "Nothing here was seeded by hand: every row was made through the product."
+        ]
+      }
+    }
+  },
+
+  // What the command line can answer without opening a browser.
+  "cli": {
+    "accounts": {
+      "summary": "who exists, according to the database",
+      "verbs": { "count": { "query": "accounts", "summary": "how many" }, "show": { "query": "account.byName", "args": ["name"], "summary": "<name> — one of them" } }
+    },
+    "mail": {
+      "summary": "what the stack has sent",
+      "verbs": { "list": { "client": "mailpit", "operation": "messages", "summary": "every message caught" } }
+    }
+  }
+}

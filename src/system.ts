@@ -112,6 +112,7 @@ export class System {
 
     this.actions = new Actions({
       operations: this.api,
+      client: (name: string) => this.client(name),
       queries: this.db,
       trace: this.trace,
       actions: config.actions ?? {},
