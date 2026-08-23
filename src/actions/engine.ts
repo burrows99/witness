@@ -750,6 +750,10 @@ export type StepConfig = {
 
 export type ActionConfig = {
   summary?: string;
+  /** How to record it. Filled in from the service this belongs to; see `ServiceConfig.records`. */
+  records?: "browser" | "terminal";
+  /** For a terminal action: what its commands run inside. */
+  shell?: string;
   /**
    * The note a person needs to re-walk this by hand — `manual-verification.md`, beside the frames.
    *

@@ -2,9 +2,10 @@ import * as path from "node:path";
 
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 
-import type { ActionResult, Params } from "./engine.ts";
+import type { ActionConfig, ActionResult, Params } from "./engine.ts";
 import type { EvidenceContext } from "../evidence/paths.ts";
 import { markRecordingStart, pane } from "../browser/narration.ts";
+import { recorderProviders } from "../providers/recorders.ts";
 import { requirePlaywright } from "../browser/playwright.ts";
 import { writeSlideCards } from "../evidence/recording.ts";
 import { slug } from "../evidence/paths.ts";
@@ -71,7 +72,41 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
    * start again from. Every attempt keeps its own evidence — the one that FAILED is the interesting
    * one, and a retry that quietly overwrote it would leave a green run with nothing to explain it.
    */
+  /**
+   * An action with no screen, filmed by whatever its service says films it.
+   *
+   * It never opens a browser: the recorder drives the steps itself and leaves a video of the same
+   * shape a pane has, which is what lets a shell sit beside a screen in one frame.
+   */
+  const recordTerminal = (name: string, action: ActionConfig, at: string, label?: { title: string; sub?: string }): ActionResult => {
+    const recorder = recorderProviders.get(action.records ?? "terminal");
+    const started = Date.now();
+    const wrote = recorder.available()
+      ? recorder.record(action.steps ?? [], inputs, path.join(outputDir, `panel-${at}-01.mp4`), { shell: action.shell, label })
+      : undefined;
+    if (!wrote) process.stderr.write(`[terminal] ${name} was not recorded — is \`vhs\` installed?\n`);
+    return {
+      action: name,
+      ok: true,
+      ms: Date.now() - started,
+      inputs,
+      value: undefined,
+      values: {},
+      warnings: wrote ? [] : ["this needs `vhs` on the path to be recorded (brew install vhs)"],
+      steps: (action.steps ?? []).map(step => ({ step: Object.keys(step)[0], ms: 0 })),
+      screenshots: [],
+      network: [],
+      console: [],
+      recording: { requests: [], console: [], errors: [], dropped: 0 },
+      trace: [],
+    };
+  };
+
   const attempt = async (name: string, at: string, values: Params, on?: Lane, dir?: string, label?: { title: string; sub?: string }): Promise<ActionResult> => {
+    // No screen, no browser: the recorder is the whole of this lane.
+    const terminal = system.actionConfig?.(name);
+    if (terminal?.records === "terminal") return recordTerminal(name, terminal, at, label);
+
     for (let n = 1; n <= retries + 1; n += 1) {
       // A chain shares one lane, because it is one story and should be one continuous recording. A
       // retry always gets a fresh one: a browser left on the screen the failure happened on is not a
@@ -146,13 +181,22 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
       // One lane for the whole chain: each action starts from where the last one left off, which is
       // why more than one is allowed — and it comes out as ONE continuous recording rather than as
       // panes of things that were never happening at once.
-      const only = await lane();
+      //
+      // Opened only when something actually needs a screen: a chain of terminal actions would
+      // otherwise record a blank browser beside the shell it was really about.
+      let only: Lane | undefined;
       try {
-        for (const name of names) {
+        for (const [index, name] of names.entries()) {
+          const config = system.actionConfig?.(name);
+          if (config?.records === "terminal") {
+            results.push(recordTerminal(name, config, String(index + 1).padStart(2, "0"), { title: name, sub: config.summary }));
+            continue;
+          }
+          only ??= await lane();
           results.push(await attempt(name, "01", { ...inputs, ...lastValues(results) }, only));
         }
       } finally {
-        await finish(only.context, "01", 1);
+        if (only) await finish(only.context, "01", 1);
       }
     }
   } catch (err) {
@@ -272,6 +316,8 @@ export type RunResult = {
 type RunnableSystem = {
   workspace: { resolve: (target?: string) => string };
   run: (action: string, page: Page, inputs: Params, within?: { at?: string }) => Promise<ActionResult>;
+  /** What the config says about one action, so a lane can find out how to film it. */
+  actionConfig?: (name: string) => ActionConfig | undefined;
   evidence: () => { dir: string; writeManifest: (context: EvidenceContext) => void; readme: () => string | undefined };
   pinEvidence: (context: EvidenceContext | undefined) => void;
   renderVideos: () => string[];

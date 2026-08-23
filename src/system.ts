@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { Actions, type ActionResult, type Params } from "./actions/engine.ts";
+import { Actions, type ActionConfig, type ActionResult, type Params } from "./actions/engine.ts";
 import { appSurface, type RouteMap, type Screens } from "./browser/surface.ts";
 import { Cli, type Noun } from "./cli/cli.ts";
 import { commandsFor } from "./cli/commands.ts";
@@ -373,6 +373,11 @@ export class System {
       process.stderr.write(`[video] ${String(err).slice(0, 160)}\n`);
       return [];
     }
+  }
+
+  /** What the config says about one action — how it is recorded, and what its commands run inside. */
+  actionConfig(name: string): ActionConfig | undefined {
+    return this.config.actions?.[name];
   }
 
   /** Whether this description declares an API at all — what the command line asks before offering one. */

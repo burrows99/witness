@@ -300,6 +300,7 @@ doing any of them is a registration rather than an edit.
 | auth | `apiKey`, `bearer`, `basic`, `cookie`, `login` | `src/providers/auth.ts` |
 | secret | `containerEnv`, `secret`, `envFile`, `env`, `literal` | `src/providers/secrets.ts` |
 | video | `ffmpeg` | `src/providers/video.ts` |
+| recorder | `terminal` (VHS) | `src/providers/recorders.ts` |
 | stub | `http` | `src/providers/stubs.ts` |
 
 ## Maintainers

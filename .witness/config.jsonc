@@ -124,6 +124,33 @@
       }
     },
 
+    // The half with no screen. Every stack has one — a migration, a queue worker, the psql somebody
+    // actually types — and Playwright is the wrong tool for filming it. This one is recorded by VHS.
+    "shell": {
+      "kind": "in-house",
+      "port": 5441,
+      "portVar": "POSTGRES_PORT",
+      "container": "witness-postgres",
+      "probe": "container",
+      "records": "terminal",
+      "shell": "docker exec -it witness-postgres bash",
+
+      "actions": {
+        "readTheDatabase": {
+          "summary": "the database, from a prompt, the way a person actually looks",
+          "steps": [
+            { "caption": { "text": "what the app wrote, from a shell" } },
+            { "type": { "on": "prompt", "value": "psql -U gitea -d gitea -c 'select name, email, is_admin from \"user\"'" } },
+            { "press": "Enter" },
+            { "wait": 1800 },
+            { "type": { "on": "prompt", "value": "psql -U gitea -d gitea -c 'select owner_name, name, is_private from repository'" } },
+            { "press": "Enter" },
+            { "wait": 1800 }
+          ]
+        }
+      }
+    },
+
     // What it sends. A second UI and a second API, which is the point of it being here.
     "mailpit": {
       "kind": "in-house",

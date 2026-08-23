@@ -77,7 +77,8 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
       // `panel-<lane>-<attempt>.webm` when the run fixed an order — a lane per action driven in
       // parallel, an attempt per retry — otherwise whatever the browser named them. Sorting by
       // filename alone puts panels in page-id order, which is nobody's intended reading.
-      const all = fs.readdirSync(at).filter(f => f.endsWith(".webm")).sort();
+      // `.mp4` too: a terminal recorder writes one directly, and a pane is a pane whatever filmed it.
+      const all = fs.readdirSync(at).filter(f => /\.(webm|mp4)$/.test(f) && f !== "video.mp4").sort();
       const ordered = all.filter(f => f.startsWith("panel-"));
       const recordings = (ordered.length ? ordered : all).map(f => path.join(at, f));
       if (!recordings.length) continue;
