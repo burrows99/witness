@@ -1,5 +1,6 @@
 import { deepEqual, equal, match, ok } from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { test } from "node:test";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -81,4 +82,48 @@ test("the index lists what is on disk, not what this run happened to produce", (
 test("the video provider is registered under the name a config uses", () => {
   deepEqual(videoProviders.names, ["ffmpeg"]);
   equal(typeof videoProviders.get("ffmpeg").available, "function");
+});
+
+const ffmpegHere = videoProviders.get("ffmpeg").available();
+
+/** A run's raw recording, with the manifest saying which cut directory it belongs to. */
+const recorded = (from: string, dir: string, into: string): string => {
+  const at = path.join(from, dir);
+  mkdirSync(at, { recursive: true });
+  execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=size=160x120:rate=8:duration=0.5", path.join(at, "panel-01-01.mp4")]);
+  writeFileSync(path.join(at, "evidence.json"), JSON.stringify({ source: "cli", test: dir, cut: "before", group: dir, dir: into }));
+  return path.join(into, "video.mp4");
+};
+
+test("a run renders what it recorded and leaves every other cut alone", { skip: ffmpegHere ? false : "needs ffmpeg" }, () => {
+  // The evidence model rests on a `before` being a record of the code as it WAS. This swept every
+  // directory still sitting under `test-results`, so running one action re-rendered another action's
+  // `before/video.mp4` and its still — a before silently regenerated AFTER the change, with nothing
+  // saying so. It is "a stale after looks like evidence without being any", arriving from the other
+  // direction, and it defeats the one rule `require-before-after.sh` deliberately does not check.
+  const root = mkdtempSync(path.join(tmpdir(), "witness-video-"));
+  const from = path.join(root, "artifacts", "test-results");
+  const alpha = recorded(from, "cli-alpha", path.join(root, "artifacts", "cli", "alpha", "before"));
+  const beta = recorded(from, "cli-beta", path.join(root, "artifacts", "cli", "beta", "before"));
+
+  deepEqual(videoProviders.get("ffmpeg").render({}, root).sort(), [alpha, beta].sort());
+  const untouched = statSync(beta).mtimeMs;
+
+  // A second run records alpha again, and only alpha.
+  const later = Date.now() / 1000 + 2;
+  utimesSync(path.join(from, "cli-alpha", "panel-01-01.mp4"), later, later);
+
+  deepEqual(videoProviders.get("ffmpeg").render({}, root), [alpha]);
+  equal(statSync(beta).mtimeMs, untouched, "beta's before cut was rewritten by a run that did not record it");
+});
+
+test("`witness video` rebuilds, because that is the word in its summary", { skip: ffmpegHere ? false : "needs ffmpeg" }, () => {
+  // The skip above must not silently turn the one command asked for by name into a no-op.
+  const root = mkdtempSync(path.join(tmpdir(), "witness-video-"));
+  const from = path.join(root, "artifacts", "test-results");
+  const only = recorded(from, "cli-alpha", path.join(root, "artifacts", "cli", "alpha", "before"));
+
+  deepEqual(videoProviders.get("ffmpeg").render({}, root), [only]);
+  deepEqual(videoProviders.get("ffmpeg").render({}, root), [], "a second run has nothing new to say");
+  deepEqual(videoProviders.get("ffmpeg").render({}, root, { force: true }), [only]);
 });

@@ -17,7 +17,7 @@ export function commandsFor(system: System): Cli {
   const cli = new Cli({ name: system.config.name, stack: system.stack, trace: system.trace }).withDefaults({
     // Rendering is the system's own job, done in this process. Shelling out to a script that calls
     // back into it is a loop nobody should have to read.
-    renderVideos: () => system.renderVideos(),
+    renderVideos: opts => system.renderVideos(opts),
     // Authenticated the way a declared operation would be — the client already knows how.
     api: system.hasApi ? (method, path, body) => system.api.request(path, { method, body }) : undefined,
     sql: system.hasDatabase ? (query: string, on?: string) => (on ? system.database(on) : system.db).sql(query) : undefined,

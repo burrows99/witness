@@ -99,6 +99,18 @@ full path instead — and `realpath`, not `abspath`: on macOS `/tmp` is a symlin
 one file arrives spelled two ways and an exact match on the spelling is not one. The general shape:
 before trusting a lookup, ask whether two different things can produce the same key.
 
+**A step that sweeps a directory touches evidence from runs it knows nothing about.** The renderer
+walked every directory under `artifacts/test-results` and re-rendered all of them, so running one
+action rewrote another action's `before/video.mp4` and its still. A `before` is a record of the code
+as it WAS; one that can be silently regenerated after the change is the same failure as a stale after,
+arriving from the other direction, and it is the one rule `require-before-after.sh` deliberately does
+not check. It was caught here in the act: a run of `theCommandsItAdvertises` moved the mtime of a
+frame that had been published as evidence on a pull request twenty minutes earlier. It also moved the
+capture time of frames the evidence hook then demanded be re-Read for no reason, which is how a gate
+gets learned as noise. Render what this run recorded; a raw recording older than the video made from
+it has nothing new to say. And when the sweep is somebody's actual request — `witness video` says
+*rebuild* — that wants a flag, not the default.
+
 ---
 
 ## Changing this repository
