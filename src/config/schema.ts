@@ -84,13 +84,19 @@ export type SystemConfig = {
  */
 export type ServiceConfig = ServiceSpec & {
   /**
-   * How this service is recorded — `browser` by default, `terminal` for the half with no screen.
+   * What CAPTURES this service, when a browser is the wrong thing to point at it.
    *
-   * A migration, a queue worker, a `psql` somebody actually types: recording those with a browser is
-   * not a limitation to work around, it is the wrong tool. A terminal recording comes out as a video
-   * of the same shape, so it stitches into the same grid beside a browser pane.
+   * Omit it and the runner drives a browser itself — that is the default and needs no name. Say
+   * `terminal` for the half of a product with no screen: a migration, a queue worker, the `psql`
+   * somebody actually types. Recording those with a browser is not a limitation to work around, it is
+   * the wrong tool.
+   *
+   * Not to be confused with `video`, which is the other end of the same pipeline: a RECORDER captures
+   * a service while it runs, and `video` turns whatever was captured into one watchable file. ffmpeg
+   * cannot drive a browser; VHS cannot stitch panes. A terminal recording comes out the same shape as
+   * a browser one, so the same stitcher puts them side by side.
    */
-  records?: "browser" | "terminal";
+  records?: "terminal";
   /** For a `terminal` service: what every command runs inside — `docker exec -it witness-postgres bash`. */
   shell?: string;
   /** What this service can be asked. The first service to declare one is what `witness api` talks to. */

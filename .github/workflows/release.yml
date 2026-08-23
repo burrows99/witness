@@ -1,17 +1,20 @@
 name: Auto Release
 
-# Every merge to main cuts a version: tests, build, a patch bump, a tag, a GitHub Release with
-# generated notes, and the package on this repository's npm registry. Releases surface in followers'
-# feeds and notify watchers; the registry is what makes the README's install line true.
+# Every merge to main cuts a version: tests, build, a tag, a GitHub Release with generated notes, and
+# the package on this repository's npm registry. Releases surface in followers' feeds and notify
+# watchers; the registry is what makes the README's install line true.
 #
-# Put "[skip release]" in the commit SUBJECT (first line) to skip one. The version-bump commit this
-# workflow pushes carries that marker itself, which is what stops it triggering itself.
+# Nothing here writes to main. The branch is protected — only merged pull requests move it — so the
+# version is bumped in the checkout, read by `npm publish`, and thrown away with the runner. The tags
+# are the record of what shipped, and the next version is computed from them.
+#
+# Put "[skip release]" in the commit SUBJECT (first line) to skip one.
 on:
   push:
     branches: [main]
 
 permissions:
-  contents: write # tag, push the version bump, publish the release
+  contents: write # push the tag, publish the release
   packages: write # publish to this repository's own npm registry
 
 concurrency:
@@ -52,27 +55,37 @@ jobs:
           npm test
           npm run build
 
-      - name: Bump the version and tag it
+      - name: Work out the next version and tag it
         if: steps.gate.outputs.skip != 'true'
         id: ver
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # The tags are the record of what has shipped, and package.json can be behind them — an
-          # earlier workflow that tagged without bumping leaves `npm version patch` colliding with a
-          # tag that already exists. So the next version is computed from whichever is higher, and
-          # written once: a catch-up bump followed by a patch bump leaves the tree dirty, and
-          # `npm version` refuses to run on a dirty tree.
+          # Semantic Versioning 2.0.0 says a PATCH is for backward compatible bug fixes, a MINOR for
+          # backward compatible additions and a MAJOR for breaks — and only a person knows which a
+          # change was. So the default is the safe one, a patch past the newest tag, and raising the
+          # version in package.json is how a pull request asks for more than that. Asked for, it is
+          # released exactly as written: bumping to 0.2.0 must publish 0.2.0, not 0.2.1.
           latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)"
-          current="$(node -p 'require("./package.json").version')"
-          base="$(printf '%s\n%s\n' "${latest#v}" "$current" | sort -V | tail -n1)"
-          next="$(echo "$base" | awk -F. '{print $1"."$2"."$3 + 1}')"
+          declared="$(node -p 'require("./package.json").version')"
 
-          # The bump commit says [skip release] so this workflow does not trigger itself.
-          version="$(npm version "$next" -m 'Release %s [skip release]')"
-          echo "tag=$version" >> "$GITHUB_OUTPUT"
-          git push --follow-tags
+          if [ -z "$latest" ]; then
+            next="$declared"
+          elif [ "$declared" != "${latest#v}" ] &&
+            [ "$(printf '%s\n%s\n' "${latest#v}" "$declared" | sort -V | tail -n1)" = "$declared" ]; then
+            next="$declared"
+          else
+            next="$(echo "${latest#v}" | awk -F. '{print $1"."$2"."$3 + 1}')"
+          fi
+
+          # Written into the checkout for `npm publish` to read, and never committed: the tag is what
+          # this run leaves behind, and main only moves through pull requests.
+          npm version "$next" --no-git-tag-version --allow-same-version
+
+          git tag -a "v$next" -m "Release v$next"
+          git push origin "v$next"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
 
       - name: Publish the release
         if: steps.gate.outputs.skip != 'true'

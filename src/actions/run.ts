@@ -79,7 +79,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
    * shape a pane has, which is what lets a shell sit beside a screen in one frame.
    */
   const recordTerminal = (name: string, action: ActionConfig, at: string, label?: { title: string; sub?: string }): ActionResult => {
-    const recorder = recorderProviders.get(action.records ?? "terminal");
+    // Named by the service; there is no default, because a service that names nothing gets a browser
+    // and never reaches here.
+    const recorder = recorderProviders.get(action.records!);
     const started = Date.now();
     const wrote = recorder.available()
       ? recorder.record(action.steps ?? [], inputs, path.join(outputDir, `panel-${at}-01.mp4`), { shell: action.shell, label })

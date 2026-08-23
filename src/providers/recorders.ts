@@ -7,7 +7,16 @@ import { Registry } from "./registry.ts";
 import type { Params, StepConfig } from "../actions/engine.ts";
 
 /**
- * How a service is recorded.
+ * What captures a service while it runs.
+ *
+ * The first half of two. A RECORDER films something as it happens; `video` (see `video.ts`) takes
+ * whatever was filmed and makes one watchable file out of it — stitching panes into a grid, splicing
+ * the slide cards. ffmpeg cannot drive a browser and VHS cannot stitch panes, which is why they are
+ * two registries and not one.
+ *
+ * A browser is not in here: the runner drives one itself, because recording it is inseparable from the
+ * context, the identities and the trace that surround it. This registry is for what a browser is the
+ * wrong tool for.
  *
  * Playwright records a browser, which is most of a product and not all of it: a stack usually has
  * something with no screen — a migration, a queue worker, a `psql` somebody actually types. Recording
