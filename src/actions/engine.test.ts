@@ -247,6 +247,27 @@ test("a whole-placeholder input keeps its type instead of becoming text", when, 
   ok(did.some(d => d.includes('"Some body"')));
 });
 
+test("a fillFields step reaches its own service's secret", when, async () => {
+  // Every other resolve in `step` was given the owning action; this one was not, so a sign-in written
+  // as `fillFields` — which is how you fill a form whose inputs carry labels and no placeholder,
+  // i.e. most of them — asked for a SHARED secret and failed naming the scoped one it was looking at.
+  const { page, did } = fakePage();
+  const actions = new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: { "linkding.signIn": { steps: [{ fillFields: { Password: "{secret.adminPassword}" } }] } },
+    url: () => "http://app/",
+    evidence: () => ({ actionFrame: async () => "f.png" }) as unknown as Evidence,
+    secret: (name: string, scope?: string) => {
+      if (scope !== "linkding.signIn") throw new Error(`no secret "${name}"`);
+      return "hunter2";
+    },
+  });
+  await actions.run("linkding.signIn", page);
+  ok(did.some(d => d.includes('"hunter2"')));
+});
+
 test("waiting for a URL can say how long to wait", when, async () => {
   // The wait IS how some steps fail — a rejected sign-in never navigates — and a default minute of
   // nothing per attempt is the difference between a loop and a coffee break.

@@ -29,7 +29,7 @@ tutorial say.
 | `video` | rebuild the MP4s from the recordings on disk — a RUN only renders what it just recorded, this re-renders everything |
 | `action list` / `action show <a>` / `action run <a…>` | any action is declared |
 | `stub list` / `stub show <s>` | any `stubs` are declared |
-| `config explore [<service>] [--pages N] [--depth N]` | always — walks the app and prints the description it implies |
+| `config explore [<service>] [--as=<action>] [--pages=N] [--depth=N]` | always — walks the app and prints the description it implies |
 | `init` | always — writes `.witness/`, populated from the compose file when there is one |
 | `skill [--write]` | always — the instructions, generated from what this copy can do; `--write` refreshes `.witness/SKILL.md` in place |
 | *your own nouns* | each entry in the `cli` block |
@@ -51,13 +51,28 @@ Exit code is 1 if any action failed.
 ## `config explore`
 
 ```
-npx witness config explore [<service>] [--pages=12] [--depth=2]
+npx witness config explore [<service>] [--as=<action>] [--pages=12] [--depth=2]
 ```
 
 Crawls same-origin from the routes already declared (or `/`), carrying the config's identity cookies,
 and prints a JSONC fragment: `routes` and `locators` from each page's aria snapshot, `forms` from the
-placeholder attributes, `api.operations` from the XHR the app made while being walked. It never
-writes the config. What the caps left out is printed, not dropped silently.
+fields it found, `api.operations` from the XHR the app made while being walked. It never writes the
+config. What the caps left out is printed, not dropped silently.
+
+**`--as` names an action that signs in**, and it is the same argument `check drift` takes, for the same
+reason: a sign-in is already described, as an action, and without one a crawl of an app whose value is
+behind a login describes the login page and stops. It is driven on the page the crawl then walks with,
+so the session it leaves is the session every navigation carries; a `records: "terminal"` action is
+refused, because it has no screen to sign a browser in on. The requests the sign-in itself makes are
+not collected as `operations` — that action is already described, and folding them in would make the
+block depend on whether `--as` was passed.
+
+**A field is found by being a field**, not by carrying a placeholder — `input`, `textarea` or `select`,
+laid out, and inside a `form` where the page has one; a button, a checkbox and a hidden token are not
+fields to fill. A `forms` entry is still a placeholder, because that is what `getByPlaceholder` takes,
+so fields without one are named separately in the fragment with their labels and belong in a
+`fillFields` step. And a crawl where every page walked carried a password field says so: `Walked 1 page`
+otherwise reads as "this app is small" rather than "I could not get in".
 
 **A fragment is meant to be committed, so it describes screens rather than rows.** A path segment
 that is an id collapses to `{id}` — in routes now as well as in operations — a page is recorded where

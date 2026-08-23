@@ -106,6 +106,17 @@ test("a missing argument says which one", when, () => {
   match(err, /missing <orderId>/);
 });
 
+test("a flag written with a space says so instead of being ignored", when, () => {
+  // `run` splits the line into positionals and flags before a verb sees it, so `--as signIn` leaves
+  // the value in the positional half where `Cli.flag` cannot reach it. Answering `undefined` there
+  // makes `config explore --as signIn` look like it signed in and describe the login page anyway —
+  // a wrong answer with a zero exit, which is the worst shape a usage error can take.
+  const dir = checkout(config);
+  const { status, err } = witness(["--config", "acme.config.json", "config", "explore", "--as", "signIn"], dir);
+  equal(status, 2);
+  match(err, /--as takes its value with an =/);
+});
+
 test("a config file may carry the comments that explain it", when, () => {
   const dir = checkout(config);
   writeFileSync(path.join(dir, "acme.config.json"), `// what this stack is\n${JSON.stringify(config)}\n`);

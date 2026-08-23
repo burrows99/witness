@@ -184,6 +184,18 @@ which is evidence contradicting itself in the one place this repository can leas
 family as `gh pr checks` — a green from a command that was never asked the question. Until it is
 fixed, do not put `echo "exit=$?"` after `action run` in anything anybody will watch.
 
+**A fixture cannot test the step that decides what goes IN a fixture.** Twenty-two tests asked
+`Explore.forms` questions and every one passed while the crawler could not see a labelled input,
+because each was handed a list of fields somebody had typed and the whole defect was the CSS selector
+that builds that list: `input[placeholder], textarea[placeholder]`, so an input with no placeholder
+was invisible however well labelled. Same shape as the tape that keeps its backslash — every
+assertion available without leaving the process is downstream of the bug, and passes against it. The
+test that catches this one opens a browser and reads markup lifted off the real apps, which means CI
+has to install the binary: a skip is exactly where the coverage was missing. And the first real run
+of the fixed code immediately produced a second thing no fixture would have contained — linkding's
+tag box carries `placeholder=" "`, which had been going into fragments as `"tagString": " "`, a
+described field that resolves to whatever the page happens to have.
+
 ---
 
 ## Changing this repository
@@ -453,6 +465,18 @@ from and, four lines above, wrote down a route to one email that would be delete
 looked wrong: the half that was right made the file read as if the rule were being applied. When a
 rule turns out to be needed twice, move it and take both callers — a copy of the reasoning in a
 comment is not the same as a call.
+
+**A stack you chose is a stack that cannot surprise you.** Gitea, grafana, mailpit and directus all
+put placeholders on their inputs and all have large ANONYMOUS surfaces, so for as long as those four
+were the measure, `config explore` looked good on both counts: gitea yields twelve routes and a
+`forms` block. Neither number was about the tool. Three applications picked for obscurity rather than
+quality — a household ERP, a bookmark manager, a pastebin — produced `"forms": {}` on two ordinary
+`name="username"` login forms and `Walked 1 page` on an app with a whole domain behind it, in one
+afternoon. The stronger version of the entry above about a service nothing uses: it is not enough for
+the stack to contain the shape, the apps in it have to be ones nobody here picked, because the ones
+you pick are the ones whose habits you already build for. The first defect was live on gitea's own
+`/user/login` and `/user/sign_up` the whole time — neither carries a placeholder — and it took the
+three obscure ones to make anybody look.
 
 ---
 

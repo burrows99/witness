@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { identityCookies } from "../browser/identities.ts";
 import { requirePlaywright } from "../browser/playwright.ts";
 import type { LocatorSpec } from "../browser/locator.ts";
+import type { Params } from "../actions/engine.ts";
 
 /**
  * A description, read off the running app.
@@ -128,10 +129,16 @@ export class Explore {
       routes: Explore.routes(pages),
       locators: Explore.locators(pages),
       forms: Explore.forms(pages),
+      unfillable: Explore.unfillable(pages),
       operations: Explore.operations(input.requests ?? []),
       visited: pages.map(page => page.path),
       skipped,
       empty,
+      // Every page walked wants a password: the crawl never got in. Said as what was OBSERVED rather
+      // than as "these were all sign-in screens", because one page of an app can carry an optional
+      // password box without being a login — microbin's paste form does. Every page carrying one is
+      // a different claim, and it is the one that means the front door was as far as this got.
+      behindSignIn: pages.length > 0 && pages.every(page => page.fields.some(field => field.password)),
     };
   }
 
@@ -183,11 +190,32 @@ export class Explore {
     return Object.values(app?.[1].routes ?? {}).filter(route => !route.includes("{"));
   }
 
-  /** The same crawl, driven against a whole system — its origin, its identities, its declared routes. */
-  static async of(system: ExplorableSystem, service: string, opts: { maxPages?: number; maxDepth?: number } = {}): Promise<Discovery> {
+  /**
+   * The same crawl, driven against a whole system — its origin, its identities, its declared routes.
+   *
+   * `as` names an action that signs in, and it is the difference between describing a product and
+   * describing its front door. Measured on three applications nobody here chose: grocy — stock,
+   * chores, recipes, equipment — walked ONE page, `/login`, and so did linkding; the only one of the
+   * three that described usefully was the only one with no authentication. Every app the tool had
+   * been pointed at until then happened to have a large anonymous surface, which flattered it.
+   *
+   * The same argument `check drift` takes, for the same reason: a sign-in is already described, as an
+   * action, and it is the most commonly written kind there is.
+   */
+  static async of(
+    system: ExplorableSystem,
+    service: string,
+    opts: { maxPages?: number; maxDepth?: number; as?: string } = {},
+  ): Promise<Discovery> {
     const origin = system.stack.endpoints[service];
     if (!origin) {
       throw new Error(`no service "${service}" — the config declares: ${Object.keys(system.stack.endpoints).join(", ")}`);
+    }
+    // The same thing `check drift` says, because `records: "terminal"` means the action has no screen
+    // to sign a browser in on. Said before a browser is launched, rather than after thirty seconds of
+    // waiting for a locator that will never exist.
+    if (opts.as && system.config.actions?.[opts.as]?.records === "terminal") {
+      throw new Error(`${opts.as} records a terminal, so it has no screen to sign a browser in on — --as takes the action that signs in`);
     }
 
     const browser = await requirePlaywright("exploring an app").chromium.launch({ headless: process.env.HEADED !== "1" });
@@ -197,8 +225,18 @@ export class Explore {
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       if (cookies.length) await context.addCookies(cookies);
       const page = await context.newPage();
+      // Signed in first, on the page the crawl then walks with — a session is a cookie jar on the
+      // context, so whatever the action leaves behind is what every later navigation carries.
+      if (opts.as) {
+        if (!system.run) throw new Error(`this system cannot run actions, so --as=${opts.as} has nothing to drive`);
+        await system.run(opts.as, page, {}, { quiet: true });
+      }
       // The API half, for free. Every call the app makes while being walked is a declared operation
       // waiting to be named, and a description needs those as much as it needs the screens.
+      //
+      // Attached after the sign-in, not before: the sign-in's own calls belong to an action that is
+      // already described, and folding them in would make `operations` differ depending on whether
+      // `--as` was passed.
       page.on("request", request => {
         const type = request.resourceType();
         if (type === "xhr" || type === "fetch") requests.push({ method: request.method(), url: request.url() });
@@ -236,32 +274,50 @@ export class Explore {
    * One page, as facts.
    *
    * Two sources, each used for what it actually knows: the accessibility tree for what a person can
-   * see and name, and the DOM for placeholder attributes — because a config's `forms` finds an input
-   * BY PLACEHOLDER, and an accessible name is the label whenever there is one.
+   * see and name, and the DOM for the fields — because a config's `forms` finds an input BY
+   * PLACEHOLDER, and an accessible name is the label whenever there is one.
    *
-   * Each field comes back as two strings rather than one. The placeholder is the right thing to
+   * A field is found by BEING one. This asked for `input[placeholder], textarea[placeholder]`, so an
+   * input with no placeholder attribute was invisible however well labelled — and labelling an input
+   * without a placeholder is the more accessible choice, which made the tool weakest on exactly the
+   * apps that had done the right thing. Two ordinary `name="username"` / `name="password"` login
+   * forms produced `"forms": {}`, on apps whose locators came through fine: the crawl saw the page
+   * and could not see the fields. Placeholder text is a fashion, not a standard.
+   *
+   * Three rules on what counts, all of them from real pages in the stack this was measured against:
+   * a button or a toggle is not a field to fill (it is already offered as a locator), a field with no
+   * box on the screen is a CSRF token or a hidden state field, and where a `form` element exists the
+   * fields inside it are the ones somebody meant.
+   *
+   * Each field comes back as four things rather than two. The placeholder is the right thing to
    * MATCH on and the wrong thing to NAME from: it is example data, and a designer's example data at
    * that. `id` is asked last on purpose — Grafana's login inputs carry `_r_0_` and `_r_1_`, which
    * React writes fresh, so a description named from those would name a different field every render.
+   * The label is kept because a field with no placeholder is filled by `fillFields`, which matches on
+   * it; `password` because a page carrying one is how a crawl knows it never got past the front door.
    */
   static async readPage(page: Page, origin: URL): Promise<Omit<PageFacts, "path">> {
     const nodes = Explore.parse(await page.ariaSnapshot());
-    const fields = await page.$$eval("input[placeholder], textarea[placeholder]", found =>
-      found
+    const fields = await page.$$eval("input, textarea, select", found => {
+      const notAField = new Set(["hidden", "submit", "button", "reset", "image", "checkbox", "radio", "file"]);
+      const anyInAForm = found.some(el => el.closest("form"));
+      return found
+        .filter(el => !notAField.has((el.getAttribute("type") ?? "").toLowerCase()))
+        .filter(el => el.getClientRects().length > 0)
+        .filter(el => !anyInAForm || el.closest("form"))
         .map(el => {
           const input = el as HTMLInputElement;
+          const label = input.labels?.[0]?.textContent?.trim() ?? "";
+          const placeholder = input.getAttribute("placeholder") ?? "";
           return {
-            placeholder: input.placeholder,
-            name:
-              input.getAttribute("name") ||
-              input.getAttribute("aria-label") ||
-              input.labels?.[0]?.textContent?.trim() ||
-              input.id ||
-              input.placeholder,
+            placeholder,
+            label,
+            password: (input.getAttribute("type") ?? "").toLowerCase() === "password",
+            name: input.getAttribute("name") || input.getAttribute("aria-label") || label || input.id || placeholder,
           };
         })
-        .filter(field => field.placeholder),
-    );
+        .filter(field => field.name);
+    });
     return { nodes, fields, links: Explore.links(nodes, origin), title: Explore.title(nodes) };
   }
 
@@ -390,6 +446,7 @@ export class Explore {
       if (!page.fields.length) continue;
       const fields: Record<string, string> = {};
       for (const field of page.fields) {
+        if (!Explore.matchable(field)) continue;
         const name = Explore.name(field.name, "") || Explore.name(field.placeholder, "");
         if (name) fields[Explore.unique(fields, name)] = field.placeholder;
       }
@@ -403,6 +460,58 @@ export class Explore {
       out[Explore.unique(out, Explore.pageName(page) || "form")] = fields;
     }
     return out;
+  }
+
+  /**
+   * The fields `forms` cannot offer, and where they are.
+   *
+   * `forms` is consumed with `getByPlaceholder`, so a field with no placeholder attribute cannot go
+   * in it — but it is still a field, and a fragment that just leaves it out is the bug this replaced
+   * wearing better clothes. Named here with its LABEL, because the honest answer for one of these is
+   * a `fillFields` step and a label is what that matches on.
+   *
+   * Deduplicated across pages the same way `forms` is: one sign-in box seen on three routes is one
+   * form, and saying so three times is how a generated block stops being read.
+   */
+  static unfillable(pages: PageFacts[]): string[] {
+    const byShape = new Map<string, string>();
+    for (const page of pages) {
+      const without = [
+        ...new Set(page.fields.filter(field => !Explore.matchable(field)).map(field => Explore.readable(field.label || field.name))),
+      ];
+      if (!without.length) continue;
+      const shape = without.join(", ");
+      if (!byShape.has(shape)) byShape.set(shape, `${Explore.templated(page.path)} — ${shape}`);
+    }
+    return [...byShape.values()];
+  }
+
+  /**
+   * Can `forms` carry this field at all? Only if there is a placeholder to match it by.
+   *
+   * One predicate with two callers rather than a rule each, because {@link forms} and
+   * {@link unfillable} split every field between them and a rule only half of them got would drop a
+   * field out of both. Whitespace does not count: linkding's tag box carries `placeholder=" "`, and
+   * `getByPlaceholder(" ")` is not a locator — it went into a fragment as `"tagString": " "`, which
+   * reads as a described field and resolves to whatever the page happens to have.
+   */
+  private static matchable(field: PageFacts["fields"][number]): boolean {
+    return Boolean(field.placeholder.trim());
+  }
+
+  /**
+   * A label as one line of a comment.
+   *
+   * Django's admin puts a whole `<select>`'s option list inside its label, so linkding's real one is
+   * `Action: ⏎⏎ --------- ⏎⏎ Delete selected feed tokens` — which broke OUT of the `//` block and
+   * left a fragment nobody could paste. Cut at a word, because `fillFields` matches an exact label
+   * first and then a PREFIX, so a shortened one still finds the field; a label cut mid-word does not.
+   */
+  private static readable(text: string, limit = 48): string {
+    const flat = text.replace(/\s+/g, " ").trim();
+    if (flat.length <= limit) return flat;
+    const cut = flat.slice(0, limit);
+    return `${cut.slice(0, cut.lastIndexOf(" ") + 1 || limit).trim()}…`;
   }
 
   /**
@@ -445,8 +554,14 @@ export class Explore {
     return out;
   }
 
-  /** The fragment, as JSONC a person can paste into the file they already have. */
-  static render(found: Discovery, service: string): string {
+  /**
+   * The fragment, as JSONC a person can paste into the file they already have.
+   *
+   * `as` is only for the notes: what to say to somebody who has not signed in yet is not what to say
+   * to somebody whose sign-in did not take, and telling a reader to do the thing they just did is
+   * how a note gets learned as noise.
+   */
+  static render(found: Discovery, service: string, as?: string): string {
     const block = {
       services: {
         [service]: {
@@ -459,6 +574,26 @@ export class Explore {
       `// What ${service} says about itself, read off the running app.`,
       "//",
       `// Walked ${found.visited.length} page${found.visited.length === 1 ? "" : "s"}: ${found.visited.join(", ")}`,
+      // `Walked 1 page` reads as "this app is small". For an app whose value is entirely behind a
+      // login it means "I could not get in", and those are opposite facts about the same number.
+      ...(found.behindSignIn
+        ? [
+            "//",
+            "// Every page walked has a password field on it, so this describes the front door and not the",
+            "// product. What is behind the login is the part worth describing.",
+            ...(as
+              ? [`// It ran \`${as}\` first and still landed here — check that that action signs THIS service in.`]
+              : [`// Run a declared sign-in first and the crawl carries the session it leaves:`, `//   config explore ${service} --as=<action>`]),
+          ]
+        : []),
+      ...(found.unfillable.length
+        ? [
+            "//",
+            "// Fields with no placeholder, which `forms` cannot carry — it is matched with getByPlaceholder:",
+            ...found.unfillable.map(where => `//   ${where}`),
+            "// Fill those with a `fillFields` step, which matches by label.",
+          ]
+        : []),
       ...(found.empty.length
         ? [
             "//",
@@ -676,8 +811,11 @@ export type SeenRequest = { method: string; url: string };
 export type PageFacts = {
   path: string;
   nodes: AriaNode[];
-  /** One per input with a placeholder: what the field is called, and the placeholder that finds it. */
-  fields: { name: string; placeholder: string }[];
+  /**
+   * One per fillable field on the page: what it is called, the placeholder that finds it (empty when
+   * it has none), the label a `fillFields` step would match on, and whether it is a password box.
+   */
+  fields: { name: string; placeholder: string; label: string; password: boolean }[];
   links: string[];
   title?: string;
   /** Where the read actually landed. Absent when nothing navigated — a fixture, or a page read in place. */
@@ -698,12 +836,16 @@ export type Discovery = {
   routes: Record<string, string>;
   locators: Record<string, LocatorSpec>;
   forms: Record<string, Record<string, string>>;
+  /** Fields a `forms` block cannot carry, because they have no placeholder to match on. */
+  unfillable: string[];
   operations: Record<string, { method: string; path: string }>;
   visited: string[];
   /** What the caps left out, said out loud. */
   skipped: string[];
   /** Walked, and offered nothing — the case that used to be indistinguishable from a simple app. */
   empty: string[];
+  /** Every page walked wanted a password: the other case a small `visited` list can mean. */
+  behindSignIn: boolean;
 };
 
 export type ExplorableSystem = {
@@ -713,5 +855,9 @@ export type ExplorableSystem = {
     /** Where a screen is declared by the time anything reads a config: a service's `app` is hoisted here. */
     apps?: Record<string, { service?: string; routes?: Record<string, string> }>;
     services?: Record<string, unknown>;
+    /** Only ever asked one thing: whether the action `--as` names has a screen to sign in on. */
+    actions?: Record<string, { records?: string }>;
   };
+  /** How a declared sign-in gets driven, for `--as`. The same signature `check drift` asks for. */
+  run?: (action: string, page: Page, inputs: Params, within?: { quiet?: boolean }) => Promise<unknown>;
 };

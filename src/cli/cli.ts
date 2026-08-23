@@ -241,6 +241,10 @@ export class Cli {
    * as an argument.
    */
   static flag(flags: string[], name: string): string | undefined {
+    // The space form is the one a person types, and it is the one that cannot work: `run` has already
+    // put the value in the positional half, where this cannot see it and the verb reads it as an
+    // argument. Silently answering `undefined` makes `--as signIn` look like it signed in.
+    if (flags.includes(`--${name}`)) Cli.die(`--${name} takes its value with an =, as \`--${name}=<value>\``, 2);
     const found = flags.find(f => f.startsWith(`--${name}=`));
     return found?.slice(name.length + 3);
   }

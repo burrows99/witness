@@ -1,0 +1,65 @@
+// Three applications nobody here chose, described so this tool can be pointed at them.
+//
+// The stack in `docker-compose.yml` is six services we picked, and every one of them flatters the
+// crawler: gitea, grafana, mailpit and directus all have large ANONYMOUS surfaces, so `config explore`
+// looked good on them — gitea yields twelve routes. That number is a fact about gitea's public pages,
+// not about the tool's reach, and it hid two defects for as long as it was the only thing measured.
+//
+// These three were added for obscurity, not quality. Nobody — person or model — has memorised their
+// route tables, their domain vocabulary or their markup, which is what makes them stand in for the
+// closed-source app somebody actually works on. They run as their own compose project, `unknown-apps`,
+// beside this one rather than inside it:
+//
+//   grocy     lscr.io/linuxserver/grocy      :8094   household ERP — stock, chores, recipes, equipment
+//   linkding  sissbruecker/linkding          :8095   bookmarks, behind an ordinary Django login
+//   microbin  danielszabo99/microbin         :8096   pastebin, and the only one with no auth at all
+//
+//   witness --config .witness/unknown.config.jsonc config explore grocy
+//
+// Two of the three are entirely behind a login, and the one that is not was the only one that ever
+// described usefully. That is the whole point of them being here.
+{
+  "name": "unknown",
+  "services": {
+    "grocy": {
+      "kind": "third-party",
+      "port": 8094,
+      "container": "unknown-grocy",
+      "probe": "container"
+    },
+    "linkding": {
+      "kind": "third-party",
+      "port": 8095,
+      "container": "unknown-linkding",
+      "probe": "container",
+      // Read out of the running container, so this file carries a SOURCE and never a value.
+      "secrets": {
+        "adminUser": { "containerEnv": "LD_SUPERUSER_NAME" },
+        "adminPassword": { "containerEnv": "LD_SUPERUSER_PASSWORD" }
+      },
+      "app": {
+        "routes": { "login": "/login/", "bookmarks": "/bookmarks" }
+      },
+      "actions": {
+        "signIn": {
+          "summary": "sign in, so a crawl sees the bookmarks rather than the front door",
+          "steps": [
+            { "goto": { "route": "login" } },
+            {
+              "fillFields": { "Username": "{secret.adminUser}", "Password": "{secret.adminPassword}" },
+              "note": "by LABEL: linkding's inputs carry no placeholder at all, which is the other half of what this stack exposed"
+            },
+            { "click": { "role": "button", "name": "Login" } },
+            { "waitForUrl": { "route": "bookmarks", "timeout": 15000 } }
+          ]
+        }
+      }
+    },
+    "microbin": {
+      "kind": "third-party",
+      "port": 8096,
+      "container": "unknown-microbin",
+      "probe": "container"
+    }
+  }
+}

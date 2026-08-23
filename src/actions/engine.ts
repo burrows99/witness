@@ -262,7 +262,11 @@ export class Actions {
     // A whole set of labelled fields at once — the shape of every "author this thing" form, where the
     // labels differ per type and the spec is the only thing that knows them.
     if (step.fillFields) {
-      const fields = this.resolve(step.fillFields, values) as Record<string, string> | string;
+      // `owner` — the one resolve in this method that was not given it, so `{secret.adminPassword}`
+      // inside a service's own action asked for a shared secret and failed naming the service-scoped
+      // one it was looking at. A `fillFields` step is exactly where a sign-in's credentials go when
+      // the inputs carry labels rather than placeholders, which is most of them.
+      const fields = this.resolve(step.fillFields, values, owner) as Record<string, string> | string;
       const pairs = typeof fields === "string" ? (JSON.parse(fields) as Record<string, string>) : fields;
       for (const [label, value] of Object.entries(pairs)) {
         // Exact label first, then a prefix: a field's label often carries a qualifier the caller has no
