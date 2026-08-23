@@ -79,6 +79,12 @@ Playwright is looked for in the project first and beside the running command sec
 the path can be pointed at a project that has none: `npm i -g @playwright/test` installs one browser
 per machine and leaves the project it is pointed at untouched.
 
+A global install puts the binary in `$(npm prefix -g)/bin`, which is **not always on `PATH`** — it is
+not on the machine this sentence was written on. A `witness: command not found` right after a
+successful `npm i -g` is that, and it reads at first exactly like a broken `bin` field. Check with
+`ls "$(npm prefix -g)/bin"` before believing the package. (`npm bin -g`, the command that used to
+answer this, was removed in npm 9.)
+
 ## Describe a product
 
 Everything lives under one directory, found the way git finds a repository — walk up, nearest wins.
