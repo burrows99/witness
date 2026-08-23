@@ -11,7 +11,11 @@
 # frame twice.
 #
 # Three rules, all mechanical:
-#   1. READ-BACK     every image surfaced/uploaded/cited was Read this session.
+#   1. READ-BACK     every image surfaced/uploaded/cited was Read this session — matched on its
+#                    RESOLVED PATH. It was matched on the basename, and every terminal recording
+#                    writes its still as `video.png`, so `<action>/before/video.png` and
+#                    `<action>/after/video.png` were the same key and Reading either satisfied the
+#                    gate for the other.
 #   2. RECENCY       that Read came AFTER the last capture of it. `witness action run` OVERWRITES
 #                    its whole run directory (same run, same paths, by design), so a re-run
 #                    invalidates every earlier Read of every frame beneath it — which is exactly the
@@ -98,7 +102,7 @@ fi
 # RULES 1+2 — read back, and after the last capture.
 command -v python3 >/dev/null 2>&1 || deny "Evidence gate: python3 is required to walk the transcript, and read-back cannot be verified without it. Install python3, or confirm by hand that each image was Read after its last capture and run this step yourself."
 
-positions=$(python3 - "$tx" <<'PY' 2>/dev/null
+positions=$(python3 - "$tx" "$cwd" <<'PY' 2>/dev/null
 import json, os, re, sys
 
 IMG = (".png", ".jpg", ".jpeg", ".webp")
@@ -141,19 +145,27 @@ try:
                 path = inp.get("file_path") or inp.get("filePath") or ""
                 if not isinstance(path, str) or not path.lower().endswith(IMG):
                     continue
-                base = os.path.basename(path)
+                # The RESOLVED path, not the basename. Every terminal recording writes its still as
+                # `video.png` (#85), so the two cuts of one action are `<action>/before/video.png` and
+                # `<action>/after/video.png` — keyed by basename they are the same file, and Reading
+                # the BEFORE frame satisfied the gate for the AFTER frame. The gate exists to stop one
+                # failure this repository has committed twice, a caption over the wrong frame, and it
+                # could be passed with the wrong frame — systematically, for most of its own evidence.
+                # `realpath` and not just `abspath`: on macOS `/tmp` is a symlink to `/private/tmp`, so
+                # the same file arrives spelled two ways and an exact match on the spelling is not one.
+                key = os.path.realpath(os.path.join(sys.argv[2], path))
                 if name == "Read":
-                    red[base] = i
+                    red[key] = i
                 elif "screenshot" in name.lower():
-                    cap[base] = i
+                    cap[key] = i
 except Exception:
     pass
 
 # One line per cut: the last run that rewrote it.
 for cut in dict(runs):
     print("RUN\t%s\t%d" % (cut, max(i for c, i in runs if c == cut)))
-for base in set(list(cap) + list(red)):
-    print("%s\t%d\t%d" % (base, cap.get(base, -1), red.get(base, -1)))
+for key in set(list(cap) + list(red)):
+    print("%s\t%d\t%d" % (key, cap.get(key, -1), red.get(key, -1)))
 PY
 )
 
@@ -164,7 +176,10 @@ lookup() { printf '%s\n' "$positions" | awk -F'\t' -v b="$1" -v c="$2" '$1==b {p
 unvalidated=""; stale=""
 while IFS= read -r p; do
   [ -n "$p" ] || continue; is_img "$p" || continue
-  b=$(basename "$p")
+  # Resolved the same way the transcript's paths were, so the two spellings of one file match and two
+  # files that merely share a name do not.
+  b=$(python3 -c 'import os,sys; print(os.path.realpath(os.path.join(sys.argv[1], sys.argv[2])))' "$cwd" "$p" 2>/dev/null)
+  [ -n "$b" ] || b="$p"
   cap_i=$(lookup "$b" 2); red_i=$(lookup "$b" 3)
   # A frame under `<actions>/<cut>/` is invalidated by the last run of THAT cut; anything else only
   # by a capture of its own name.
