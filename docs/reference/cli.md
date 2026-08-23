@@ -52,6 +52,10 @@ and prints a JSONC fragment: `routes` and `locators` from each page's aria snaps
 placeholder attributes, `api.operations` from the XHR the app made while being walked. It never
 writes the config. What the caps left out is printed, not dropped silently.
 
+Each page is read once it has **settled**, not once its document is done — a client-rendered app is an
+empty shell at `domcontentloaded`. A page that still offers nothing is named in the fragment: an empty
+page is nearly always one behind a sign-in, not one with nothing on it.
+
 ## Your own nouns
 
 ```jsonc

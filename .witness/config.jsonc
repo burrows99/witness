@@ -105,6 +105,29 @@
       }
     },
 
+    // All console, no document. The app `config explore` reads as empty even once it has waited —
+    // which is the case the fragment now has to say something about, rather than report a walk of one
+    // page and leave it looking like an app with one page.
+    "keycloak": {
+      "kind": "in-house",
+      "port": 8092,
+      "portVar": "KEYCLOAK_PORT",
+      "container": "witness-keycloak",
+      "probe": { "path": "/realms/master", "contains": "master" },
+      "actions": {
+        "describeItself": {
+          "summary": "what `config explore` says about an app that offers nothing — the case that used to be silent",
+          "records": "terminal",
+          "steps": [
+            { "caption": { "text": "asking witness what Keycloak says about itself" } },
+            { "type": { "on": "prompt", "value": "./bin/witness config explore keycloak --pages=2 | head -12" } },
+            { "press": "Enter" },
+            { "wait": 20000, "note": "one page, but it is waited on before it is read" }
+          ]
+        }
+      }
+    },
+
     // What it writes to. The layer a screen can disagree with.
     "postgres": {
       "kind": "in-house",
@@ -214,6 +237,17 @@
             { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin" } }
           ]
         },
+        "describeItself": {
+          "summary": "what `config explore` reads off a client-rendered app — no browser, just the CLI",
+          "records": "terminal",
+          "steps": [
+            { "caption": { "text": "asking witness what Grafana says about itself" } },
+            { "type": { "on": "prompt", "value": "./bin/witness config explore grafana --pages=6 | head -30" }, "note": "the fragment is longer than the pane once it finds anything — without the head, the line that says how many pages were walked scrolls off before the recording ends" },
+            { "press": "Enter" },
+            { "wait": 30000, "note": "the crawl waits for each page to settle, so this has to outlast six of them" }
+          ]
+        },
+
         "openDataSources": {
           "summary": "what it can query — nothing yet, which is what a fresh install looks like",
           "steps": [

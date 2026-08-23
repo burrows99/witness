@@ -111,7 +111,13 @@ test("paths that differ in one segment are one operation with a parameter", () =
     { method: "GET", url: "http://localhost:3020/api/v1/repos/7/issues" },
     { method: "GET", url: "http://localhost:3020/api/v1/repos/12/issues" },
     { method: "POST", url: "http://localhost:3020/api/v1/user/repos" },
+    // An asset fetched with `fetch()` is still an asset — Grafana loads its icons this way.
+    { method: "GET", url: "http://localhost:3010/public/build/img/icons/unicons/eye.svg" },
   ]);
+  deepEqual(
+    Object.keys(operations).filter(name => /svg/i.test(name)),
+    [],
+  );
   deepEqual(operations["repos.byId.issues"], { method: "GET", path: "/api/v1/repos/{id}/issues" });
   // The method only enters the name when it has to: `user.repos` reads better than `user.repos.get`.
   deepEqual(operations["user.repos.post"], { method: "POST", path: "/api/v1/user/repos" });
@@ -140,9 +146,44 @@ test("a page that cannot be read is reported rather than dropped", async () => {
   match(found.skipped.join("\n"), /\/gone — could not be read/);
 });
 
+test("a page with nothing to do on it is said out loud", async () => {
+  // `Walked 1 page` reads exactly like "your app has one page", and for three client-rendered apps
+  // in seven it meant the opposite. An empty page is nearly always a mistake, and this is the only
+  // thing positioned to notice.
+  const shell = "- generic:\n  - generic\n";
+  const found = await Explore.crawl({
+    origin: "http://localhost:3010",
+    maxPages: 5,
+    maxDepth: 1,
+    read: async () => ({ ...page("/", shell) }),
+  });
+  deepEqual(found.empty, ["/"]);
+  match(Explore.render(found, "grafana"), /Nothing to do on: \//);
+
+  // A title and nothing else counts, which is the whole of Keycloak's console: one heading reading
+  // "We are sorry...", no link and no control. A page you can only read the name of is a dead end,
+  // and the heading is still offered as a locator — it is just not a way through.
+  const dead = await Explore.crawl({
+    origin: "http://localhost:8092",
+    maxPages: 5,
+    maxDepth: 1,
+    read: async () => ({ ...page("/", '- heading "We are sorry..." [level=1]\n') }),
+  });
+  deepEqual(dead.empty, ["/"]);
+  deepEqual(Object.keys(Explore.locators([page("/", '- heading "We are sorry..." [level=1]\n')])), ["weAreSorry"]);
+  // And a page with anything on it is not accused of being empty.
+  const real = await Explore.crawl({
+    origin: "http://localhost:3020",
+    maxPages: 5,
+    maxDepth: 0,
+    read: async () => ({ ...page("/", REGISTER) }),
+  });
+  deepEqual(real.empty, []);
+});
+
 test("the fragment says it is a starting point and where it came from", () => {
   const rendered = Explore.render(
-    { routes: { home: "/" }, locators: {}, forms: {}, operations: {}, visited: ["/"], skipped: [] },
+    { routes: { home: "/" }, locators: {}, forms: {}, operations: {}, visited: ["/"], skipped: [], empty: [] },
     "web",
   );
   match(rendered, /Walked 1 page: \//);
@@ -151,6 +192,29 @@ test("the fragment says it is a starting point and where it came from", () => {
   ok(rendered.includes('"services"') && rendered.includes('"web"'));
 });
 
-test("the service to explore is the one with screens", () => {
-  equal(Explore.likelyApp({ services: { db: {}, web: { app: { routes: {} } } } }), "web");
+/**
+ * Both of these ask the shape `loadConfig` RETURNS, not the shape a config is written in.
+ *
+ * A service's `app` block is hoisted into `apps` and removed from the service when the config is
+ * read. Asking `services.web.app` — which is what these two did — is a question every real caller
+ * answers with `undefined`, so the crawl started at `/` on every described app and `likelyApp`
+ * picked whichever service was written first.
+ */
+test("the service to explore is the one with a screen", () => {
+  equal(Explore.likelyApp({ apps: { web: { service: "web", routes: {} } }, services: { db: {}, web: {} } }), "web");
+  // An app can be named for itself and point at a service called something else.
+  equal(Explore.likelyApp({ apps: { site: { service: "gitea" } }, services: { gitea: {} } }), "gitea");
+  // Nothing declares a screen at all: the state `init` leaves a config in, since a compose file says
+  // which services exist and not which of them a person looks at.
+  equal(Explore.likelyApp({ services: { gitea: {}, postgres: {} } }), "gitea");
+});
+
+test("a crawl starts from the routes the config already declares", () => {
+  const loaded = {
+    apps: { grafana: { service: "grafana", routes: { login: "/login", home: "/", user: "/admin/users/{id}" } } },
+    services: { grafana: {}, postgres: {} },
+  };
+  // A route with a parameter cannot be visited without a value, so it is not a starting point.
+  deepEqual(Explore.startingRoutes(loaded, "grafana"), ["/login", "/"]);
+  deepEqual(Explore.startingRoutes(loaded, "postgres"), []);
 });
