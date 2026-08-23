@@ -26,7 +26,7 @@ tutorial say.
 |---|---|
 | `api <get\|post\|put\|patch\|delete> <path> [json]` | any service declares an `api` — authenticated the way a declared operation is |
 | `db sql "<query>" [--on=<service>]` | a `database` is declared — `--on` names one of the others |
-| `video render` | rebuild the MP4s from the last run's recordings |
+| `video` | rebuild the MP4s from the recordings on disk — a RUN only renders what it just recorded, this re-renders everything |
 | `action list` / `action show <a>` / `action run <a…>` | any action is declared |
 | `stub list` / `stub show <s>` | any `stubs` are declared |
 | `config explore [<service>] [--pages N] [--depth N]` | always — walks the app and prints the description it implies |
