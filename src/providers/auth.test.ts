@@ -70,7 +70,7 @@ test("login signs in once and carries what that returned", async () => {
 });
 
 test("a login that fails says what the other end said", async () => {
-  globalThis.fetch = (async () => new Response("no such user", { status: 401 })) as typeof fetch;
+  globalThis.fetch = (async () => new Response("no such user", { status: 401 }));
   await rejects(
     () => authHeaders({ provider: "login", login: { url: "https://sandbox.example/nope" } }, context()),
     /login https:\/\/sandbox.example\/nope → 401: no such user/,

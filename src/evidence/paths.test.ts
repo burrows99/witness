@@ -6,7 +6,7 @@ const havePlaywright = await import("@playwright/test").then(
   () => true,
   () => false,
 );
-const { currentContext, slug } = havePlaywright ? await import("./paths.ts") : ({ currentContext: null, slug: null } as never);
+const { currentContext, slug } = havePlaywright ? await import("./paths.ts") : ({} as typeof import("./paths.ts"));
 const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 
 const originalEnv = { ...process.env };

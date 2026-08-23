@@ -3,6 +3,7 @@ import { HttpApi } from "../http/client.ts";
 import type { Stack } from "../environment/stack.ts";
 import type { Trace } from "../diagnostics/trace.ts";
 import { type AuthConfig, authHeaders } from "./auth.ts";
+import { asText } from "../config/load.ts";
 import { Registry } from "./registry.ts";
 
 /**
@@ -98,7 +99,7 @@ const matches = (item: unknown, where: Record<string, unknown>): boolean =>
     const actual = at(item, path);
     if (expected && typeof expected === "object" && !Array.isArray(expected)) {
       const rule = expected as Record<string, unknown>;
-      if ("startsWith" in rule) return String(actual ?? "").startsWith(String(rule.startsWith));
+      if ("startsWith" in rule) return asText(actual).startsWith(String(rule.startsWith));
       if ("not" in rule) return !same(actual, rule.not);
       if ("in" in rule) return (rule.in as unknown[]).some(v => same(actual, v));
     }

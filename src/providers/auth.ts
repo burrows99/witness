@@ -1,4 +1,5 @@
 import { resolveSecret, secretProviders, type SecretSource } from "./secrets.ts";
+import { asText } from "../config/load.ts";
 import { Registry } from "./registry.ts";
 import type { Stack } from "../environment/stack.ts";
 
@@ -85,7 +86,7 @@ export const authProviders = new Registry<AuthProvider>("auth")
   /** A session cookie the caller already holds — `call(op, { sid })`. */
   .register("cookie", async (config, { params }) => {
     const name = config.cookie ?? "sid";
-    const value = String(params[name] ?? params.sid ?? "");
+    const value = asText(params[name] ?? params.sid);
     if (!value) throw new Error(`cookie auth "${name}" needs the value passed with the call`);
     return { Cookie: `${name}=${value}` };
   })
@@ -96,7 +97,7 @@ export const authProviders = new Registry<AuthProvider>("auth")
    * often. The token is fetched once and reused; `derive` lifts anything else the callee needs out of
    * the login answer (a practice id, a tenant), which is the part that is usually undocumented.
    */
-  .register("login", async (config, { stack, declared }) => {
+  .register("login", async (config, { stack }) => {
     const cached = logins.get(JSON.stringify(config.login));
     if (cached) return cached;
     if (!config.login) throw new Error("login auth needs a `login` block");
@@ -115,7 +116,7 @@ export const authProviders = new Registry<AuthProvider>("auth")
     const pick = (path: string): string => {
       let cursor: unknown = answer;
       for (const key of path.split(".")) cursor = (cursor as Record<string, unknown> | undefined)?.[key];
-      return typeof cursor === "string" ? cursor : String(cursor ?? "");
+      return typeof cursor === "string" ? cursor : asText(cursor);
     };
 
     const headers: Record<string, string> = { Authorization: `Bearer ${pick(config.login.tokenPath ?? "token")}` };

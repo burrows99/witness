@@ -20,7 +20,7 @@ function workspace(): { root: string; evidence: (group?: string) => Evidence; co
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "witness-evidence-"));
   roots.push(root);
   const outputDir = path.join(root, "test-results", "a-test");
-  const context: EvidenceContext = { spec: "a", test: "b", cut: "run", group: path.join("a", "b", "run"), outputDir };
+  const context: EvidenceContext = { source: "cli", test: "b", cut: "run", group: path.join("cli", "b", "run"), outputDir };
   return { root, context, evidence: (group = context.group) => new Evidence({ root, context: { ...context, group } }) };
 }
 

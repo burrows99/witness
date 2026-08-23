@@ -1,0 +1,27 @@
+name: codeql
+
+# GitHub's own static analysis, on the schedule it recommends plus every change. Advanced setup rather
+# than the one-click kind so the configuration is in the repository, reviewable like everything else.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          # One identifier covers both here; the sources are TypeScript and the bin is run by Node.
+          languages: javascript-typescript
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3

@@ -44,9 +44,9 @@ test("the commands are the command line's own, not a list somebody kept", () => 
     ],
   });
   match(out, /- `npx witness stack` — what is up/);
-  match(out, /  - `stack status` — reachability/);
+  match(out, / {2}- `stack status` — reachability/);
   match(out, /- `npx witness order` — orders/);
-  match(out, /  - `order show` — <orderId>/);
+  match(out, / {2}- `order show` — <orderId>/);
 });
 
 test("the loop only offers commands this copy actually has", () => {
@@ -97,7 +97,7 @@ test("without a description it says how to get one; with one it names what the p
   }).render();
   match(described, /^---\nname: acme/);
   match(described, /- \*\*apps\*\*: `customer`/);
-  match(described, /  - `customer\.cancelOrder` — cancel an order/);
+  match(described, / {2}- `customer\.cancelOrder` — cancel an order/);
   match(described, /- \*\*operations\*\*: `orders\.show`/);
   match(described, /- \*\*queries\*\*: `order\.status`/);
   // A signed-in run needs these before it needs anything else, and they were findable only by

@@ -4,7 +4,7 @@ import { Cli } from "../cli/cli.ts";
 import { slug } from "../evidence/paths.ts";
 import { Stack } from "../environment/stack.ts";
 import { Template } from "../config/template.ts";
-import { TypeSource, type TypeField } from "../config/types.ts";
+import { TypeSource } from "../config/types.ts";
 
 /**
  * The instructions this tool hands whoever is driving it.
@@ -289,7 +289,7 @@ export class Skill {
       "its own evidence. These are the verbs a step can use:",
       "",
     ];
-    for (const field of step.fields as TypeField[]) {
+    for (const field of step.fields) {
       if (field.name === "note" || field.name === "as") continue;
       lines.push(`- \`${field.name}\`${field.doc ? ` — ${Skill.sentence(field.doc)}` : ""}`);
     }
@@ -402,7 +402,7 @@ export class Skill {
     const config = this.types.declaration("SystemConfig");
     const lines = ["## The description", "", "`.witness/config.jsonc` — comments allowed. Its fields:", ""];
     if (config.kind === "object") {
-      for (const field of config.fields as TypeField[]) {
+      for (const field of config.fields) {
         lines.push(`- \`${field.name}\`${field.optional ? "" : " (required)"}${field.doc ? ` — ${Skill.sentence(field.doc)}` : ""}`);
       }
     }

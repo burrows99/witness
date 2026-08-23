@@ -313,9 +313,18 @@ question, a bug, or something that surprised you.
 
 ```bash
 npm install
-npm test          # node --test, no framework and nothing to configure
-npm run typecheck
+npm run check     # types (tests included), lint, dead code, then the suite
 ```
+
+| | |
+|---|---|
+| `npm run typecheck` | `tsc`, over the tests too — they do not ship, which is not a reason not to check them |
+| `npm run lint` | type-aware ESLint: a floating promise here is a step that silently did not happen |
+| `npm run deadcode` | knip — files and exports nothing reaches |
+| `npm test` | `node --test`, no framework and nothing to configure |
+| `npm run package` | publint, over what `npm pack` would actually publish |
+
+CodeQL runs on every change and weekly.
 
 What the codebase asks of a change:
 

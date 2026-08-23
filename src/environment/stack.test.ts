@@ -27,7 +27,7 @@ const fakeDocker = (opts: { running?: string[]; publishers?: Record<number, stri
   });
 
 const answering = (status: number, body = ""): void => {
-  globalThis.fetch = (async () => new Response(body, { status })) as typeof fetch;
+  globalThis.fetch = (async () => new Response(body, { status }));
 };
 
 const originalFetch = globalThis.fetch;
@@ -109,9 +109,9 @@ test("status: reachable, with its container up", async () => {
 test("status: a database is asked of docker, not of HTTP", async () => {
   // Postgres answers no HTTP request ever, and reporting a healthy one as DOWN sends whoever is
   // debugging down the wrong path.
-  globalThis.fetch = (() => {
+  globalThis.fetch = () => {
     throw new Error("a container probe must not make a request");
-  }) as unknown as typeof fetch;
+  };
   const stack = new Stack({
     root: root(),
     docker: fakeDocker({ running: ["acme-postgres"] }),
@@ -168,7 +168,7 @@ test("status: an identity probe that matches passes", async () => {
 test("status: nothing listening is DOWN, not NOT OURS", async () => {
   globalThis.fetch = (async () => {
     throw new Error("ECONNREFUSED");
-  }) as typeof fetch;
+  });
   const stack = new Stack({ root: root(), docker: fakeDocker(), services: { web: { port: 3000 } } });
   const [row] = await stack.status();
   equal(row.reachable, false);

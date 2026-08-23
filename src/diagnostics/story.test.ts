@@ -233,7 +233,7 @@ test("a step that passed in a way worth knowing about is not buried under a tick
   match(out, /## 1 step passed in a way worth knowing about/);
   match(out, /- `expect` — matched a node outside the viewport/);
   // …and again where the step is, so it reads in order too.
-  match(out, /2\. ✓ `expect`.*\n   ⚠ matched a node outside the viewport/);
+  match(out, /2\. ✓ `expect`.*\n {3}⚠ matched a node outside the viewport/);
 });
 
 test("what came back decides what is an asset, not how it was asked for", () => {

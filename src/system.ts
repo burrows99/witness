@@ -108,7 +108,7 @@ export class System {
           database: config.database.database,
           // Resolved here rather than passed through: `containerEnv` reads the running container,
           // which is not a thing a database driver should know how to do.
-          password: resolveSecret(config.database.credential as Parameters<typeof resolveSecret>[0], this.stack),
+          password: resolveSecret(config.database.credential, this.stack),
           trace: this.trace,
         })
       : undefined;
@@ -294,7 +294,7 @@ export class System {
       const spec = this.config.secrets?.[candidate];
       // Handed the lookup so a secret can point at another one — an `auth` block naming the
       // credential the `secrets` block already declared, rather than respelling where it comes from.
-      if (spec !== undefined) return resolveSecret(spec as Parameters<typeof resolveSecret>[0], this.stack, at => this.secretOrNothing(at, scope));
+      if (spec !== undefined) return resolveSecret(spec, this.stack, at => this.secretOrNothing(at, scope));
     }
     throw new Error(
       `no secret "${name}"${scope ? ` for ${scope}` : ""} — declared: ${Object.keys(this.config.secrets ?? {}).join(", ") || "none"}`,
@@ -535,7 +535,7 @@ export class System {
             run: async (args: string[], flags: string[] = []) => {
               const { names, inputs } = parseRunArgs(args);
               if (!names.length) Cli.die("missing <action> — `action list` says which", 2);
-              return runActions(this as never, {
+              return runActions(this, {
                 names,
                 inputs,
                 headed: process.env.HEADED === "1",
@@ -585,7 +585,7 @@ export class System {
 
 /** An app the config declared: its routes as screens, its forms, and its sign-in if it has one. */
 /** A cast entry is JSON: its shape is in the config, not in the type system. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 export type CastEntry = Record<string, any>;
 
 export type AppSurface = WebApp &

@@ -1,4 +1,4 @@
-import { deepEqual, equal, ok, throws } from "node:assert/strict";
+import { deepEqual, equal, throws } from "node:assert/strict";
 import { test } from "node:test";
 
 import { normalise, OLDER_NAME, qualify, scoped, unfilled } from "./normalise.ts";
@@ -115,14 +115,14 @@ test("the generated template says it is still the template", () => {
   // Loading `witness init`'s file unedited failed on `no client provider "…"` — an error about a
   // registry, naming neither the field nor the file, as the very first thing a new project sees.
   deepEqual(
-    unfilled({ name: "…", services: { web: { port: 3000, container: "…" } } } as unknown as SystemConfig),
+    unfilled({ name: "…", services: { web: { port: 3000, container: "…" } } }),
     ["name", "services.web.container"],
   );
-  deepEqual(unfilled({ name: "acme", services: { web: { port: 3000 } } } as unknown as SystemConfig), []);
+  deepEqual(unfilled({ name: "acme", services: { web: { port: 3000 } } }), []);
 });
 
 test("a placeholder inside a list is found too", () => {
-  deepEqual(unfilled({ name: "a", services: {}, root: ["…"] } as unknown as SystemConfig), ["root[0]"]);
+  deepEqual(unfilled({ name: "a", services: {}, root: ["…"] }), ["root[0]"]);
 });
 
 test("a containerEnv inside a service means THAT service's container", () => {

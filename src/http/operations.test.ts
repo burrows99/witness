@@ -17,7 +17,7 @@ afterEach(() => {
 const stack = { env: () => "" } as unknown as Stack;
 
 const operations = (config: Partial<ClientConfig> = {}, base = "http://api"): Operations =>
-  new Operations(new HttpApi(base, () => ({}), new Trace()), stack, { service: "api", operations: {}, ...config } as ClientConfig, new Trace());
+  new Operations(new HttpApi(base, () => ({}), new Trace()), stack, { service: "api", operations: {}, ...config }, new Trace());
 
 /** Answer each request in turn, and keep what was asked. */
 const answering = (...payloads: unknown[]): { seen: { url: string; method: string }[] } => {
@@ -93,14 +93,14 @@ test("a cleanup that fails reports and keeps going", async () => {
   process.stderr.write = ((text: string) => {
     said.push(text);
     return true;
-  }) as typeof process.stderr.write;
+  });
 
   let call = 0;
-  globalThis.fetch = (async () => {
+  globalThis.fetch = async () => {
     call += 1;
     if (call === 3) return new Response("gone", { status: 404 });
     return new Response(JSON.stringify({ id: `id-${call}` }), { status: 200 });
-  }) as unknown as typeof fetch;
+  };
 
   const ops = operations({
     operations: { create: { method: "POST", path: "/v1/things", undo: { operation: "remove", param: "id" } }, remove: { method: "DELETE", path: "/v1/things/{id}" } },
