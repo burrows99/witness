@@ -62,6 +62,16 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Social sign-in, pointed at the identity provider below. Grafana renders it as a LINK on the
+      # login page — `/login/generic_oauth`, a path on Grafana's own origin, which answers 302 to
+      # Keycloak. That shape is on the login page of a very large number of applications, and it is
+      # the reason anything walking an app has to care where a link LANDS.
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: witness-demo
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: http://localhost:${KEYCLOAK_PORT:-8092}/realms/master/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://keycloak:8080/realms/master/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: http://keycloak:8080/realms/master/protocol/openid-connect/userinfo
 
   # --- Third-party OSS, deliberately not chosen for convenience -------------------------------
   # Six applications nobody here designed, picked so each one stresses a different part of reading a

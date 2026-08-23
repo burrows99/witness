@@ -146,6 +146,62 @@ test("a page that cannot be read is reported rather than dropped", async () => {
   match(found.skipped.join("\n"), /\/gone — could not be read/);
 });
 
+test("a link that LANDS somewhere else is dropped rather than described", async () => {
+  // The same-origin test used to be made against the href, so a path on this origin that answers 302
+  // passed it and the crawl described somebody else's sign-in screen as the product's own — a git
+  // forge whose description offered "Email, phone, or Skype". Where a navigation lands is the only
+  // version of the question worth asking, and it can only be asked after the navigation.
+  const found = await Explore.crawl({
+    origin: "http://localhost:3010",
+    from: ["/login", "/away"],
+    maxPages: 5,
+    maxDepth: 0,
+    read: async url =>
+      url.endsWith("/away")
+        ? { ...page("/away", '- heading "We are sorry..." [level=1]\n'), url: "http://localhost:8092/realms/master" }
+        : { ...page("/login", REGISTER), url },
+  });
+  deepEqual(found.visited, ["/login"]);
+  match(found.skipped.join("\n"), /\/away — left this origin for http:\/\/localhost:8092/);
+  // And nothing it says about the product came from there.
+  ok(!("weAreSorry" in found.locators));
+});
+
+test("a sign-in that hands off to an identity provider is never requested at all", async () => {
+  // Not "walked and discarded": every OAuth start endpoint is a same-origin link on the login page of
+  // a very large number of applications, and walking an app must not send a third party a request
+  // because somebody typed `config explore`. The landed-origin check is the backstop; this is the
+  // half that sends nothing.
+  const asked: string[] = [];
+  const found = await Explore.crawl({
+    origin: "http://localhost:3010",
+    from: ["/login", "/login/generic_oauth", "/user/oauth2/keycloak", "/api/auth/idp/microsoft/start", "/saml/acs", "/sso"],
+    maxPages: 9,
+    maxDepth: 0,
+    read: async url => {
+      asked.push(new URL(url).pathname);
+      return { ...page("/login", REGISTER), url };
+    },
+  });
+  deepEqual(asked, ["/login"]);
+  equal(found.skipped.length, 5);
+  match(Explore.render(found, "grafana"), /generic_oauth — hands off to an identity provider/);
+});
+
+test("the login form itself is still walked", async () => {
+  // A checker that cries wolf is worse than none: `/lessons` contains `sso`, and the app's own login
+  // page is the one screen a description most needs.
+  const found = await Explore.crawl({
+    origin: "http://localhost:3020",
+    from: ["/user/login", "/auth/login", "/lessons"],
+    maxPages: 5,
+    maxDepth: 0,
+    read: async url => ({ ...page("/", REGISTER), url }),
+  });
+  deepEqual(found.visited, ["/user/login", "/auth/login", "/lessons"]);
+  deepEqual(found.skipped, []);
+});
+
 test("a page with nothing to do on it is said out loud", async () => {
   // `Walked 1 page` reads exactly like "your app has one page", and for three client-rendered apps
   // in seven it meant the opposite. An empty page is nearly always a mistake, and this is the only

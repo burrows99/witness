@@ -68,6 +68,11 @@ Two sources per page, each for what it knows: the accessibility tree for what a 
 name, the DOM for placeholder attributes, because `forms` is consumed with `getByPlaceholder` and an
 accessible name is the label wherever there is one.
 
+Same-origin is judged on where a navigation **landed**, not on the href it started from — a local
+path that answers 302 defeats the second version of the check entirely — and auth-handoff shapes are
+skipped before any request goes out. The one thing a crawler must not do is walk out of the product
+it was pointed at.
+
 It is the only part of `config/` that needs a browser, lazily, like everywhere else.
 
 ## template + types: generated from the source

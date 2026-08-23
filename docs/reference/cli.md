@@ -56,6 +56,14 @@ Each page is read once it has **settled**, not once its document is done — a c
 empty shell at `domcontentloaded`. A page that still offers nothing is named in the fragment: an empty
 page is nearly always one behind a sign-in, not one with nothing on it.
 
+**It walks your app and nothing else.** A sign-in that hands off — `/login/generic_oauth`,
+`/user/oauth2/keycloak`, `/api/auth/idp/microsoft/start` — is a link on your own origin that answers
+302 to an identity provider, so those shapes are skipped before anything is requested. Whatever else
+turns out to have left this origin is judged on where the navigation **landed**, and dropped rather
+than read: a description that named the third party's screens would be describing somebody else's
+product. Both kinds are named in the fragment, so a route you do want described can be declared by
+hand.
+
 ## Your own nouns
 
 ```jsonc
