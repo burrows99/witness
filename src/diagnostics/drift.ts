@@ -1,7 +1,10 @@
 import type { Page } from "@playwright/test";
 
 import { describe, type LocatorSpec, locate } from "../browser/locator.ts";
-import type { ActionConfig, StepConfig } from "../actions/engine.ts";
+import type { ActionConfig, Params, StepConfig } from "../actions/engine.ts";
+import type { IdentityConfig } from "../config/schema.ts";
+import { identityCookies } from "../browser/identities.ts";
+import { requirePlaywright } from "../browser/playwright.ts";
 
 /**
  * Whether the description still describes the thing.
@@ -25,6 +28,44 @@ import type { ActionConfig, StepConfig } from "../actions/engine.ts";
  * exactly those, which is the only thing that can be judged without guessing.
  */
 export class Drift {
+  /**
+   * The same check, driven against a whole system.
+   *
+   * Opening a browser, carrying the identities, resolving a route: all of it is the system's own
+   * knowledge, and none of it is the composite root's job to spell out a second time.
+   */
+  static async sweep(system: SweepableSystem, as?: string): Promise<Report> {
+    const browser = await requirePlaywright("checking the description").chromium.launch({ headless: process.env.HEADED !== "1" });
+  const cookies = identityCookies(system.config.identities);
+  try {
+    const report = await Drift.check({
+      actions: system.config.actions ?? {},
+      // The same resolution a `goto` step does, so a claim is checked at the URL the step goes to.
+      routeOf: (app, route) => {
+        try {
+          // A route with parameters cannot be visited without values, so it is left unchecked
+          // rather than fetched with `{orderId}` still in the path.
+          return app ? system.routeUrl(app, route) : undefined;
+        } catch {
+          return undefined;
+        }
+      },
+      page: async () => {
+        const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+        if (cookies.length) await context.addCookies(cookies);
+        return context.newPage();
+      },
+      // Quiet: this is a read-only check, and it used to leave a whole `cli/adhoc/run/actions/`
+      // tree of frames and stories behind from the sign-in it drives to get in.
+      signIn: as ? async (page: Page) => void (await system.run(as, page, {}, { quiet: true })) : undefined,
+      signInAction: as,
+    });
+    return report;
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
+  }
+
   static async check(input: CheckInput): Promise<Report> {
     const claims = Drift.claims(input.actions, input.routeOf, input.signInAction);
     const findings: Finding[] = [];
@@ -187,6 +228,13 @@ export class Drift {
     return lines.join("\n");
   }
 }
+
+/** The part of a system this needs, so the check does not depend on the whole composite root. */
+export type SweepableSystem = {
+  config: { actions?: Record<string, ActionConfig>; apps?: Record<string, unknown>; identities?: Record<string, IdentityConfig> };
+  routeUrl: (app: string, route: string) => string;
+  run: (action: string, page: Page, inputs: Params, within?: { quiet?: boolean }) => Promise<unknown>;
+};
 
 export type CheckInput = {
   actions: Record<string, ActionConfig>;

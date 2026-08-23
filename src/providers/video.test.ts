@@ -4,7 +4,8 @@ import { test } from "node:test";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
 
-import { fallbackGroup, gridFilter, videoProviders, writeIndex } from "./video.ts";
+import { fallbackGroup, gridFilter, videoProviders } from "./video.ts";
+import { writeCatalogue } from "../evidence/catalogue.ts";
 
 /** How many panels the filter actually stacks, and where each one starts. */
 const layoutOf = (filter: string): { inputs: number; cells: string[]; scale: string } => {
@@ -64,7 +65,7 @@ test("the index lists what is on disk, not what this run happened to produce", (
   writeFileSync(path.join(out, "orders-583", "a-customer-cancels", "after", "frames", "01-dashboard.png"), "");
   evidence("signup-474", "a-member-signs-up", "run", []);
 
-  writeIndex(out);
+  writeCatalogue(out);
 
   const index = readFileSync(path.join(out, "index.md"), "utf8");
   match(index, /## orders-583/);

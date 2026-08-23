@@ -3,13 +3,12 @@ import type { Page } from "@playwright/test";
 import { Actions, type ActionResult, type Params } from "./actions/engine.ts";
 import { appSurface, type RouteMap, type Screens } from "./browser/surface.ts";
 import { Cli, type Noun } from "./cli/cli.ts";
+import { commandsFor } from "./cli/commands.ts";
 import { fill, type SystemConfig, loadConfig, scoped } from "./config/index.ts";
 import { locate } from "./browser/locator.ts";
 import { resolveSecret } from "./providers/secrets.ts";
 import { Evidence } from "./evidence/evidence.ts";
 import type { EvidenceContext } from "./evidence/paths.ts";
-import { identityCookies } from "./browser/identities.ts";
-import { parseRunArgs, runActions } from "./actions/run.ts";
 import { HttpApi } from "./http/client.ts";
 import { Operations } from "./http/operations.ts";
 import { Postgres } from "./database/postgres.ts";
@@ -18,7 +17,6 @@ import { SignIn } from "./browser/sign-in.ts";
 import { type StubServer, stubProviders } from "./providers/stubs.ts";
 import { renderVideos } from "./evidence/render.ts";
 import { Drift, type Report } from "./diagnostics/drift.ts";
-import { requirePlaywright } from "./browser/playwright.ts";
 import { Stack } from "./environment/stack.ts";
 import { Workspace } from "./environment/workspace.ts";
 import { Trace } from "./diagnostics/trace.ts";
@@ -277,8 +275,13 @@ export class System {
   }
 
   /** Run a declared action, and get back everything it did. */
-  run<T = unknown>(action: string, page: import("@playwright/test").Page, inputs: Params = {}): Promise<ActionResult<T>> {
-    return this.actions.run<T>(action, page, inputs);
+  run<T = unknown>(
+    action: string,
+    page: import("@playwright/test").Page,
+    inputs: Params = {},
+    within: { at?: string; quiet?: boolean } = {},
+  ): Promise<ActionResult<T>> {
+    return this.actions.run<T>(action, page, inputs, within);
   }
 
   /**
@@ -352,42 +355,14 @@ export class System {
   }
 
   /**
-   * Sweep the description against the running product.
+   * Whether the description still describes the thing.
    *
    * `as` names an action that signs somebody in — how this product does that is already described, so
-   * there is no second way of saying it here. Without one, only the signed-out pass runs, and the
-   * report says so rather than calling every signed-in locator dead.
+   * there is no second way of saying it here.
    */
   async checkDrift(as?: string): Promise<Report & { rendered: string }> {
-    const browser = await requirePlaywright("checking the description").chromium.launch({ headless: process.env.HEADED !== "1" });
-    const cookies = identityCookies(this.config.identities);
-    try {
-      const report = await Drift.check({
-        actions: this.config.actions ?? {},
-        // The same resolution a `goto` step does, so a claim is checked at the URL the step goes to.
-        routeOf: (app, route) => {
-          try {
-            // A route with parameters cannot be visited without values, so it is left unchecked
-            // rather than fetched with `{orderId}` still in the path.
-            return app ? this.routeUrl(app, route) : undefined;
-          } catch {
-            return undefined;
-          }
-        },
-        page: async () => {
-          const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-          if (cookies.length) await context.addCookies(cookies);
-          return context.newPage();
-        },
-        // Quiet: this is a read-only check, and it used to leave a whole `cli/adhoc/run/actions/`
-        // tree of frames and stories behind from the sign-in it drives to get in.
-        signIn: as ? async (page: Page) => void (await this.actions.run(as, page, {}, { quiet: true })) : undefined,
-        signInAction: as,
-      });
-      return { ...report, rendered: Drift.render(report) };
-    } finally {
-      await browser.close().catch(() => undefined);
-    }
+    const report = await Drift.sweep(this, as);
+    return { ...report, rendered: Drift.render(report) };
   }
 
   /** Turn this run's recordings into MP4s. What the `video` command does, callable. */
@@ -398,6 +373,21 @@ export class System {
       process.stderr.write(`[video] ${String(err).slice(0, 160)}\n`);
       return [];
     }
+  }
+
+  /** Whether this description declares an API at all — what the command line asks before offering one. */
+  get hasApi(): boolean {
+    return Boolean(this.http);
+  }
+
+  /** The same question of a database. */
+  get hasDatabase(): boolean {
+    return Boolean(this.postgres);
+  }
+
+  /** Nouns something registered with `addCommands`, for whatever builds the command line. */
+  get added(): Record<string, Noun> {
+    return this.commands;
   }
 
   /** Command-line nouns beyond the ones the config generates. */
@@ -442,129 +432,13 @@ export class System {
   }
 
   /**
-   * The command line: the built-in verbs, whatever the config's `cli` block declares, and anything
-   * `addCommands` added. Every operation and query stays reachable through `api` / `db` regardless.
+   * The command line this description gives you.
+   *
+   * Built elsewhere: assembling a product's parts and deciding what a command line looks like are two
+   * jobs, and this class only has to be good at the first.
    */
   cli(): Cli {
-    const cli = new Cli({ name: this.config.name, stack: this.stack, trace: this.trace }).withDefaults({
-      // Rendering is the system's own job, done in this process. Shelling out to a script that calls
-      // back into it is a loop nobody should have to read.
-      renderVideos: () => this.renderVideos(),
-      api: this.http ? (method, path, body) => this.callByPath(method, path, body) : undefined,
-      sql: this.postgres ? (query: string) => this.db.sql(query) : undefined,
-    });
-
-    for (const [noun, group] of Object.entries(this.config.cli ?? {})) {
-      cli.command(noun, {
-        summary: group.summary ?? "",
-        verbs: Object.fromEntries(
-          Object.entries(group.verbs).map(([verb, spec]) => {
-            const argNames = spec.args ?? [];
-            return [
-              verb,
-              {
-                summary: spec.summary ?? argNames.map(a => `<${a}>`).join(" "),
-                run: (args: string[]) => {
-                  const params = Object.fromEntries(argNames.map((a, i) => [a, Cli.need(args[i], a)]));
-                  if (spec.query) return this.db.query(spec.query, params);
-                  if (spec.signIn) {
-                    const site = this.apps[spec.signIn];
-                    if (!site?.signInLink) throw new Error(`app "${spec.signIn}" declares no signIn`);
-                    return site.signInLink(String(Object.values(params)[0] ?? ""));
-                  }
-                  const on = spec.client ? this.client(spec.client) : this.api;
-                  return on.call(spec.operation!, params);
-                },
-              },
-            ];
-          }),
-        ),
-      });
-    }
-
-    // Merged rather than replacing: a noun usually comes from the config, and code adds the one verb
-    // that needed code.
-    if (Object.keys(this.config.stubs ?? {}).length) {
-      cli.command("stub", {
-        summary: "the local stand-ins for third parties the app calls server-side",
-        verbs: {
-          list: {
-            summary: "every stub this config declares, and where to point the app",
-            run: () =>
-              Object.entries(this.config.stubs ?? {}).map(
-                ([stubName, spec]) =>
-                  `${stubName}  :${spec.port}  ${fill(spec.reachableAs ?? "", { port: spec.port })}  ${spec.why ?? ""}`,
-              ),
-          },
-          show: { summary: "<stub> — its routes, as declared", run: (args: string[]) => this.config.stubs?.[Cli.need(args[0], "stub")] },
-        },
-      });
-    }
-
-    cli.command("check", {
-      summary: "whether the description still matches what is running",
-      verbs: {
-        drift: {
-          summary: "[<action that signs in>] — visit every declared route and count every declared locator",
-          // What it prints IS the answer, so it is not wrapped in a record of a request nobody made.
-          raw: true,
-          run: async (args: string[]) => {
-            const report = await this.checkDrift(args[0]);
-            // So this can gate a pipeline. Set rather than exited, so the report is flushed first.
-            if (!report.ok) process.exitCode = 1;
-            return report.rendered;
-          },
-        },
-      },
-    });
-
-    if (this.actions.names.length) {
-      cli.command("action", {
-        summary: "run one of the declared actions in a browser, and report everything it did",
-        verbs: {
-          list: {
-            summary: "every action this config declares",
-            run: () => this.actions.names.map(n => `${n}  ${this.config.actions?.[n].summary ?? ""}`).join("\n"),
-          },
-          show: {
-            summary: "<action> — its steps, as declared",
-            run: (args: string[]) => this.config.actions?.[Cli.need(args[0], "action")],
-          },
-          run: {
-            summary: "<action…> [key=value…] [--parallel] [--retries N] — drive them and report everything they did",
-            run: async (args: string[], flags: string[] = []) => {
-              const { names, inputs } = parseRunArgs(args);
-              if (!names.length) Cli.die("missing <action> — `action list` says which", 2);
-              return runActions(this, {
-                names,
-                inputs,
-                headed: process.env.HEADED === "1",
-                // Side by side in one video, each in its own browser. What `--parallel` is FOR is
-                // seeing two things happen at once, which is why it changes the recording.
-                parallel: flags.includes("--parallel"),
-                // What each pane says about itself. The summary is already written; a pane headed
-                // with a bare action name makes the reader guess what they are looking at.
-                labels: Object.fromEntries(
-                  Object.entries(this.config.actions ?? {}).flatMap(([action, spec]) => (spec.summary ? [[action, spec.summary]] : [])),
-                ),
-                retries: Number(flags.find(flag => flag.startsWith("--retries"))?.split("=")[1] ?? 0),
-                cookies: identityCookies(this.config.identities),
-              });
-            },
-          },
-        },
-      });
-    }
-
-    for (const [noun, spec] of Object.entries(this.commands)) {
-      const existing = this.config.cli?.[noun];
-      cli.command(noun, {
-        summary: spec.summary || existing?.summary || "",
-        verbs: { ...(cli.verbs(noun) ?? {}), ...(spec.verbs ?? {}) },
-        passthrough: spec.passthrough,
-      });
-    }
-    return cli;
+    return commandsFor(this);
   }
 
   /**
