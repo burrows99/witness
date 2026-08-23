@@ -19,6 +19,7 @@ import * as path from "node:path";
  *         app.ts                  the entry point specs import
  *         specs/                  what it can prove
  *         stubs/                  pages the declared stand-ins serve
+ *         fixtures/               files an `upload` step attaches — a seed document, a sample import
  *         artifacts/              what runs leave behind — generated, and ignored by the .gitignore beside it
  *
  * The order is fixed and asking is free (`witness config where`):
@@ -33,6 +34,14 @@ export class Workspace {
   static readonly DIRECTORY = ".witness";
   /** Config file names, in the order they are tried. */
   static readonly CONFIG_NAMES = ["config.jsonc", "config.json"];
+  /**
+   * Where the files an `upload` step attaches are kept.
+   *
+   * Beside the description that names them rather than anywhere on the machine, so a step saying
+   * `"upload": "seed.pdf"` means one file in every checkout. A path that resolves only where it was
+   * written is the failure this exists to rule out.
+   */
+  static readonly FIXTURES = "fixtures";
 
   /** Everything witness reads and writes is under here. */
   readonly dir: string;

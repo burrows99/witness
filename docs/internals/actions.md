@@ -19,6 +19,14 @@ instance fields made two lanes share a warning.
 **Evidence paths are threaded too** — `type Within = { from?, at?, quiet? }`. A `run` step passes its
 own directory down, which is how a composed action's frames land inside the step that ran it.
 
+**`upload` bridges two elements, not one.** A styled dropzone is a `<div>` with the real
+`<input type="file">` hidden inside it, and the half a person has a name for is the visible one — no
+role and no label reaches a control that is `display: none`. So `to` may name either: the input
+inside what was named is preferred, and what was named is used when there is none. Both ways of
+being wrong get their own message, because they want opposite fixes — a `to` that matches nothing is
+a misspelt name, and a `to` that matches something with no file input in it is the right name one
+element off, which Playwright answers with a sentence about an HTMLInputElement.
+
 **Values gather into one bag.** Every `store`, `api`, `query`, `capture` and `select` writes into it
 under its `as`, and every string in a later step is a template over it. Dotted, so `{order.items.1.sku}`
 works, and objects fill as JSON rather than `[object Object]`.

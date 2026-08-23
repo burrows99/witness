@@ -172,6 +172,8 @@ its own evidence. These are the verbs a step can use:
 - `reload` — Reload the page — for "and it is still there afterwards", which `goto` does not say.
 - `fillFields` — Fill a set of labelled fields: `{ "Heading": "…", "Body": "…" }`.
 - `within` — Scope for `fillFields` — usually the dialog the form is in.
+- `upload` — Attach a file, by its name under `.witness/fixtures/`.
+- `to` — For `upload`: what to attach it to — the dropzone, named the way a person would name it.
 - `capture` — Wait for a response and store something from its body.
 - `select` — Pick one item out of a stored list by matching fields.
 - `run` — Another action, run here with the values collected so far.
@@ -202,6 +204,13 @@ Things that cost other people an afternoon:
   container — naming the service again is what being written there already says. An `auth` block
   points at a credential the `secrets` block declares with `{ "secret": "name" }` rather than
   respelling where it comes from, which is two places to change and one to forget.
+- **An app behind a dropzone starts with `upload`.**
+  `{ "upload": "seed.pdf", "to": { "testId": "dropzone" } }` attaches a file out of
+  `.witness/fixtures/` — a FILENAME, not a path, so the description finds the same file in the next
+  checkout. `to` names the visible dropzone OR the hidden `<input type="file">` inside it; either
+  half works, and the visible one is the half that has a name. Without it an action reaches the
+  landing screen, types the prompt and stops — and every other route is behind an id the upload
+  was going to mint.
 - **Wait for a route, not a URL.** `{ "waitForUrl": { "route": "home" } }` resolves through the
   service's declared port; a literal `localhost:3020` in a step disconnects `portVar` quietly.
 - **An assertion passing is not the same as evidence.** A `css` or `testId` match can succeed on

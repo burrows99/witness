@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { describe, type LocatorSpec, locate } from "../browser/locator.ts";
-import { type ActionConfig, type Params, resolveAction, type StepConfig } from "../actions/engine.ts";
+import { type ActionConfig, MODIFIERS, type Params, resolveAction, type StepConfig } from "../actions/engine.ts";
 import type { IdentityConfig } from "../config/schema.ts";
 import { identityCookies } from "../browser/identities.ts";
 import { requirePlaywright } from "../browser/playwright.ts";
@@ -251,8 +251,9 @@ export class Drift {
     return claims;
   }
 
+  /** The engine's own rule, not a second copy of it — the copy is the one that stops learning about new keys. */
   private static label(step: StepConfig): string {
-    return Object.keys(step).find(key => !["note", "as", "within", "fullPage"].includes(key)) ?? "step";
+    return Object.keys(step).find(key => !MODIFIERS.includes(key)) ?? "step";
   }
 
   /** The status, and where the browser actually ended up — which is not always where it was sent. */

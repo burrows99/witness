@@ -20,6 +20,27 @@ Every verb an action can use. One object per step; a step object holds one verb 
 | `fill` | `{ on, value }` | at once. Faster, worse to watch |
 | `press` | `"Enter"`, `"Control+A"` | |
 | `fillFields` | `{ "Heading": "…", "Body": "…" }` | by label; `within` scopes it to a dialog |
+| `upload` | `"seed.pdf"` or `["a.pdf", "b.pdf"]` | a file under `.witness/fixtures/`; `to` says what to attach it to |
+
+### Attaching a file
+
+```jsonc
+{ "upload": "seed.pdf", "to": { "testId": "dropzone" } }
+```
+
+A **filename**, not a path: files live in `.witness/fixtures/`, beside the description that names
+them, so the same step finds the same file in the next checkout. An absolute path is taken as
+written and is the one form that cannot survive being cloned. A fixture that is not there fails
+naming the path it looked at, before a browser is asked for anything.
+
+`to` names a locator, the same way `click` does — and **either half works**. A styled dropzone is a
+`<div>` with the real `<input type="file">` hidden inside it, where no role and no label can reach
+it; name the dropzone you can see and the input inside it is found. Name the input directly and it
+is used as it is. A `<label>` works too, because Playwright retargets one to the control it is for.
+
+The two ways it fails say which of the two was missing, because they want opposite fixes: a `to`
+that matches nothing is a misspelt name, and a `to` that matches something with no file input in it
+is the right name one element off.
 
 ## Claiming something
 
