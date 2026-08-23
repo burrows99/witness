@@ -86,6 +86,8 @@ with more logging.
 - `npx witness connections` — what it can query
   - `connections sources` — configured data sources
   - `connections available` — data source plugins it ships with
+- `npx witness check` — whether the description still matches what is running
+  - `check drift` — [<action that signs in>] — visit every declared route and count every declared locator
 - `npx witness action` — run one of the declared actions in a browser, and report everything it did
   - `action list` — every action this config declares
   - `action show` — <action> — its steps, as declared
@@ -180,6 +182,11 @@ npx witness action run <yours>                             # it will fail on a l
 #   … open the frame the story names, fix it, run again …
 EVIDENCE=before npx witness action run <yours>             # then make the change, then EVIDENCE=after
 ```
+
+And when a run breaks that used to pass, ask `npx witness check drift <the action that signs in>`
+before rewriting anything: it re-checks every claim the description makes — each locator against
+the route the step using it is on — and names ALL of them at once. A run tells you about the
+first one, thirty seconds later, and buys you the next one only after you fix it.
 
 **A locator you have not run is a guess.** In this tool's own worked example, five of nine
 actions named something that did not exist on the page — a button that looked like a link, a

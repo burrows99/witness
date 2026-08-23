@@ -17,6 +17,8 @@ import { Queries } from "./database/queries.ts";
 import { SignIn } from "./browser/sign-in.ts";
 import { type StubServer, stubProviders } from "./providers/stubs.ts";
 import { renderVideos } from "./evidence/render.ts";
+import { Drift, type Report } from "./diagnostics/drift.ts";
+import { requirePlaywright } from "./browser/playwright.ts";
 import { Stack } from "./environment/stack.ts";
 import { Workspace } from "./environment/workspace.ts";
 import { Trace } from "./diagnostics/trace.ts";
@@ -111,11 +113,7 @@ export class System {
       queries: this.db,
       trace: this.trace,
       actions: config.actions ?? {},
-      url: (appName, route, params) => {
-        const target = this.apps[appName];
-        if (!target) throw new Error(`action names app "${appName}", which the config does not declare`);
-        return (target as unknown as Record<string, { url: (p: Params) => string }>)[route].url(params);
-      },
+      url: (appName, route, params) => this.routeUrl(appName, route, params),
       evidence: () => this.evidence(),
       // So an action can sign in without the caller typing a password on the command line — which is
       // the whole reason `secrets` exists, and was unreachable from a description until now.
@@ -317,6 +315,52 @@ export class System {
     (this as Record<string, unknown>)[name] = value;
   }
 
+  /** Where a declared route lives, for whatever needs to go there. */
+  routeUrl(appName: string, route: string, params: Params = {}): string {
+    const target = this.apps[appName];
+    if (!target) throw new Error(`action names app "${appName}", which the config does not declare`);
+    const screen = (target as unknown as Record<string, { url: (p: Params) => string } | undefined>)[route];
+    if (!screen) throw new Error(`app "${appName}" declares no route "${route}"`);
+    return screen.url(params);
+  }
+
+  /**
+   * Sweep the description against the running product.
+   *
+   * `as` names an action that signs somebody in — how this product does that is already described, so
+   * there is no second way of saying it here. Without one, only the signed-out pass runs, and the
+   * report says so rather than calling every signed-in locator dead.
+   */
+  async checkDrift(as?: string): Promise<Report & { rendered: string }> {
+    const browser = await requirePlaywright("checking the description").chromium.launch({ headless: process.env.HEADED !== "1" });
+    const cookies = identityCookies(this.config.identities);
+    try {
+      const report = await Drift.check({
+        actions: this.config.actions ?? {},
+        // The same resolution a `goto` step does, so a claim is checked at the URL the step goes to.
+        routeOf: (app, route) => {
+          try {
+            // A route with parameters cannot be visited without values, so it is left unchecked
+            // rather than fetched with `{orderId}` still in the path.
+            return app ? this.routeUrl(app, route) : undefined;
+          } catch {
+            return undefined;
+          }
+        },
+        page: async () => {
+          const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+          if (cookies.length) await context.addCookies(cookies);
+          return context.newPage();
+        },
+        signIn: as ? async (page: Page) => void (await this.run(as, page, {})) : undefined,
+        signInAction: as,
+      });
+      return { ...report, rendered: Drift.render(report) };
+    } finally {
+      await browser.close().catch(() => undefined);
+    }
+  }
+
   /** Turn this run's recordings into MP4s. What the `video` command does, callable. */
   renderVideos(): string[] {
     try {
@@ -427,6 +471,23 @@ export class System {
         },
       });
     }
+
+    cli.command("check", {
+      summary: "whether the description still matches what is running",
+      verbs: {
+        drift: {
+          summary: "[<action that signs in>] — visit every declared route and count every declared locator",
+          // What it prints IS the answer, so it is not wrapped in a record of a request nobody made.
+          raw: true,
+          run: async (args: string[]) => {
+            const report = await this.checkDrift(args[0]);
+            // So this can gate a pipeline. Set rather than exited, so the report is flushed first.
+            if (!report.ok) process.exitCode = 1;
+            return report.rendered;
+          },
+        },
+      },
+    });
 
     if (this.actions.names.length) {
       cli.command("action", {

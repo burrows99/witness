@@ -151,6 +151,7 @@ npx witness stack status               # what is up, on which ports, from which 
 npx witness api get /v1/health         # any route, authenticated the way the config says
 npx witness db sql "select 1"          # the stack's database
 npx witness order show 1234            # the verbs the config declares
+npx witness check drift app.signIn     # does the description still match what is running
 npx witness action list                # what the product can DO
 npx witness action run app.signIn email=ada@example.com
 EVIDENCE=before npx witness action run app.checkout   # record a "before" cut
@@ -257,6 +258,12 @@ screen actually renders — and that is not read out of the app's source:
 witness action run yours                   # it will fail on a locator; that is the point
 #   … open the frame the story names, fix it, run again …
 ```
+
+When a run that used to pass breaks, `witness check drift <the action that signs in>` re-checks every
+claim the description makes — each locator against the route the step using it is on — and names all of
+them at once. Measured on the example: a description written for Grafana 13.2, run against 10.4, breaks
+in three places. The run reports one, after 47 seconds. The check reports all three in 7, exits non-zero
+so a pipeline can gate on it, and says nothing at all when the description is right.
 
 **A locator you have not run is a guess.** In the Grafana example, five of nine actions named something
 that did not exist — `Skip` was a `button` styled as a link, a placeholder read "Search Grafana plugins"
