@@ -27,6 +27,36 @@ jobs:
       # cannot be reached by any fixture.
       - run: npx playwright install --with-deps chromium
 
+      # ffmpeg and VHS are optional binaries and stay optional: a missing one is a warning and a run
+      # that carries on, never a failure, and nothing in the package asks for either. Putting them on
+      # the runner makes this machine one that has them. It makes them a dependency of nothing.
+      #
+      # They are here because two assertions cannot be made from inside the process. That a run
+      # renders its own cut and leaves every other `before` alone (#117) — the hole that let a
+      # published `before` be regenerated after the change it was evidence against, with nothing
+      # saying so. And that what the tape types is what the shell receives (#98), the only test in the
+      # suite that can catch this tool altering what it records: every assertion reachable without
+      # running vhs passes against that defect, which is why neither of these was ever faked. Both
+      # skipped on every run here, under the comment above saying nothing should (#125).
+      #
+      # Pinned rather than tracked, because `latest` moves underneath a run whose whole product is
+      # evidence. VHS ships a .deb and records through ttyd, which ships a static binary, so neither a
+      # Go toolchain nor a terminal emulator is built here — the two costs that made this a judgement
+      # call rather than an obvious yes.
+      - name: ffmpeg, and VHS with the ttyd it records through
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          sudo curl -fsSL -o /usr/local/bin/ttyd https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.x86_64
+          sudo chmod +x /usr/local/bin/ttyd
+          curl -fsSL -o "$RUNNER_TEMP/vhs.deb" https://github.com/charmbracelet/vhs/releases/download/v0.11.0/vhs_0.11.0_amd64.deb
+          sudo apt-get install -y "$RUNNER_TEMP/vhs.deb"
+          # VHS draws the terminal in a real browser, and the runner image carries one — the chromium
+          # installed above is not it, because that lands in a Playwright cache VHS does not look in.
+          # Named here so an image that stops carrying one fails on this line, saying which binary is
+          # gone, instead of failing inside a recording that says the shell never ran the command.
+          command -v google-chrome || command -v chromium
+
       # The types, including the TESTS — `tsconfig.build.json` excludes them because they do not ship,
       # and for a long time that meant nothing checked them at all.
       - run: npm run typecheck
@@ -35,7 +65,22 @@ jobs:
       - run: npm run lint
       - run: npm run deadcode
 
-      - run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.ts" "bin/**/*.test.ts"
+      # Every install above exists so that nothing skips here, and the skip count is the only thing
+      # that says whether they worked. It went unread for months — three tests skipping on every run,
+      # in the line directly under the one everybody reads, while this file said they did not — so the
+      # run reads it back and a new skip fails the build instead of passing quietly. The suite's own
+      # exit code is carried through: a check that swallowed it would be this same bug again, one
+      # layer out.
+      - name: the suite, and nothing in it skipped
+        run: |
+          node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.ts" "bin/**/*.test.ts" > "$RUNNER_TEMP/tests.tap" || failed=$?
+          cat "$RUNNER_TEMP/tests.tap"
+          skipped="$(grep -m1 '^# skipped ' "$RUNNER_TEMP/tests.tap" || true)"
+          if [ "$skipped" != "# skipped 0" ]; then
+            echo "::error::\"${skipped:-no skip count at all}\" — a binary this workflow installs is missing, or the suite never reached its summary"
+            exit 1
+          fi
+          exit "${failed:-0}"
 
       - name: the template must still describe the schema
         run: bin/witness config template > /dev/null
