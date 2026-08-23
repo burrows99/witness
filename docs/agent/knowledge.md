@@ -69,6 +69,14 @@ legitimate fix; a fixup commit on top is not.
 silently vanishes and the comment reads as if it had none. Mint a real attachment URL through a
 logged-in browser and put *that* in the body. `require-evidence.sh` enforces this.
 
+**The tagline lives in six places and two of them are not in git.** The README's first line, the
+banner HTML *and* the PNG it has to be regenerated into, `package.json`'s description, the GitHub
+repository description, and the GitHub topics. A diff can only ever show four, so the two that are
+repository settings drift with nothing to catch them. A dozen files under `src/` and `docs/` already
+justified a design decision by what an agent cannot do, while every front door still described a
+config-driven test harness. Change the sentence, grep the repository for the old one, and set the two
+that live in repository settings over the API in the same run.
+
 ---
 
 ## Writing for an agent
@@ -101,6 +109,13 @@ is worse than no gate.
 
 **Exempt the same paths both ways.** Whatever a gate excuses from *triggering* a requirement must
 also be excused from *invalidating* it, or the two halves disagree and the gate blocks its own author.
+
+**A metadata-only change trips the code gate, and the hatch is the honest way out.** `package.json`
+is not in the before/after exemption, so editing its `description` — which nothing in `src/` reads —
+demands two recordings. Making them would produce a before and an after that are identical, and this
+file already has an entry about evidence that contradicts what is written over it: a cut nobody could
+learn anything from reads exactly like one somebody could. `[no-evidence: <reason>]` is for this, and
+it leaves the reason in the diff where a reviewer can disagree with it.
 
 ---
 
