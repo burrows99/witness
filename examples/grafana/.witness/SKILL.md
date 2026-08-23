@@ -195,6 +195,12 @@ before rewriting anything: it re-checks every claim the description makes — ea
 the route the step using it is on — and names ALL of them at once. A run tells you about the
 first one, thirty seconds later, and buys you the next one only after you fix it.
 
+And do not hand-write a locator you could be handed. `npx playwright codegen <url>` records what
+you do and prints the locator for each step, choosing them the same way this tool resolves them —
+role and accessible name first, a CSS selector last. Its **Pick Locator** button gives you one for
+anything you hover. For a screen behind a login, `--save-storage` once and `--load-storage` after
+means you record the screen you actually care about instead of the sign-in in front of it.
+
 **A locator you have not run is a guess.** In this tool's own worked example, five of nine
 actions named something that did not exist on the page — a button that looked like a link, a
 placeholder with different words, a test id with the item's name appended, a table whose header

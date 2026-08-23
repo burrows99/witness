@@ -307,6 +307,13 @@ them at once. Measured on the example: a description written for Grafana 13.2, r
 in three places. The run reports one, after 47 seconds. The check reports all three in 7, exits non-zero
 so a pipeline can gate on it, and says nothing at all when the description is right.
 
+Do not hand-write a locator you could be handed, either. **`npx playwright codegen <url>`** records what
+you do and prints a locator per step, chosen [the same way this tool resolves
+them](https://playwright.dev/docs/codegen) — *"prioritizing role, text and test id locators"*, improving
+the locator when more than one element matches. **Pick Locator** gives you one for anything you hover,
+and `--save-storage` / `--load-storage` lets you record the screen behind a login rather than the login.
+Witness does not reimplement any of that, and should not.
+
 **A locator you have not run is a guess.** In the Grafana example, five of nine actions named something
 that did not exist — `Skip` was a `button` styled as a link, a placeholder read "Search Grafana plugins"
 and not "Search all", a card's test id had the plugin's name appended, and a table's header is a `row`
@@ -327,6 +334,9 @@ Not the tool's rules — what makes the output worth anything.
   the failure message, which is the only sentence anyone reads when it breaks.
 - **Describe it in the change that makes it.** A locator added a week later is a week of runs that could
   not see it — and by then the frame that would have told you what it is called is gone.
+- **Use the Playwright CLI for what it already does.** `codegen` for locators, `show-trace` to read a run
+  as a person, `--save-storage` for anything behind a login. This drives a product and writes down what
+  happened; it is not a second Playwright.
 
 ## API
 
