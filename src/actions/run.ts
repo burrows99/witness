@@ -4,7 +4,9 @@ import type { Browser, BrowserContext, Page } from "@playwright/test";
 
 import type { ActionResult, Params } from "./engine.ts";
 import type { EvidenceContext } from "../evidence/paths.ts";
+import { markRecordingStart, pane } from "../browser/narration.ts";
 import { requirePlaywright } from "../browser/playwright.ts";
+import { writeSlideCards } from "../evidence/recording.ts";
 import { slug } from "../evidence/paths.ts";
 
 /**
@@ -38,6 +40,8 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
 
   const browser = await launch();
   const cookies = request.cookies ?? [];
+  // Slides are timed from here, so a card lands where the run actually showed it.
+  markRecordingStart();
 
   /** A lane: its own context, its own page, its own recording. One of these per pane. */
   const lane = async (): Promise<Lane> => {
@@ -67,13 +71,14 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
    * start again from. Every attempt keeps its own evidence — the one that FAILED is the interesting
    * one, and a retry that quietly overwrote it would leave a green run with nothing to explain it.
    */
-  const attempt = async (name: string, at: string, values: Params, on?: Lane, dir?: string): Promise<ActionResult> => {
+  const attempt = async (name: string, at: string, values: Params, on?: Lane, dir?: string, label?: { title: string; sub?: string }): Promise<ActionResult> => {
     for (let n = 1; n <= retries + 1; n += 1) {
       // A chain shares one lane, because it is one story and should be one continuous recording. A
       // retry always gets a fresh one: a browser left on the screen the failure happened on is not a
       // place to start again from.
       const own = on && n === 1 ? undefined : await lane();
       const using = own ?? on!;
+      if (own && label) await pane(using.page, label.title, label.sub).catch(() => undefined);
       // `checkout`, then `checkout-retry-2` — so the tree says how many goes it took without anybody
       // having to diff two directories to find out.
       const into = n === 1 ? dir : `${dir ?? slug(name, 56)}-retry-${n}`;
@@ -119,7 +124,12 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
           const lane = String(index + 1).padStart(2, "0");
           // `01-grafana-signin` beside `panel-01`: the directory says which pane it is, and two lanes
           // running the SAME action no longer write their evidence over each other.
-          return attempt(name, lane, { ...inputs }, undefined, `${lane}-${slug(name, 52)}`);
+          return attempt(name, lane, { ...inputs }, undefined, `${lane}-${slug(name, 52)}`, {
+            // Four recordings side by side are four things happening at once and no way to tell which
+            // is which. The pane says who it is, for the whole of it.
+            title: name,
+            sub: request.labels?.[name],
+          });
         }),
       );
       for (const [index, settled] of lanes.entries()) {
@@ -149,6 +159,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
     failure = err instanceof Error ? err : new Error(String(err));
     const attached = (failure as { result?: ActionResult }).result;
     if (attached) results.push(attached);
+    // One full-frame card per slide, spliced into the timeline — rather than the same title painted
+    // into every pane, which reads as four things happening at once.
+    await writeSlideCards({ browser, outputDir, panes: parallel ? names.length : 1 }).catch(() => undefined);
   } finally {
     if (!keep) await browser.close();
     system.pinEvidence(undefined);
@@ -232,6 +245,8 @@ export type RunRequest = {
   parallel?: boolean;
   /** How many more goes a failing action gets. Each is a fresh browser, and keeps its own evidence. */
   retries?: number;
+  /** What to write on each pane's header, by action name. Defaults to the action's own name alone. */
+  labels?: Record<string, string>;
   /** Turn the recording into an MP4. On by default: that is the point of recording it. */
   render?: boolean;
 };

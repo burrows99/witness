@@ -54,5 +54,15 @@ test("literal is for the thing that is not actually secret", () => {
 });
 
 test("an unregistered kind names the ones that exist", () => {
-  throws(() => resolveSecret({ vault: { path: "x" } } as never, stack()), /no secret provider "vault" — registered: containerEnv, envFile, env, literal/);
+  throws(() => resolveSecret({ vault: { path: "x" } } as never, stack()), /no secret provider "vault" — registered: containerEnv, secret, envFile, env, literal/);
+});
+
+test("a credential can point at one this description already declares", () => {
+  // An `auth` block respelling the same `containerEnv` as the `secrets` entry above it is two places
+  // to change and one place to forget — and it was in this repository's own config, twice.
+  equal(resolveSecret({ secret: "adminPassword" } as never, stack(), name => (name === "adminPassword" ? "from the container" : undefined)), "from the container");
+});
+
+test("pointing at one that is not declared says so", () => {
+  throws(() => resolveSecret({ secret: "nope" } as never, stack(), () => undefined), /no secret "nope" to point at/);
 });

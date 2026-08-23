@@ -60,6 +60,45 @@ export async function finishRecording(opts: {
   resetSlideMarks();
 }
 
+/**
+ * Rasterise each slide the run showed, at the size of the finished frame.
+ *
+ * The other half of `finishRecording`, on its own: the command line saves its own recordings — one per
+ * lane, named for the lane — and only needs the cards. Without this, a run's slides stayed painted
+ * into each pane, which is a title repeated four times rather than one thing being said.
+ */
+export async function writeSlideCards(opts: {
+  browser: Browser;
+  outputDir: string;
+  /** How many panes the finished frame has, so a card is drawn at that size. */
+  panes: number;
+  layout?: { columns?: number; panelWidth?: number; panelHeight?: number };
+}): Promise<void> {
+  const marks = slideMarks();
+  if (!marks.length) return;
+  fs.mkdirSync(opts.outputDir, { recursive: true });
+
+  const columns = opts.layout?.columns ?? (opts.panes >= 4 ? 2 : Math.max(opts.panes, 1));
+  const rows = Math.ceil(opts.panes / columns);
+  const width = (opts.layout?.panelWidth ?? 960) * columns;
+  const height = (opts.layout?.panelHeight ?? 600) * rows;
+
+  // No recording on this context: it exists only to rasterise the cards.
+  const context = await opts.browser.newContext({ viewport: { width, height } });
+  const page = await context.newPage();
+  const manifest: SlideMark[] = [];
+  for (const [index, mark] of marks.entries()) {
+    const image = `slide-${String(index + 1).padStart(2, "0")}.png`;
+    await page.setContent(card(mark, width));
+    await page.screenshot({ path: path.join(opts.outputDir, image) });
+    manifest.push({ ...mark, image });
+  }
+  await context.close();
+  fs.writeFileSync(path.join(opts.outputDir, "slides.json"), JSON.stringify(manifest, null, 2));
+  // The module outlives one run, so without this the next inherits these cards.
+  resetSlideMarks();
+}
+
 /** The full-frame card. Deliberately plain: it is a title, not a screen. */
 function card(mark: SlideMark, width: number): string {
   const accent = mark.tone === "bad" ? "#f87171" : mark.tone === "good" ? "#4ade80" : "#7dd3fc";

@@ -12,12 +12,14 @@ import { Registry } from "./registry.ts";
  */
 export type SecretSource =
   | string
-  | { containerEnv: { service: string; key: string } }
+  /** A credential this description already declares, by name — `{ "secret": "adminPassword" }`. */
+  | { secret: string }
+  | { containerEnv: string | { service: string; key: string } }
   | { envFile: { file: string; key: string } }
   | { env: string }
   | { literal: string };
 
-export type SecretProvider = (spec: unknown, stack: Stack) => string;
+export type SecretProvider = (spec: unknown, stack: Stack, declared?: (name: string) => string | undefined) => string;
 
 export const secretProviders = new Registry<SecretProvider>("secret")
   /**
@@ -28,6 +30,18 @@ export const secretProviders = new Registry<SecretProvider>("secret")
   .register("containerEnv", (spec, stack) => {
     const { service, key } = spec as { service: string; key: string };
     return stack.env(service, key);
+  })
+  /**
+   * One this description already declares, by name.
+   *
+   * An `auth` block spelling out the same `containerEnv` as the `secrets` entry eight lines above it
+   * is two places to change and one place to forget — and it was in this repository's own config.
+   */
+  .register("secret", (spec, stack, declared) => {
+    const name = typeof spec === "string" ? spec : String((spec as { name?: string }).name);
+    const found = declared?.(name);
+    if (found === undefined) throw new Error(`no secret "${name}" to point at — is it declared?`);
+    return found;
   })
   /** A gitignored `KEY=value` file — where shared third-party credentials usually live. */
   .register("envFile", (spec, stack) => {
@@ -48,9 +62,9 @@ export const secretProviders = new Registry<SecretProvider>("secret")
   .register("literal", (spec) => (typeof spec === "string" ? spec : ((spec as { value?: string }).value ?? "")));
 
 /** Resolve any secret spec. A bare string is a literal. */
-export function resolveSecret(spec: SecretSource | undefined, stack: Stack): string {
+export function resolveSecret(spec: SecretSource | undefined, stack: Stack, declared?: (name: string) => string | undefined): string {
   if (spec === undefined) return "";
   if (typeof spec === "string") return spec;
   const [kind, value] = Object.entries(spec)[0] as [string, unknown];
-  return secretProviders.get(kind)(value, stack);
+  return secretProviders.get(kind)(value, stack, declared);
 }

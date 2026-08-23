@@ -22,7 +22,7 @@
       "secrets": {
         "user": { "literal": "witness-admin" },
         "email": { "literal": "witness-admin@example.com" },
-        "credential": { "containerEnv": { "service": "gitea", "key": "WITNESS_ACCOUNT_CREDENTIAL" } }
+        "credential": { "containerEnv": "WITNESS_ACCOUNT_CREDENTIAL" }
       },
 
       // Its REST API — the default one, so `witness api get /api/v1/version` talks to it.
@@ -30,8 +30,8 @@
         "auth": {
           "admin": {
             "provider": "basic",
-            "username": { "literal": "witness-admin" },
-            "from": { "containerEnv": { "service": "gitea", "key": "WITNESS_ACCOUNT_CREDENTIAL" } }
+            "username": { "secret": "user" },
+            "from": { "secret": "credential" }
           }
         },
         "operations": {
@@ -67,7 +67,7 @@
             { "type": { "on": { "label": "Password", "exact": true }, "value": "{secret.credential}" } },
             { "type": { "on": { "label": "Confirm Password", "exact": true }, "value": "{secret.credential}" } },
             { "click": { "role": "button", "name": "Register Account" } },
-            { "waitForUrl": { "url": "localhost:3020/(\\?.*)?$", "timeout": 20000 } },
+            { "waitForUrl": { "route": "home", "timeout": 20000 } },
             { "expect": { "on": { "text": "Account was successfully created" }, "because": "registering the first user signs them straight in" } }
           ]
         },
@@ -107,7 +107,7 @@
       "database": {
         "user": "gitea",
         "database": "gitea",
-        "credential": { "containerEnv": { "service": "postgres", "key": "POSTGRES_PASSWORD" } },
+        "credential": { "containerEnv": "POSTGRES_PASSWORD" },
         "queries": {
           "accounts": "select count(*) from \"user\"",
           "account.byName": "select name, email, is_admin from \"user\" where name = '{name}'",
@@ -148,15 +148,15 @@
       "container": "witness-grafana",
       "probe": { "path": "/api/health", "contains": "database" },
       "secrets": {
-        "adminUser": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
-        "adminPassword": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
+        "adminUser": { "containerEnv": "GF_SECURITY_ADMIN_USER" },
+        "adminPassword": { "containerEnv": "GF_SECURITY_ADMIN_PASSWORD" }
       },
       "api": {
         "auth": {
           "admin": {
             "provider": "basic",
-            "username": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_USER" } },
-            "from": { "containerEnv": { "service": "grafana", "key": "GF_SECURITY_ADMIN_PASSWORD" } }
+            "username": { "secret": "adminUser" },
+            "from": { "secret": "adminPassword" }
           }
         },
         "operations": { "health": { "path": "/api/health", "summary": "up, and is its database reachable" } }
@@ -174,7 +174,7 @@
             { "type": { "on": { "placeholder": "password" }, "value": "{secret.adminPassword}" }, "note": "the declared secret, read out of the running container" },
             { "click": { "role": "button", "name": "Log in" } },
             { "click": { "role": "button", "name": "Skip", "exact": true }, "note": "Grafana renders Skip as a button styled as a link — the frame said so" },
-            { "waitForUrl": { "url": "localhost:3010/(\\?.*)?$", "timeout": 15000 } },
+            { "waitForUrl": { "route": "home", "timeout": 15000 } },
             { "expect": { "on": { "text": "Welcome to Grafana" }, "because": "the home page greets a signed-in admin" } }
           ]
         },
@@ -190,8 +190,37 @@
     }
   },
 
-  // About more than one service, so it lives here rather than under any of them.
+  // About more than one service, so they live here rather than under any of them.
   "actions": {
+    "theApp": {
+      "summary": "the app a person uses",
+      "steps": [
+        { "slide": { "title": "The app", "kicker": "pane 1", "lines": ["A git forge. Somebody registers, and makes something."] } },
+        { "run": "gitea.register" },
+        { "run": "gitea.createRepo" },
+        { "frame": "the repository, on screen" }
+      ]
+    },
+
+    "theWatcher": {
+      "summary": "what is watching it",
+      "steps": [
+        { "slide": { "title": "What watches it", "kicker": "pane 2", "lines": ["Somebody else's software, described the same way as our own."] } },
+        { "run": "grafana.signIn" },
+        { "run": "grafana.openDataSources" },
+        { "frame": "nothing connected yet" }
+      ]
+    },
+
+    "theMail": {
+      "summary": "where its mail actually goes",
+      "steps": [
+        { "slide": { "title": "Where the mail goes", "kicker": "pane 3", "lines": ["Caught before it leaves the machine."] } },
+        { "run": "mailpit.openInbox" },
+        { "wait": 2500, "note": "held so the pane is watchable while the others are still working" },
+        { "frame": "the inbox" }
+      ]
+    },
     "tour": {
       "summary": "the whole stack, walked once: the app, the database it wrote to, the mail it sent, and what watches it",
       "steps": [

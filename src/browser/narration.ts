@@ -138,6 +138,39 @@ export async function slide(
 }
 
 /**
+ * A header pinned to the top of a pane, for the whole of it.
+ *
+ * Four recordings side by side are four things happening at once and no way to tell which is which.
+ * A caption is a moment; this is an identity — so it goes in through `addInitScript` and survives
+ * every navigation the pane makes, which is the difference between labelling a pane and labelling the
+ * first page it happened to load.
+ */
+export async function pane(page: Page, title: string, sub?: string): Promise<void> {
+  const paint = ({ title, sub }: { title: string; sub?: string }): void => {
+    const draw = (): void => {
+      if (!document.body || document.getElementById("__witness_pane__")) return;
+      const el = document.createElement("div");
+      el.id = "__witness_pane__";
+      el.style.cssText =
+        "position:fixed;top:0;left:0;right:0;z-index:2147483645;background:#312e81;color:#eef2ff;" +
+        "font-family:-apple-system,system-ui,sans-serif;padding:6px 12px;pointer-events:none;" +
+        "box-shadow:0 1px 0 rgba(255,255,255,.15)";
+      el.innerHTML =
+        `<div style="font-size:13px;font-weight:650;line-height:1.25">${title}</div>` +
+        (sub ? `<div style="font-size:11px;opacity:.75;line-height:1.3">${sub}</div>` : "");
+      document.body.appendChild(el);
+    };
+    draw();
+    // The app may not have a body yet, and a single-page app replaces it as it routes.
+    document.addEventListener("DOMContentLoaded", draw);
+    setInterval(draw, 400);
+  };
+  await page.addInitScript(paint, { title, sub });
+  // And on whatever is already open, because `addInitScript` only affects the next document.
+  await page.evaluate(paint, { title, sub }).catch(() => undefined);
+}
+
+/**
  * Type one key at a time, so the video shows the text arriving instead of a field that is suddenly full.
  * `fill()` is instant and reads as a bot. The delay scales down for long bodies so a paragraph does not
  * cost the viewer ten seconds of watching a machine type.

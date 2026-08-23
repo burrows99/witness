@@ -65,6 +65,8 @@ export type ClientContext = {
   stack: Stack;
   trace: Trace;
   config: ClientConfig;
+  /** The credentials this description declares, so an `auth` block can point at one by name. */
+  declared?: (name: string) => string | undefined;
 };
 
 export type ClientProvider = {
@@ -128,7 +130,7 @@ const headersFor = async (op: OperationConfig, params: Params, context: ClientCo
   if (!op.auth) return {};
   const scheme = context.config.auth?.[op.auth];
   if (!scheme) throw new Error(`operation wants auth "${op.auth}", which this client does not define`);
-  return authHeaders(scheme, { stack: context.stack, params });
+  return authHeaders(scheme, { stack: context.stack, params, declared: context.declared });
 };
 
 const template = (value: unknown, params: Params): unknown => {

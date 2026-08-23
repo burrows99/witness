@@ -124,3 +124,23 @@ test("the generated template says it is still the template", () => {
 test("a placeholder inside a list is found too", () => {
   deepEqual(unfilled({ name: "a", services: {}, root: ["…"] } as unknown as SystemConfig), ["root[0]"]);
 });
+
+test("a containerEnv inside a service means THAT service's container", () => {
+  // The reorganisation's whole point was that a service owns what is true about it — and then every
+  // credential named the service again, which was the commonest line in the file.
+  const config = of({
+    grafana: {
+      secrets: { adminKey: { containerEnv: "GF_ADMIN" } },
+      database: { user: "u", database: "d", credential: { containerEnv: "PG_CREDENTIAL" } },
+    },
+  });
+  deepEqual(config.secrets?.["grafana.adminKey"], { containerEnv: { service: "grafana", key: "GF_ADMIN" } });
+  // Anywhere inside it, not only under `secrets`: a rule that held in one place is a rule nobody
+  // can remember.
+  deepEqual(config.database?.credential, { containerEnv: { service: "grafana", key: "PG_CREDENTIAL" } });
+});
+
+test("a containerEnv that names its service is left as written", () => {
+  const config = of({ web: { secrets: { key: { containerEnv: { service: "elsewhere", key: "K" } } } } });
+  deepEqual(config.secrets?.["web.key"], { containerEnv: { service: "elsewhere", key: "K" } });
+});

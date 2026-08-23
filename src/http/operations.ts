@@ -2,6 +2,7 @@ import type { ClientConfig, ClientProvider, OperationConfig, Params } from "../p
 import { clientProviders } from "../providers/clients.ts";
 import type { HttpApi } from "./client.ts";
 import { authHeaders } from "../providers/auth.ts";
+import type { ClientContext } from "../providers/clients.ts";
 import type { Stack } from "../environment/stack.ts";
 import type { Trace } from "../diagnostics/trace.ts";
 
@@ -23,10 +24,13 @@ export class Operations {
   private readonly stack: Stack;
   private readonly trace: Trace;
   private readonly config: ClientConfig;
+  /** The credentials the description declares, so an `auth` block can point at one by name. */
+  private readonly declared?: (name: string) => string | undefined;
   private readonly client: ClientProvider;
   private readonly created: { operation: string; param: string; id: string }[] = [];
 
-  constructor(http: HttpApi, stack: Stack, config: ClientConfig, trace: Trace) {
+  constructor(http: HttpApi, stack: Stack, config: ClientConfig, trace: Trace, declared?: (name: string) => string | undefined) {
+    this.declared = declared;
     this.http = http;
     this.stack = stack;
     this.trace = trace;
@@ -121,12 +125,12 @@ export class Operations {
     // escape hatch that silently drops auth is worse than no escape hatch — it 403s and looks like the
     // app's fault.
     const scheme = Object.values(this.config.auth ?? {}).find(a => a.from || a.fromContainerEnv || a.value);
-    const headers = scheme ? await authHeaders(scheme, { stack: this.stack, params: {} }) : {};
+    const headers = scheme ? await authHeaders(scheme, { stack: this.stack, params: {}, declared: this.declared }) : {};
     return this.http.request<T>(path, { ...init, headers: { ...headers, ...(init.headers ?? {}) } });
   }
 
-  private context(): { http: HttpApi; stack: Stack; trace: Trace; config: ClientConfig } {
-    return { http: this.http, stack: this.stack, trace: this.trace, config: this.config };
+  private context(): ClientContext {
+    return { http: this.http, stack: this.stack, trace: this.trace, config: this.config, declared: this.declared };
   }
 }
 
