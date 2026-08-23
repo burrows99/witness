@@ -97,7 +97,9 @@ export function commandsFor(system: System): Cli {
         },
         show: {
           summary: "<action> — its steps, as declared",
-          run: (args: string[]) => system.config.actions?.[Cli.need(args[0], "action")],
+          // The same name `run` takes, answered the same way: a bare `createRepo` shown as nothing at
+          // all, while `action run createRepo` drives it, is the contradiction one layer down.
+          run: (args: string[]) => system.config.actions?.[system.resolveAction(Cli.need(args[0], "action"))],
         },
         run: {
           summary: "<action…> [key=value…] [--parallel] [--retries N] — drive them and report everything they did",

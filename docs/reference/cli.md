@@ -45,6 +45,9 @@ npx witness action run <action…> [key=value…] [--parallel] [--retries=N]
 - `--retries=N` re-runs a failure in a fresh browser, keeping each attempt's evidence
 - `key=value` supplies the action's `inputs`
 - `HEADED=1` shows the browser
+- **a name is answered for first** — an action under a service can be named `<service>.<name>` or, when
+  only one service declares that name, bare; anything else is refused before a browser is opened, and
+  leaves no evidence directory behind
 
 Exit code is 1 if any action failed.
 

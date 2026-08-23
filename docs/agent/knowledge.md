@@ -236,6 +236,19 @@ tidiness: a global `bin/` entry is a symlink, Node leaves `argv[1]` unresolved, 
 walks up an entirely different tree — `<prefix>/bin/…` instead of `<prefix>/lib/node_modules/…`, which
 finds nothing and looks exactly like not being installed.
 
+**Opening a browser is already writing evidence, so a check that comes after one has published a
+lie.** `action run <name>` resolved the name inside the engine — after the context and its video
+recorder were up — so a name that named nothing was filmed anyway: `cli/<the name that was rejected>/`
+with a 3.6 KB video of a blank page in it, sitting beside the real action's directory and reading as a
+second cut of it. Anything that can refuse a run belongs before the first thing that writes; the
+inputs check was already there, one line further down, saying so.
+
+**A branch that cannot be reached reads as a feature the thing does not have.** The same error carried
+a `(tried "<resolved>" too)` clause that could never print: resolution returned the scoped name only
+when it was declared, so wherever the message was built the two were equal by construction. It looked
+like the command line had a fallback for bare names. It did not — and the generated skill told its
+readers to write one, which is how #141 was found. Grep for what a message CLAIMS before believing it.
+
 ---
 
 ## Publishing

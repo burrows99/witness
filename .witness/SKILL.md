@@ -55,6 +55,11 @@ are written under it in `services`, once — an action there needs no `app` and 
 in its own name, and reaches its siblings and its service's secrets by bare name. The top level
 carries only what is SHARED or about more than one service.
 
+`action list` prints such an action as `<service>.<name>`, and `./bin/witness action run` takes
+either: the bare name whenever exactly one service declares it, the prefixed one always. Two
+services declaring the same name is the case the bare one cannot answer — it says so, and names
+both, rather than picking.
+
 There is no third thing. **There are no test files to write**: an action composes other actions
 (`run`), narrates (`caption`, `slide`), asserts against the screen (`expect`) and against what the
 API answered or the database stored (`check`). Anything you would otherwise write as a program

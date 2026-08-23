@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import { Actions, type ActionConfig, type ActionResult, type Params } from "./actions/engine.ts";
+import { Actions, type ActionConfig, type ActionResult, type Params, resolveAction } from "./actions/engine.ts";
 import { appSurface, type RouteMap, type Screens } from "./browser/surface.ts";
 import { Cli, type Noun } from "./cli/cli.ts";
 import { commandsFor } from "./cli/commands.ts";
@@ -303,6 +303,16 @@ export class System {
     const found = (this.config.cast ?? {})[name];
     if (found === undefined) throw new Error(`no cast member "${name}" in the config`);
     return found as T;
+  }
+
+  /**
+   * Which declared action a name means — the question the runner asks before it opens anything.
+   *
+   * `gitea.createRepo` and, because only gitea declares one, `createRepo`. Throws naming what IS
+   * declared, which is the whole of what a caller needs to type next.
+   */
+  resolveAction(name: string): string {
+    return resolveAction(this.config.actions ?? {}, name);
   }
 
   /** Run a declared action, and get back everything it did. */

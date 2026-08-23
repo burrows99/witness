@@ -195,6 +195,36 @@ test("a terminal action is recognised as one through the real System", when, () 
   equal(system.actionConfig("nothing.declared"), undefined);
 });
 
+test("a bare name at the command line finds the one service that declares it", when, () => {
+  // `action list` prints `web.openHome`, while the description — and the skill generated from it —
+  // say an action written under a service needs no `<service>.` in its own name. So the bare name is
+  // the one whoever wrote the config has to hand, and it was the one thing the command line would not
+  // take: it opened a browser, filmed it, and only then said the name meant nothing (#141).
+  //
+  // Through `loadConfig` for the same reason as the test above: the qualifying happens on the way in.
+  const dir = inCheckout();
+  const file = path.join(dir, "config.jsonc");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      name: "acme",
+      root: ["marker"],
+      services: {
+        web: { port: 3000, container: "acme-web", actions: { openHome: { steps: [] }, describeItself: { steps: [] } } },
+        api: { port: 8080, container: "acme-api", actions: { describeItself: { steps: [] } } },
+      },
+    }),
+  );
+  const system = new System(loadConfig(file));
+
+  equal(system.resolveAction("web.openHome"), "web.openHome");
+  equal(system.resolveAction("openHome"), "web.openHome");
+  // What one service means by a name is not what another does, and both are declared: the candidates
+  // are named rather than one of them picked.
+  throws(() => system.resolveAction("describeItself"), /declared by 2 services — name the one you mean: web\.describeItself, api\.describeItself/);
+  throws(() => system.resolveAction("openHom"), /no such action "openHom" — declared: web\.openHome, web\.describeItself, api\.describeItself/);
+});
+
 test("a service's own action reaches its own secret by bare name", when, () => {
   // The headline of the service-owned reorganisation, and the one line of it nothing stood on.
   // `normalise.test` checks `scoped("adminKey", "grafana")` — a SERVICE name — while every real caller

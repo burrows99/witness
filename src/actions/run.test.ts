@@ -1,4 +1,4 @@
-import { deepEqual, equal, match, ok } from "node:assert/strict";
+import { deepEqual, equal, match, ok, rejects } from "node:assert/strict";
 import { test } from "node:test";
 
 import { parseRunArgs } from "./run.ts";
@@ -57,6 +57,9 @@ test("it runs each action in turn, passing what one stored to the next", async (
 
   const system: RunnableSystem = {
     workspace: { resolve: (target = ".") => `/tmp/witness-run-test/${target}` },
+    // Every name here is already a declared one. The runner asks anyway, and asks first — the test
+    // below is about what happens when the answer is that nothing is declared by that name.
+    resolveAction: name => name,
     run: async (name, _page, inputs) => {
       ran.push({ name, inputs });
       return { action: name, ok: true, ms: 1, inputs, value: {}, values: { from: name }, warnings: [], steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
@@ -88,6 +91,39 @@ test("it runs each action in turn, passing what one stored to the next", async (
   deepEqual(browser.closed, ["trace trace.zip", "context", "video panel-01-01.webm", "video removed", "browser"]);
 });
 
+test("a name that names nothing is refused before anything is opened or written", async () => {
+  // The name used to be resolved inside the engine, with the context and its video recorder already
+  // up. So `action run homepage` — the bare name the description itself teaches you to write — filmed
+  // a blank page, wrote `cli/homepage/before/` beside the real action's evidence, and left a 3.6 KB
+  // video in it: the shape of a run that happened, for one that never did. Everything asserted here is
+  // something that DID happen before the fix (#141).
+  const { runActions } = await import("./run.ts");
+  const wrote: string[] = [];
+  let launched = 0;
+  const system: RunnableSystem = {
+    workspace: { resolve: (target = ".") => `/tmp/witness-run-test/${target}` },
+    resolveAction: name => {
+      if (name === "web.signIn") return name;
+      throw new Error(`no such action "${name}" — declared: web.signIn`);
+    },
+    run: async () => {
+      throw new Error("nothing should have been run");
+    },
+    actionConfig: () => undefined,
+    evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => void wrote.push("manifest"), readme: () => (wrote.push("readme"), undefined) }),
+    pinEvidence: () => undefined,
+    renderVideos: () => (wrote.push("video"), []),
+  };
+
+  await rejects(
+    () => runActions(system, { names: ["homepage"] }, { launch: async () => (launched += 1, {}) as never }),
+    /no such action "homepage" — declared: web\.signIn/,
+  );
+  // No browser paid for to prove a string is not in a list, and nothing on disk to read as a run.
+  equal(launched, 0);
+  deepEqual(wrote, []);
+});
+
 test("a failing action comes back with its own evidence rather than a stack trace", async () => {
   const { runActions } = await import("./run.ts");
   const browser = fakeBrowser();
@@ -95,6 +131,7 @@ test("a failing action comes back with its own evidence rather than a stack trac
 
   const system: RunnableSystem = {
     workspace: { resolve: (target = ".") => `/tmp/witness-run-test/${target}` },
+    resolveAction: name => name,
     run: async name => {
       if (name === "second") throw Object.assign(new Error(`action "second" failed at step 1: no such button`), { result: attached });
       return { action: name, ok: true, ms: 1, inputs: {}, value: {}, values: {}, warnings: [], steps: [], screenshots: [], network: [], console: [], recording: { requests: [], console: [], errors: [], dropped: 0 }, trace: [] };
@@ -120,6 +157,7 @@ test("parallel gives each action its own lane, and the panes come out in the ord
   const result = await runActions(
     {
       workspace: { resolve: (t?: string) => `/tmp/witness-run-test/${t ?? ""}` },
+      resolveAction: name => name,
       run: async (action: string) => (ran.push(action), { action, ok: true, values: {} }) as never,
       actionConfig: () => undefined,
       evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
@@ -147,6 +185,7 @@ test("a retry is a fresh browser, and keeps the failed attempt's evidence", asyn
   const result = await runActions(
     {
       workspace: { resolve: (t?: string) => `/tmp/witness-run-test/${t ?? ""}` },
+      resolveAction: name => name,
       run: async (action: string, _p: unknown, _i: unknown, within?: { at?: string }) => {
         filed.push(within?.at);
         goes += 1;
@@ -184,6 +223,7 @@ test("an action with no screen never opens a browser", async () => {
     const result = await runActions(
       {
         workspace: { resolve: (t?: string) => `/tmp/witness-run-test/${t ?? ""}` },
+        resolveAction: name => name,
         run: async () => ({ ok: true, values: {} }) as never,
         actionConfig: () => ({ records: "terminal" as const, steps: [] }),
         evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
@@ -224,6 +264,7 @@ test("the pane a description asks for is the pane it is filmed in", async () => 
     await runActions(
       {
         workspace: { resolve: (t?: string) => `/tmp/witness-run-test/${t ?? ""}` },
+        resolveAction: name => name,
         run: async () => ({ ok: true, values: {} }) as never,
         actionConfig: () => action,
         evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),

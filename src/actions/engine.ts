@@ -93,14 +93,6 @@ export class Actions {
     };
   }
 
-  /** `signIn` inside `grafana.openDashboards` is `grafana.signIn`, if there is one. */
-  private resolveName(name: string, from?: string): string {
-    if (this.config[name] || !from) return name;
-    const service = from.includes(".") ? from.slice(0, from.indexOf(".")) : undefined;
-    const scoped = service ? `${service}.${name}` : name;
-    return this.config[scoped] ? scoped : name;
-  }
-
   get names(): string[] {
     return Object.keys(this.config);
   }
@@ -116,17 +108,10 @@ export class Actions {
     // Per RUN, not per engine: two actions driving two browsers at once would otherwise interleave
     // their warnings into each other's results, and the one instance is shared by both.
     const running: Running = { notices: [] };
-    // A service's own action reaches its siblings by bare name — being under the same service is what
-    // says which `signIn` is meant, and repeating the prefix inside it says nothing new.
-    const resolved = this.resolveName(name, from);
-    const action = this.config[resolved];
-    if (!action) {
-      throw new Error(
-        `no such action "${name}"${from && resolved !== name ? ` (tried "${resolved}" too)` : ""} — ` +
-          `declared: ${this.names.join(", ") || "none"}`,
-      );
-    }
-    name = resolved;
+    // The same door the command line knocks on before it opens a browser, so a name means the same
+    // action wherever it is typed.
+    name = resolveAction(this.config, name, from);
+    const action = this.config[name];
     // Where this action's evidence goes. A composed action lives INSIDE the step that ran it, so the
     // directory tree is the call tree — which is the one thing a flat `actions/` folder could not say,
     // and the reason nothing on disk showed that `theWholeProduct` ran the eight beside it.
@@ -652,6 +637,45 @@ export class Actions {
       return undefined;
     }
   }
+}
+
+/**
+ * The declared name a typed one means, or the error saying why nothing does.
+ *
+ * One name, written three ways. As declared, which is what `action list` prints. From inside a
+ * service, where a sibling is reached by bare name — being under the same service is what says which
+ * `signIn` is meant, and repeating the prefix inside it says nothing new. And from outside, with no
+ * service to be under, where a bare name means the one service that declares it: the config already
+ * says an action written under a service needs no `<service>.` in its own name, so the bare name is
+ * the one whoever wrote the description has to hand, and the command line was the only reader of that
+ * config demanding the prefix back. Ambiguity is the caller's to settle — three `describeItself`
+ * actions is the normal case, and picking one of them would be picking at random.
+ *
+ * The last rule stops at a service's own boundary: a step inside `gitea.tour` that reaches for a name
+ * gitea does not declare means gitea's, and falling through to `grafana.signIn` would sign into the
+ * wrong product and say nothing about having done so.
+ *
+ * Asked BEFORE a browser is opened. It used to be asked inside `run()`, after the context and its
+ * recorder were up, so a name that named nothing still cost a browser and left a directory with a
+ * video of a blank page in it — the shape of a run that happened, named after one that did not (#141).
+ *
+ * It reads only the names, so anything holding the declared actions can ask — including the two
+ * callers that keep a narrower view of them than the engine does.
+ */
+export function resolveAction(actions: Record<string, unknown>, name: string, from?: string): string {
+  if (actions[name]) return name;
+  const service = from?.includes(".") ? from.slice(0, from.indexOf(".")) : undefined;
+  const sibling = service ? `${service}.${name}` : undefined;
+  if (sibling && actions[sibling]) return sibling;
+  const scoped = sibling ? [] : Object.keys(actions).filter(declared => declared.endsWith(`.${name}`));
+  if (scoped.length === 1) return scoped[0];
+  if (scoped.length > 1) {
+    throw new Error(`action "${name}" is declared by ${scoped.length} services — name the one you mean: ${scoped.join(", ")}`);
+  }
+  throw new Error(
+    `no such action "${name}"${sibling ? ` (tried "${sibling}" too)` : ""} — ` +
+      `declared: ${Object.keys(actions).join(", ") || "none"}`,
+  );
 }
 
 /**
