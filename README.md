@@ -8,11 +8,13 @@
 [![tests](https://img.shields.io/github/actions/workflow/status/burrows99/witness/tests.yml?branch=main&style=flat-square&label=tests)](https://github.com/burrows99/witness/actions/workflows/tests.yml)
 [![license](https://img.shields.io/github/license/burrows99/witness?style=flat-square)](LICENSE)
 
-Drive a running system from one config file, and come back with evidence rather than a pass/fail.
+Built for AI agents: drive and debug a running app from one config file, and come back with proof —
+watchable by a person, readable by an agent. Not a pass/fail, and not a guess.
 
-[Install](#install) · [Describe a product](#describe-a-product) · [Write an action](#write-an-action) ·
-[Run it](#run-it) · [What a run leaves behind](#what-a-run-leaves-behind) ·
-[Example](#example-four-services) · [When not to use this](#when-not-to-use-this)
+[Who is driving](#who-is-driving) · [Install](#install) · [Describe a product](#describe-a-product) ·
+[Write an action](#write-an-action) · [Run it](#run-it) ·
+[What a run leaves behind](#what-a-run-leaves-behind) · [Example](#example-four-services) ·
+[When not to use this](#when-not-to-use-this)
 
 Describe your product in `.witness/config.jsonc` — where the services are, what the API can be asked,
 what a person sees, what they can do — and drive it against the real thing: the containers on this
@@ -26,6 +28,7 @@ and nothing anyone can rerun.
 
 ## Table of Contents
 
+- [Who is driving](#who-is-driving)
 - [Install](#install)
 - [Describe a product](#describe-a-product)
 - [Write an action](#write-an-action)
@@ -38,6 +41,20 @@ and nothing anyone can rerun.
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Who is driving
+
+**Mostly an agent.** Something changes code and then has to answer *does it work* — and an agent
+cannot open a network tab, watch a screen, or scrub a video. What it can do is read a filesystem. So
+what it does instead is infer: the build passed, the handler looks right, the field is probably
+rendering. That inference is cheap, confident, and wrong often enough to matter — and from the
+outside it is indistinguishable from having actually looked.
+
+This closes that gap by making the looking mechanical. Every command prints the whole exchange, and
+every run writes a directory whose shape is the call tree: the requests with their bodies, a frame
+per step, the console and network tied to the step that was running, and a note in English. **One
+artefact, two readers** — an agent gets there by listing a directory, a person by opening the video
+beside it, and both are checking the same claim rather than trading assurances about it.
 
 ## Install
 
