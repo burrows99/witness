@@ -222,6 +222,29 @@ approve a path the uploader then refuses. And there is no way round it from insi
 CSP blocks a `fetch` of a local server and of a `data:` URI, a synthetic `⌘V` carries no clipboard, and
 its own uploader ignores a synthetic `drop`. A file the upload tool will accept is the only door.
 
+**The door is on the compare page, not the issue page.** The entry above says find a path the upload
+tool accepts; the half it is missing is that the tool needs a `<input type="file">` to hand the file
+to, and GitHub's rebuilt issue and pull-request views have none in the DOM at all —
+`document.querySelectorAll("input[type=file]")` answers `0`, so no `read_page` or `find` can produce a
+ref, and the only "Add Files" control is a button whose click opens a native picker nothing in the
+browser can see. The classic **compare** page still has the real one:
+`/compare/<base>...<branch>?expand=1` carries `input.fc-pull_request_body`, hidden. Un-hide it from
+the page, `find` it by the `aria-label` you just gave it, upload, and read the minted URL back out of
+`textarea[name="pull_request[body]"]` — then clear the textarea and close the tab, because nothing has
+to be submitted there for the asset to exist. Read it back with a **regex for the asset id**: the
+extension refuses to return the whole field (`[BLOCKED: Cookie/query string data]`), which reads like
+the upload failing when it has already succeeded. And on this machine the tool accepted a path outside
+the session's project directory, so the constraint in the entry above is not universal — try the real
+path before copying anything.
+
+**Two frames uploaded from one action arrive with the same filename.** Every terminal recording writes
+its still as `video.png`, so `before/video.png` and `after/video.png` upload as `video.png` and
+`video.png` and the only thing separating them afterwards is which order you did them in — which is
+precisely the mistake this file records twice already, arriving through a third door. `curl -sL -w
+"%{size_download}"` on each minted URL and compare against the bytes on disk. It is one command, it
+runs after the body is published, and it is the only check that cannot be talked into agreeing with
+you.
+
 ---
 
 ## Writing for an agent
