@@ -8,7 +8,7 @@ Every verb an action can use. One object per step; a step object holds one verb 
 |---|---|---|
 | `goto` | `{ app?, route?, url?, params? }` | prefer `route` — `url` disconnects `portVar` |
 | `reload` | `true` | for "and it survives a refresh", which `goto` does not say |
-| `waitForUrl` | `{ route? , url?, app?, timeout? }` or a string | `url` is a **regular expression**, not a glob |
+| `waitForUrl` | `{ route?, url?, app?, service?, timeout? }` or a string | `url` is a **regular expression**, not a glob; `service` is any path on another service's origin |
 | `wait` | `1200` | milliseconds. Last resort — prefer waiting for a thing |
 
 ## Doing something
@@ -29,6 +29,40 @@ Every verb an action can use. One object per step; a step object holds one verb 
 | `check` | `{ that, equals?, not?, contains?, matches?, atLeast?, atMost?, because? }` | about the **values gathered** — `matches` is a regex |
 
 `because` becomes the failure message. Write it for the person reading the failure.
+
+## A sign-in that leaves the app
+
+Behind SSO, social login and every hosted identity provider is the same sequence: the app hands the
+browser to somebody else, a form is filled over there, and the browser comes back with a session.
+There is no `signIn` verb for it — it is the ordinary verbs, plus one word for the origin it goes to:
+
+```jsonc
+{ "goto": { "route": "login" } },
+{ "click": { "role": "link", "name": "Keycloak" } },
+{ "waitForUrl": { "service": "keycloak" } },          // where it expects to LAND — another origin
+{ "type": { "on": { "label": "Username" }, "value": "{secret.providerUser}" } },
+{ "type": { "on": { "label": "Password" }, "value": "{secret.providerPassword}" } },
+{ "click": { "role": "button", "name": "Sign In" } },
+{ "waitForUrl": { "route": "home" } },                // …and where it expects to come BACK to
+{ "expect": { "on": { "text": "Welcome" }, "because": "the session took" } }
+```
+
+`service` is any path on that service's origin, taken off the stack — so the provider's port is
+declared once, in the service, exactly like `route` does it for this app's own. A literal
+`"localhost:8092"` would work and is the thing to avoid: it is a substring of an address rather than
+an address, and it disconnects `portVar`.
+
+Credentials belonging to the provider are still declared under the app that has to type them, with
+the long form that names whose container they live in:
+
+```jsonc
+"providerPassword": { "containerEnv": { "service": "keycloak", "key": "KC_BOOTSTRAP_ADMIN_PASSWORD" } }
+```
+
+`config explore` will not walk a link like that one — it refuses anything that hands off to an
+identity provider, because a crawl must reach nobody it was not pointed at. A step naming the
+provider is somebody pointing at it, by the name their own stack gives it. That is the whole
+difference, and it is the reason this is a step rather than something a crawler decides.
 
 ## Gathering
 

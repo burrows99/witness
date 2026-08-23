@@ -83,7 +83,9 @@ Every value is a template filled from what the run gathered, written whether the
 - **`expect` passing is not the same as evidence.** A `css` match can succeed on a node that is
   off-screen: the run goes green and the picture shows nothing.
 - **`waitForUrl` takes a route, not a URL** — `{ "waitForUrl": { "route": "home" } }`. A literal
-  `localhost:3020` disconnects `portVar`.
+  `localhost:3020` disconnects `portVar`. Somewhere that is not this app at all — the identity
+  provider a sign-in hands the browser to — is `{ "waitForUrl": { "service": "keycloak" } }`, the
+  same idea one service along. See [reference/steps.md](../reference/steps.md#a-sign-in-that-leaves-the-app).
 - **Prefer waiting for a thing over waiting for time.** `wait: 600` after typing into a search box
   stored 226 unfiltered rows here on a slow run, and the assertion under it was loose enough to pass.
 

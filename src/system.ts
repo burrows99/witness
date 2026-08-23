@@ -126,6 +126,9 @@ export class System {
       // So an action can sign in without the caller typing a password on the command line — which is
       // the whole reason `secrets` exists, and was unreachable from a description until now.
       secret: (name: string, scope?: string) => this.secret(name, scope),
+      // Where a step that leaves the app expects to land. Off the stack rather than out of the step,
+      // so an identity provider's port is declared in the one place every other port is.
+      origin: (service: string) => this.origin(service),
     });
 
     this.apps = {};
@@ -380,6 +383,24 @@ export class System {
     const screen = (target as unknown as Record<string, { url: (p: Params) => string } | undefined>)[route];
     if (!screen) throw new Error(`app "${appName}" declares no route "${route}"`);
     return screen.url(params);
+  }
+
+  /**
+   * Where one of the stack's services answers — for a step that leaves this app and has to say where
+   * it is going.
+   *
+   * A service that publishes no port is a real case (a worker, a migration container) and it is a
+   * different mistake from a name nobody declared, so the two say different things.
+   */
+  origin(service: string): string {
+    const at = this.stack.endpoints[service];
+    if (at) return at;
+    const known = Object.keys(this.stack.endpoints);
+    throw new Error(
+      known.includes(service)
+        ? `service "${service}" publishes no port, so there is no origin to land on`
+        : `no service "${service}" — declared: ${known.join(", ") || "none"}`,
+    );
   }
 
   /**

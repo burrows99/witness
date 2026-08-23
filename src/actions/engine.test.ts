@@ -21,7 +21,7 @@ const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 type Done = string[];
 
 /** A page that says what it was asked to do, and hands back whatever it was told to. */
-const fakePage = (opts: { text?: string; all?: string[]; response?: unknown; gotoFails?: string } = {}): { page: never; did: Done } => {
+const fakePage = (opts: { text?: string; all?: string[]; response?: unknown; gotoFails?: string; at?: string } = {}): { page: never; did: Done } => {
   const did: Done = [];
   const locator = (what: string) => ({
     click: async () => void did.push(`click ${what}`),
@@ -53,12 +53,22 @@ const fakePage = (opts: { text?: string; all?: string[]; response?: unknown; got
     waitForResponse: async () => ({ json: async () => opts.response ?? {} }),
     on: () => undefined,
     off: () => undefined,
+    /** Where the browser is. Half of reading a failed wait is knowing where it ended up instead. */
+    url: () => opts.at ?? "http://localhost:3000/login",
   };
   return { page: page as never, did };
 };
 
-const engine = (actions: Record<string, unknown>, opts: { api?: (name: string, params: unknown, body: unknown) => unknown; sql?: (name: string, params: unknown) => string } = {}) =>
+const engine = (
+  actions: Record<string, unknown>,
+  opts: {
+    api?: (name: string, params: unknown, body: unknown) => unknown;
+    sql?: (name: string, params: unknown) => string;
+    origin?: (service: string) => string;
+  } = {},
+) =>
   new Actions({
+    ...(opts.origin ? { origin: opts.origin } : {}),
     operations: { call: async (name: string, params: unknown, body: unknown) => opts.api?.(name, params, body) ?? {} } as unknown as Operations,
     queries: { query: (name: string, params: unknown) => opts.sql?.(name, params) ?? "row" } as unknown as Queries,
     trace: new Trace(),
@@ -253,6 +263,58 @@ test("waiting for a URL can say how long to wait", when, async () => {
     a: { steps: [{ waitForUrl: "/chat" }, { waitForUrl: { url: "/chat", timeout: 2000 } }] },
   }).run("a", withWait);
   deepEqual(waits, [60_000, 2000]);
+});
+
+test("a step can wait to arrive somewhere that is not this app", when, async () => {
+  // The shape behind SSO, social login and every hosted identity provider: the app hands the browser
+  // to somebody else, who hands it back with a session. The description names the provider the way
+  // the stack names it, so its port is written down once — and the pattern is anchored to that
+  // origin, because a substring of an address is not an address.
+  const { page, did } = fakePage();
+  await engine(
+    { "grafana.signIn": { steps: [{ click: { role: "link", name: "Keycloak" } }, { waitForUrl: { service: "keycloak" } }] } },
+    { origin: service => (service === "keycloak" ? "http://auth.local:8092" : "") },
+  ).run("grafana.signIn", page);
+  // `RegExp.source` spells a `/` as `\/` — what is being asserted here is the anchoring and the
+  // escaped dot, which is what makes this an origin rather than a substring of an address.
+  deepEqual(did, ["click role=link name=Keycloak", "waitForUrl ^http:\\/\\/auth\\.local:8092(?:[/?#]|$)"]);
+});
+
+test("a wait that names nothing is a step that checked nothing", when, async () => {
+  // `{ "waitForUrl": {} }` — and anything else it cannot act on, a misspelt key included — used to
+  // compile to `new RegExp("")`, which matches the address bar whatever is in it. The step passed
+  // instantly, the run was green, and the claim the description was making went nowhere near a browser.
+  const { page } = fakePage();
+  await rejects(
+    engine({ a: { steps: [{ waitForUrl: {} }] } }).run("a", page),
+    /waits for nothing — name a `route`, a `service` or a `url`/,
+  );
+});
+
+test("a wait that gives up says where the browser actually is", when, async () => {
+  // Playwright's timeout says what was waited FOR. The other half — a sign-in that never left, an app
+  // that bounced straight back to its own login — is only in the address bar, and only at that moment.
+  const { page } = fakePage({ at: "http://localhost:3010/login" });
+  const stuck = {
+    ...(page as unknown as Record<string, unknown>),
+    waitForURL: async () => {
+      throw new Error("Timeout 15000ms exceeded.\nwaiting for navigation");
+    },
+  } as never;
+  await rejects(
+    engine({ a: { steps: [{ waitForUrl: { service: "keycloak", timeout: 15_000 } }] } }, { origin: () => "http://localhost:8092" }).run("a", stuck),
+    /waited for keycloak \(http:\/\/localhost:8092\), and the browser is on http:\/\/localhost:3010\/login/,
+  );
+});
+
+test("a step naming a service, in a system built without a stack, says so", when, async () => {
+  // The injected seam's default is the one branch nothing else runs, and "cannot read properties of
+  // undefined" is not an answer to "where is keycloak".
+  const { page } = fakePage();
+  await rejects(
+    engine({ a: { steps: [{ waitForUrl: { service: "keycloak" } }] } }).run("a", page),
+    /a step waits for service "keycloak", and this system was built without a stack to find one in/,
+  );
 });
 
 test("every step is named by what it does, and says what it is about", when, async () => {

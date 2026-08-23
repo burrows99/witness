@@ -64,6 +64,17 @@ test("a client naming a service nobody declared fails while the config is being 
   );
 });
 
+test("a step that leaves the app is sent to an origin off the stack, not one typed into the step", when, () => {
+  // What a `waitForUrl` naming a service resolves through. The port comes from the same place every
+  // other port does, so a sign-in that hands the browser to an identity provider survives `portVar`
+  // moving it — and a service with no port at all is a different mistake from a name nobody declared.
+  inCheckout();
+  const system = new System(config({ services: { web: { port: 3000, portVar: "WEB_PORT" }, worker: {} } }));
+  equal(system.origin("web"), "http://localhost:3100");
+  throws(() => system.origin("worker"), /service "worker" publishes no port, so there is no origin to land on/);
+  throws(() => system.origin("keycloak"), /no service "keycloak" — declared: web, worker/);
+});
+
 test("an undeclared client, cast member, identity or secret each say what is missing", when, () => {
   inCheckout();
   const system = new System(config({ cast: { REGULAR: { id: "1" } }, identities: { staff: { cookies: [] } } }));
