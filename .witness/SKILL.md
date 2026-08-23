@@ -107,7 +107,7 @@ with more logging.
   - `action run` — <action…> [key=value…] [--parallel] [--retries N] — drive them and report everything they did
 - `./bin/witness config` — the description this tool reads, and where it comes from
   - `config template` — print a config file with every field witness understands, and its documentation
-  - `config explore` — [<service>] [--as=<action that signs in>] [--pages=N] [--depth=N] — walk the running app and print the description it implies
+  - `config explore` — [<service>] [--as=<action to run first>] [--pages=N] [--depth=N] — walk the running app and print the description it implies
   - `config where` — which description is in force here, and why
 - `./bin/witness init` — make a .witness/ in this directory
 - `./bin/witness skill` — how to use this, generated from what this copy can do — `--write` rewrites the copy on disk
@@ -245,6 +245,20 @@ It is read out of a run:
 #   … open the frame the story names, fix it, run again …
 EVIDENCE=before ./bin/witness action run <yours>           # then make the change, then EVIDENCE=after
 ```
+
+Starting from nothing, `./bin/witness config explore [<service>]` walks the running app and prints the
+description it implies — routes, locators, forms, and the operations the app called while being
+walked. It never writes the config: merge and trim by hand, because a generated name is worse
+than the one you would choose.
+
+**`--as=<action>` runs a declared action before that crawl**, on the page the crawl then walks
+with, so everything the action leaves behind — the session, whatever it wrote on the server, the
+URL it landed on — is what every page after it carries. **Any** action, not only a sign-in: an
+upload, a seed, a first record, whatever leaves the app in the state worth describing. Only an
+action with no screen (`records: "terminal"`) is refused. An app whose landing screen is a
+dropzone links nowhere until a file has been dropped on it, so it walks ONE page unaided and the
+routes behind the upload with `--as=<the action that uploads>`. **`Walked 1 page` is a gate,
+nearly never a small app** — reach for `--as` before concluding the app cannot be walked.
 
 And when a run breaks that used to pass, ask `./bin/witness check drift <the action that signs in>`
 before rewriting anything: it re-checks every claim the description makes — each locator against

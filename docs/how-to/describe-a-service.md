@@ -6,7 +6,8 @@
 npx witness init                      # reads the compose file beside you
 npx witness config explore            # the service with screens
 npx witness config explore mailpit --pages=20 --depth=3
-npx witness config explore grocy --as=grocy.signIn   # signed in first, then walked
+npx witness config explore grocy --as=grocy.signIn   # ran that action first, then walked
+npx witness config explore docs --as=docs.upload     # any action: whatever unlocks the app
 ```
 
 `init` reads `docker compose config` and writes the whole `services` block: where each service runs,
@@ -37,12 +38,16 @@ label — exactly, then by prefix. Rule of thumb: `forms` where the app has plac
 where it labels instead, and a login form is usually the second (gitea's, grocy's and linkding's all
 are). Nothing stops one form using both.
 
-**Anything behind a login needs a way in.** `--as=<action>` runs a declared sign-in first and walks
-with the session it leaves — the same argument `check drift` takes, for the same reason. Without it a
-crawl describes the front door: grocy — stock, chores, recipes, equipment — walks exactly one page,
-`/login`. An `identity` whose cookies get you in works too, where a session cookie can be had out of
-band. A crawl where every page walked carried a password field says so in the fragment, because
-`Walked 1 page` otherwise reads as "this app is small" rather than "I could not get in".
+**Anything behind a gate needs a way past it.** `--as=<action>` runs a declared action before the
+crawl and walks with everything it left behind — the session, whatever it wrote on the server, the
+URL it landed on. A sign-in is the commonest one and not the only one: grocy — stock, chores,
+recipes, equipment — walks exactly one page, `/login`, without `--as=grocy.signIn`; and an app whose
+landing screen is a dropzone walks exactly one page for a reason with no login in it, because nothing
+links anywhere until a file has been dropped on it and every other route takes an id the upload
+mints. Whatever gets past your gate is an action worth declaring anyway. An `identity` whose cookies
+get you in works for the login case, where a session cookie can be had out of band. A crawl where
+every page walked carried a password field says so in the fragment, because `Walked 1 page` otherwise
+reads as "this app is small" rather than "I could not get in".
 
 **A sign-in that leaves the app is not walked** — an OAuth or SAML start endpoint is a same-origin
 link that redirects to an identity provider, and exploring your stack must not send a third party a

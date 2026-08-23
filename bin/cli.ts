@@ -42,16 +42,17 @@ const config: Parameters<Cli["command"]>[1] = {
       run: () => Template.forWitness().render(),
     },
     explore: {
-      summary: "[<service>] [--as=<action that signs in>] [--pages=N] [--depth=N] — walk the running app and print the description it implies",
+      summary: "[<service>] [--as=<action to run first>] [--pages=N] [--depth=N] — walk the running app and print the description it implies",
       // The fragment IS the answer, so it is not wrapped in a record of a request nobody made.
       raw: true,
       // Unlike its siblings this one needs the description loaded — an origin to walk, the identities
       // to carry, the routes it already declares. It is listed before that happens and only ever RUN
       // after, which is why the variable is enough and a second registration was not.
       run: async (args: string[], flags: string[] = []) => {
-        // The same argument `check drift` takes, for the same reason: without it a crawl of anything
-        // behind a login describes the login page and stops. Read first, because a flag typed with a
-        // space is a usage error and nothing below it is worth doing.
+        // The action to run before the walk: a sign-in, an upload, a seed — whatever leaves the app in
+        // the state worth describing, named as the action that already describes it. Without one a
+        // crawl of anything behind a gate describes the gate and stops. Read first, because a flag
+        // typed with a space is a usage error and nothing below it is worth doing.
         const as = Cli.flag(flags, "as");
         const service = args[0] ?? Explore.likelyApp(system.config);
         const number = (flag: string, fallback: number): number =>
