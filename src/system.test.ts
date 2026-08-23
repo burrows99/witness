@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import * as path from "node:path";
 
 import type { SystemConfig } from "./config/schema.ts";
+import { normalise } from "./config/index.ts";
 
 /** The composite root pulls in the browser half, so this file runs where that is installed. */
 const havePlaywright = await import("@playwright/test").then(
@@ -140,4 +141,43 @@ test("a database credential is a source, not a string the config has to hold", (
   // Nothing is set in the environment and nothing needs to be: what this asserts is that the config
   // can NAME a source instead of holding a value, which is the whole point of the change.
   ok(system.db, "the database is built without the password being written down");
+});
+
+test("a service's own action reaches its own secret by bare name", when, () => {
+  // The headline of the service-owned reorganisation, and the one line of it nothing stood on.
+  // `normalise.test` checks `scoped("adminKey", "grafana")` — a SERVICE name — while every real caller
+  // is the engine, which passes the ACTION name. `System.secret` cuts the service off the front of it,
+  // and that cut had no test: delete it and every `{secret.…}` written inside a service's own action
+  // stops resolving, with `no secret "adminKey" — declared: grafana.adminKey`, which reads as the
+  // config being wrong rather than the tool.
+  //
+  // Through `normalise`, because that is the shape `System` receives: a service's secrets are given
+  // scoped names on the way in, and a fixture handed the written shape would find nothing to scope.
+  inCheckout();
+  process.env.GRAFANA_CREDENTIAL_SOURCE = "grafana-value";
+  process.env.BILLING_CREDENTIAL_SOURCE = "billing-value";
+  const system = new System(
+    normalise({
+      name: "acme",
+      root: ["marker"],
+      services: {
+        grafana: {
+          port: 3000,
+          container: "acme-grafana",
+          secrets: { adminKey: { env: "GRAFANA_CREDENTIAL_SOURCE" } },
+          actions: { signIn: { steps: [] } },
+        },
+        billing: { port: 8080, container: "acme-billing", secrets: { adminKey: { env: "BILLING_CREDENTIAL_SOURCE" } } },
+      },
+    }),
+  );
+
+  // The scope the engine actually passes is the qualified ACTION name.
+  equal(system.secret("adminKey", "grafana.signIn"), "grafana-value");
+  equal(system.secret("adminKey", "billing.charge"), "billing-value");
+  // The service name alone — what a caller outside an action would use — still works.
+  equal(system.secret("adminKey", "grafana"), "grafana-value");
+  // And with no scope there is nothing to disambiguate two services that both declared one, so it
+  // says so rather than picking.
+  throws(() => system.secret("adminKey"), /no secret "adminKey" — declared: grafana\.adminKey, billing\.adminKey/);
 });
