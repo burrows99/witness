@@ -18,6 +18,16 @@ test("fill refuses to leave a placeholder blank", () => {
   throws(() => fill("{id}", { id: undefined }), /missing \{id\}/);
 });
 
+test("a doubled brace is text, not a parameter nobody supplied", () => {
+  // Not every string that reaches `fill` was written as a template. `docker ps --format '{{.Names}}'`
+  // is a command somebody meant literally, and reading `{.Names}` out of it threw on a step that has
+  // no parameters in it at all — so the command could not be recorded, at all, by any description.
+  equal(fill("docker ps --format '{{.Names}}'"), "docker ps --format '{{.Names}}'");
+  equal(fill("{{.Names}}\t{{.Ports}}"), "{{.Names}}\t{{.Ports}}");
+  // And a real placeholder beside one still fills.
+  equal(fill("{host} {{.Names}}", { host: "witness" }), "witness {{.Names}}");
+});
+
 test("withoutComments removes line and block comments", () => {
   equal(withoutComments('{ // why\n "a": 1 }').replace(/\n/g, ""), '{  "a": 1 }');
   equal(withoutComments('{ /* why */ "a": 1 }'), '{  "a": 1 }');

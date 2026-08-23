@@ -314,7 +314,7 @@
         { "type": { "on": "prompt", "value": "./bin/witness init /tmp/witness-board/witness | tail -4" } },
         { "press": "Enter" },
         { "wait": 9000, "note": "`docker compose config` shells out, and it is not quick on a machine running four stacks" },
-        { "type": { "on": "prompt", "value": "clear; echo 'docker ps:'; docker ps | awk 'NR>1 {print $NF}' | grep ^witness | sort; echo" }, "note": "neither `--format '{{.Names}}'` nor a backslash: a step's text is interpolated, so a brace pair reads as a missing parameter, and VHS drops a backslash out of a `Type` string" },
+        { "type": { "on": "prompt", "value": "clear; echo 'docker ps:'; docker ps --format '{{.Names}}' | grep ^witness | sort | tr '\\n' ' '; echo; echo" }, "note": "the command a person would type, which for a long time this could not record: the braces threw as a missing parameter and the backslash reached the shell doubled, so every letter n in the ground truth became a space" },
         { "press": "Enter" },
         { "wait": 2500, "note": "the ground truth every row below is a claim about" },
         { "type": { "on": "prompt", "value": "./bin/witness --config /tmp/witness-board/witness/.witness/config.jsonc stack status --quiet" } },
