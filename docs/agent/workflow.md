@@ -50,8 +50,12 @@ Two hooks in `.claude/hooks/`, because both of these were prose rules that got b
   directory, so re-running invalidates every earlier read of it. A screenshot you never opened is not
   evidence, and neither is one you opened before re-shooting it.
 - **`require-before-after.sh`** — a pull request that changes behaviour must have both an
-  `EVIDENCE=before` and an `EVIDENCE=after` run in the session, and the `after` must come after the
-  last source edit. Docs-only changes are exempt.
+  `EVIDENCE=before` and an `EVIDENCE=after` run in the session. Docs-only changes are exempt, and
+  `[no-evidence: <reason>]` in the body is a deliberate, reviewable override.
 
-Neither hook can check whether a frame supports the *claim* — no hook can diff prose against pixels.
-That stays a discipline rule, in phase 5.
+Two things stay discipline rules because no hook can check them: whether a frame supports the
+**claim** (phase 5), and whether the `after` was recorded **after** the change. The second was
+enforced for one afternoon — deciding "was that command an edit?" from a transcript needs a
+heuristic, and the heuristic fired on a `grep` and then on the hook editing itself. Narrowing it to
+the Edit tool would have made it inert here, where most editing is a heredoc, and an inert gate that
+looks active is the worse failure.

@@ -97,6 +97,8 @@ gh pr create --title "<what changed, as a sentence>" --body-file <file>
 - **The body carries the before and the after.** `gh` cannot upload an image, so a local path in the
   body renders nothing; mint real attachment URLs through a logged-in browser and cite those.
   `require-evidence.sh` will block the publish otherwise, and it is right to.
+- **Both cuts must exist**, or `require-before-after.sh` blocks it. Nothing checks that the after came
+  after the change — that one is on you, and a stale after looks like evidence without being any.
 - Then watch the checks **by exit code**:
   ```bash
   gh pr checks <n> --watch; echo "exit=$?"

@@ -6,17 +6,21 @@
 # whole premise, so a pull request from it that says "fixed" and shows nothing is the one thing it
 # cannot ship. The rule was prose first; prose lost.
 #
-# Blocks `gh pr create` / `gh pr edit --body…` unless, in THIS session:
-#   1. an `EVIDENCE=before … witness action run …` ran, and
-#   2. an `EVIDENCE=after … witness action run …` ran, and
-#   3. the `after` run came AFTER the last edit to a source file — otherwise it recorded the code as
-#      it was two changes ago, which is worse than no recording because it looks like one.
+# Blocks `gh pr create` / `gh pr edit --body…` unless, in THIS session, both an
+# `EVIDENCE=before … witness action run …` and an `EVIDENCE=after … witness action run …` ran.
 #
 # EXEMPT: a diff that touches only docs, markdown and the agent files. There is nothing to record,
 # and demanding a video of a typo fix is how a gate gets disabled.
 #
-# NOT checked: whether the two recordings show the same journey, or whether the after shows the fix.
-# No hook can. That is phase 5 of /flow.
+# NOT checked, and deliberately not attempted:
+#   - whether the two recordings show the same journey
+#   - whether the after shows the fix
+#   - whether the after was recorded AFTER the last edit
+# The third was tried. Deciding "was that command an edit?" from a transcript needs a heuristic, and
+# the heuristic fired on `grep foo bar.sh` and on editing this hook — twice, on its own first run.
+# Narrowing it to the Edit tool would have made it inert here, where most editing is a heredoc, and
+# an inert gate that looks active is worse than no gate. It is a discipline rule in /flow instead,
+# beside the one no hook can check: does the frame support the claim.
 #
 # Override, for the case the rule genuinely does not fit: put `[no-evidence: <reason>]` in the PR
 # body. Deliberate, visible in the diff, and reviewable — unlike deleting the hook.
@@ -60,12 +64,12 @@ done <<<"$changed"
 
 command -v python3 >/dev/null 2>&1 || exit 0   # cannot verify; do not deny on a false reason
 
-read -r before after edit <<<"$(python3 - "$tx" <<'PY' 2>/dev/null
+# Did both cuts get recorded in this session? Counted from the transcript's own tool calls, so it is
+# what actually ran rather than what a summary says ran.
+counts=$(python3 - "$tx" <<'PY' 2>/dev/null
 import json, sys
 
-SRC = (".ts", ".js", ".mjs", ".json", ".jsonc", ".yml", ".yaml", ".sh")
-before = after = edit = -1
-i = 0
+before = after = 0
 try:
     with open(sys.argv[1], "r", encoding="utf-8", errors="replace") as fh:
         for line in fh:
@@ -82,38 +86,26 @@ try:
             for block in content:
                 if not isinstance(block, dict) or block.get("type") != "tool_use":
                     continue
-                i += 1
-                name = block.get("name") or ""
-                inp = block.get("input") or {}
-                if name == "Bash":
-                    c = str(inp.get("command") or "")
-                    if "action run" in c and "witness" in c:
-                        if "EVIDENCE=before" in c:
-                            before = i
-                        elif "EVIDENCE=after" in c:
-                            after = i
-                    # A heredoc or sed writing a source file is an edit too — this project does most
-                    # of its editing that way, and counting only the Edit tool would have made the
-                    # recency half of this gate inert.
-                    elif any(e in c for e in SRC) and any(w in c for w in ("cat >", "sed -i", "tee ", "python3 -")):
-                        edit = i
-                elif name in ("Edit", "Write", "NotebookEdit"):
-                    p = str(inp.get("file_path") or "")
-                    if p.endswith(SRC):
-                        edit = i
+                if (block.get("name") or "") != "Bash":
+                    continue
+                c = str((block.get("input") or {}).get("command") or "")
+                if "action run" not in c or "witness" not in c:
+                    continue
+                if "EVIDENCE=before" in c:
+                    before += 1
+                elif "EVIDENCE=after" in c:
+                    after += 1
 except Exception:
     pass
-print(before, after, edit)
+print(before, after)
 PY
-)"
-before=${before:--1}; after=${after:--1}; edit=${edit:--1}
+)
+read -r before after <<<"$counts"
+before=${before:-0}; after=${after:-0}
 
 missing=""
-[ "$before" = "-1" ] && missing="${missing}  - no \`EVIDENCE=before … witness action run …\` in this session"$'\n'
-[ "$after" = "-1" ] && missing="${missing}  - no \`EVIDENCE=after … witness action run …\` in this session"$'\n'
-if [ -z "$missing" ] && [ "$edit" != "-1" ] && [ "$after" -lt "$edit" ]; then
-  missing="  - the \`EVIDENCE=after\` run happened BEFORE your last source edit, so it recorded code you have since changed"$'\n'
-fi
+[ "$before" = "0" ] && missing="${missing}  - no \`EVIDENCE=before … witness action run …\` in this session"$'\n'
+[ "$after" = "0" ] && missing="${missing}  - no \`EVIDENCE=after … witness action run …\` in this session"$'\n'
 [ -n "$missing" ] || exit 0
 
 deny "Before/after gate: this pull request changes code, so it needs a recording of the behaviour on both sides of the change. This tool's whole premise is that a green tick is not the deliverable; a PR from it that asserts a fix and shows nothing is the one thing it cannot ship.
@@ -123,6 +115,7 @@ Do this:
   …make the change…
   EVIDENCE=after  npx witness action run <action>   # same action, same inputs
 Both cuts land side by side under .witness/artifacts/cli/<action>/. Open the frames, then cite them in the body.
+Record the after AFTER the change — this cannot check that, and a stale after looks like evidence without being any.
 No action shows it? Write one — docs/how-to/write-an-action.md. It outlives this PR.
 Terminal output rather than a screen? docs/how-to/record-a-terminal.md.
 Genuinely nothing to record? Put [no-evidence: <reason>] in the body — visible in the diff and reviewable."

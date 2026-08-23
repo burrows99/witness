@@ -86,6 +86,20 @@ skill kept sending readers to it. Nothing type-checks a string in a document.
 
 ---
 
+## Gates
+
+**A gate is only worth having if it can be right.** The before/after gate's third rule — "the after
+must post-date the last edit" — needs a heuristic for "was that command an edit?", and the heuristic
+fired twice on its first run: once on `grep foo bar.sh`, once on the hook being edited. The version
+that would not misfire (count only the Edit tool) would have been inert, because most editing here is
+a heredoc. Dropped to two rules and one written-down discipline rule. An inert gate that looks active
+is worse than no gate.
+
+**Exempt the same paths both ways.** Whatever a gate excuses from *triggering* a requirement must
+also be excused from *invalidating* it, or the two halves disagree and the gate blocks its own author.
+
+---
+
 ## Judgement calls that keep coming back
 
 **A checker that cries wolf is worse than none.** Drift's first design swept every locator across
