@@ -251,3 +251,119 @@ test("what came back decides what is an asset, not how it was asked for", () => 
   ok(!/eye\.svg/.test(out), "an icon is an icon however it was fetched");
   match(out, /…and 1 static asset/);
 });
+
+/**
+ * The traceback that came back as `200`.
+ *
+ * A real one, from the run in #145: a graph build that had 401'd against its provider the whole time,
+ * reported by a polled task endpoint that answers 200 whatever the answer is.
+ */
+const failedTask = JSON.stringify({
+  data: { error: 'Traceback (most recent call last):\n  File ".../zep_cloud/graph/raw_client.py", line 1071, in create', status: "failed" },
+});
+
+test("a 200 carrying the failure in its body is a failure, and the table says which marker fired", () => {
+  // The whole of #145. Three ticks, every request 200, a clean console, `ok` in the title — over a
+  // build that never worked. The body was captured and written to `debug.json` the whole time; what
+  // was missing was a predicate willing to look at it.
+  const input: Partial<StoryInput> = {
+    recording: recording({
+      requests: [
+        request({ method: "POST", url: "http://localhost:8000/api/graph/build", responseBody: '{"data":{"taskId":"32f8"}}' }),
+        request({ step: "wait", url: "http://localhost:8000/api/graph/task/32f8", responseBody: failedTask }),
+      ],
+    }),
+    failureWhen: [{ path: "data.error", present: true }],
+  };
+  const out = story(input).markdown();
+
+  // The title is the only line some readers get to, so it stops reading as `ok, nothing to look at`.
+  match(out, /# customer\.cancelOrder — ok, but 1 request failed in the body \(4\.2s\)/);
+  match(out, /## Network \(2 requests · 1 failed\)/);
+  // The transport really did answer 200. What made it a failure is named beside it rather than left
+  // to whoever thinks to open the JSON.
+  match(out, /\| \*\*200 · data\.error\*\* \|.*graph\/task\/32f8/);
+  match(out, /### The ones that failed/);
+  match(out, /\*\*GET http:\/\/localhost:8000\/api\/graph\/task\/32f8\*\* → 200 · data\.error \(40ms\) during `wait`/);
+  match(out, /zep_cloud\/graph\/raw_client\.py/);
+  // The request that was fine is in the table and not in the failures.
+  ok(!/\*\*200 · data\.error\*\*.*graph\/build/.test(out));
+
+  // …and the same conclusion in the half something else reads, by the index of the request it is about.
+  const json = story(input).json();
+  equal(json.network.failed, 1);
+  deepEqual(json.network.failedInBody, [{ index: 1, marker: "data.error" }]);
+  // Still `ok`: what should fail a step is what the step asserted, and this changes what is reported.
+  equal(json.ok, true);
+});
+
+test("a 200 that is genuinely fine is still a 200 that is genuinely fine", () => {
+  // The other half of a predicate: one that fires on a healthy body is a checker that cries wolf,
+  // which this repository holds to be worse than none.
+  const out = story({
+    recording: recording({
+      requests: [
+        request({ responseBody: '{"data":{"error":null,"status":"running"}}' }),
+        request({ url: "http://localhost:3000/graphql", responseBody: '{"data":{"me":{"id":"1"}},"errors":[]}' }),
+      ],
+    }),
+    failureWhen: [{ path: "data.error", present: true }, { path: "errors", present: true }],
+  }).markdown();
+  match(out, /# customer\.cancelOrder — ok \(4\.2s\)/);
+  match(out, /## Network \(2 requests\)$/m);
+  ok(!/The ones that failed/.test(out), "nothing went wrong, so nothing is spelled out");
+  ok(!/\*\*200/.test(out), "and nothing is bolded");
+});
+
+test("a GraphQL error is a 200 by specification, and the table can finally show one", () => {
+  // The provider declares this shape itself, so no description has to: `clients.ts` registers it, and
+  // for as long as the predicate was the status code the table could never show a GraphQL failure at all.
+  const out = story({
+    recording: recording({
+      requests: [request({ method: "POST", url: "http://localhost:3000/graphql", responseBody: '{"data":null,"errors":[{"message":"no such patient"}]}' })],
+    }),
+    failureWhen: [{ path: "errors", present: true }],
+  }).markdown();
+  match(out, /\| \*\*200 · errors\*\* \|/);
+  match(out, /no such patient/);
+});
+
+test("a marker can be the value a field has, not only that it has one", () => {
+  const out = story({
+    recording: recording({ requests: [request({ responseBody: '{"success":false,"message":"card declined"}' })] }),
+    failureWhen: [{ path: "success", equals: false }],
+  }).markdown();
+  match(out, /\| \*\*200 · success=false\*\* \|/);
+  match(out, /card declined/);
+});
+
+test("a body that is not JSON, or JSON with its tail cut off, is not a story that throws", () => {
+  // A body is not always JSON and a recorded one is routinely valid JSON that was clipped at 4000
+  // characters on the way in. A debug story that crashes is worse than one that is too quiet — and a
+  // marker that could not be looked for is said out loud, because a silent miss here is the same bug
+  // one layer down.
+  const clipped = `{"data":{"error":"Traceback (most recent${"…".repeat(3)}`;
+  const out = story({
+    recording: recording({
+      requests: [
+        request({ contentType: "text/html", responseBody: "<!doctype html><h1>502 Bad Gateway</h1>" }),
+        request({ url: "http://localhost:3000/api/build", responseBody: clipped }),
+        request({ url: "http://localhost:3000/api/huge", responseBody: `{"data":{"error":"${"x".repeat(20_000)}"}}` }),
+      ],
+    }),
+    failureWhen: [{ path: "data.error", present: true }],
+  }).markdown();
+  match(out, /2 JSON bodies were not readable back/);
+  ok(!/The ones that failed/.test(out), "unreadable is not the same claim as failed");
+});
+
+test("a body-level failure during the step that broke is pulled in with everything else", () => {
+  const out = story({
+    ok: false,
+    steps: [{ step: "goto", ms: 10 }, { step: "wait", ms: 900, error: "timed out waiting for the build" }],
+    recording: recording({ requests: [request({ step: "wait", stepIndex: 1, responseBody: failedTask })] }),
+    failureWhen: [{ path: "data.error", present: true }],
+  }).markdown();
+  match(out, /- 1 request, \*\*1 of them failed\*\*/);
+  match(out, /→ 200 · data\.error \(40ms\) during `wait`/);
+});

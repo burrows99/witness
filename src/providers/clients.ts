@@ -59,6 +59,42 @@ export type ClientConfig = {
   operations: Record<string, OperationConfig>;
   /** Refuse to run unless the resolved base URL matches — a guard for anything that deletes. */
   requireUrlMatch?: string;
+  /**
+   * What a failure looks like in a response BODY, when the status code does not say.
+   *
+   * `{ "path": "data.error", "present": true }` — an app that answers 200 and puts the traceback in
+   * the payload. The shape of most Python and PHP APIs, of every job whose failure arrives by polling
+   * (the POST that starts it genuinely IS 200), and of GraphQL by specification. Without this the debug
+   * story judges a request by its transport status alone and reports a build that 401'd all the way
+   * through as three ticks and a clean network table — with the traceback sitting in `debug.json`,
+   * captured and not looked at.
+   *
+   * It changes what the story REPORTS, not whether a step passed: what should fail an assertion is
+   * what the assertion says, and a request nobody asserted on is evidence rather than a verdict.
+   */
+  failureWhen?: FailureWhen;
+};
+
+/**
+ * One marker that says a body carries a failure.
+ *
+ * A dotted path into the parsed response, and what has to be true at it. Deliberately two ways of
+ * asking rather than an expression language: `{"success": false}` and `{"error": "…"}` are between
+ * them nearly every API that reports failure inside a 200, and a description is meant to be readable
+ * by whoever did not write it.
+ */
+export type FailureWhen = {
+  /** Where to look — `data.error`, `errors`, `success`. A numeric segment indexes an array. */
+  path: string;
+  /**
+   * Failure when there is something at that path: a non-empty string, a non-empty array, a number, an
+   * object. What `{ "path": "data.error", "present": true }` reads as, and what a marker means when it
+   * names no value. A literal `true` rather than a boolean because there is no useful other setting,
+   * and a generated template offering `false` would be offering the opposite of what it documents.
+   */
+  present?: true;
+  /** …or failure when it is exactly this: `{ "path": "status", "equals": "failed" }`. */
+  equals?: string | number | boolean;
 };
 
 export type ClientContext = {
@@ -74,6 +110,15 @@ export type ClientProvider = {
   /** The URL an operation would hit, for a note or a browser. */
   url: (op: OperationConfig, params: Params, context: ClientContext) => string;
   call: <T>(name: string, op: OperationConfig, params: Params, body: unknown, context: ClientContext) => Promise<T>;
+  /**
+   * What failure looks like in this wire format, when the format itself says — nobody has to declare it.
+   *
+   * The leverage is here rather than in the config: a GraphQL error is a 200 with `errors[]` by
+   * specification, so for one of the formats this ships a provider for, the network table could never
+   * show a failure at all and no amount of care in a description would have fixed it. A `failureWhen`
+   * on the client wins, because a product knows its own API better than its wire format does.
+   */
+  failureWhen?: FailureWhen;
 };
 
 export type Params = Record<string, unknown>;
@@ -182,4 +227,7 @@ export const clientProviders = new Registry<ClientProvider>("client")
       if (answer.errors?.length) throw new Error(`${name}: ${answer.errors.map(e => e.message).join("; ")}`);
       return shape(answer.data, op, params) as never;
     },
+    // The same rule the `call` above enforces, said where the debug story can read it: a GraphQL
+    // failure is a 200, so the browser's own queries need this to be visible in the network table.
+    failureWhen: { path: "errors", present: true },
   });

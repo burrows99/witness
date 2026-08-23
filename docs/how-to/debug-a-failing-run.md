@@ -28,6 +28,30 @@ what broke, step by step — the network and console of the action that failed, 
 Every request, log and exception is tagged with **the step running when it happened**. That join is
 what a person does by hand across three panes, and an agent reading a filesystem cannot do at all.
 
+## When the failure is in the body
+
+A status code cannot see `{"data":{"error":"Traceback …"},"status":"failed"}` inside a `200` — and a
+job whose failure arrives by polling is a `200` every time you ask. Tell the description what failure
+looks like on the wire and the table stops reading as healthy:
+
+```jsonc
+"api": { "failureWhen": { "path": "data.error", "present": true } }
+```
+
+```md
+# process — ok, but 1 request failed in the body (3.9s)
+
+| 2.4s | wait | GET | **200 · data.error** | 5ms | …/api/graph/task/32f8 |
+
+### The ones that failed
+**GET …/api/graph/task/32f8** → 200 · data.error (5ms) during `wait`
+Came back:  {"data":{"error":"Traceback (most recent call last): …","status":"failed"}}
+```
+
+See [reference/config.md](../reference/config.md#api). It changes what the story says, not whether the
+run passed — the steps still assert what they assert. `graphql` needs no declaration: a non-empty
+`errors[]` is a failure by specification, and the provider says so itself.
+
 ## The order to look in
 
 1. **`debug.md` of the action that failed** — the step list, then "Where it broke".

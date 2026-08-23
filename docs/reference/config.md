@@ -70,6 +70,22 @@ set on one action instead. See [how-to/record-a-terminal.md](../how-to/record-a-
 The first service to declare one is what bare `witness api …` talks to; the rest are reachable by
 name from a step (`{ "api": { "client": "mailpit", … } }`).
 
+**`failureWhen`** — what a failure looks like in a response *body*, for an app that answers `200` and
+puts the error in the payload:
+
+```jsonc
+"failureWhen": { "path": "data.error", "present": true }
+```
+
+`path` is a dotted path into the parsed body; `present: true` fires when there is something there, and
+`equals` when it is a particular value (`{ "path": "status", "equals": "failed" }`). Without one, the
+debug story judges a request by its status code alone — so most Python and PHP APIs, every job whose
+failure arrives by polling, and every GraphQL query read as healthy. `graphql` declares its own and
+needs none: a non-empty `errors[]` is a failure by specification.
+
+It changes what [`debug.md`](../how-to/debug-a-failing-run.md) **reports**, never whether a step
+passed. What should fail a run is what an `expect` or a `check` says.
+
 ## `app`
 
 - `routes` — screen name → path, `{param}` for an argument. `goto` and `waitForUrl` take these names.

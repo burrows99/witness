@@ -1,4 +1,4 @@
-import type { ClientConfig, ClientProvider, OperationConfig, Params } from "../providers/clients.ts";
+import type { ClientConfig, ClientProvider, FailureWhen, OperationConfig, Params } from "../providers/clients.ts";
 import { clientProviders } from "../providers/clients.ts";
 import type { HttpApi } from "./client.ts";
 import { authHeaders } from "../providers/auth.ts";
@@ -19,6 +19,14 @@ import type { Trace } from "../diagnostics/trace.ts";
 export class Operations {
   readonly names: string[];
   readonly provider: string;
+  /**
+   * What a failure looks like in a body from this API, for whatever reads one back.
+   *
+   * The description's own declaration first, and the wire format's second: a product knows its API
+   * better than its format does, but a format that DEFINES failure — a GraphQL 200 with `errors[]` —
+   * should not have to be declared by every project that speaks it.
+   */
+  readonly failureWhen?: FailureWhen;
 
   private readonly http: HttpApi;
   private readonly stack: Stack;
@@ -37,6 +45,7 @@ export class Operations {
     this.config = config;
     this.provider = config.provider ?? "rest";
     this.client = clientProviders.get(this.provider);
+    this.failureWhen = config.failureWhen ?? this.client.failureWhen;
     this.names = Object.keys(config.operations ?? {});
 
     // A guard for the clients that can delete: refuse to run against anything but the expected host.

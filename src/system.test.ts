@@ -1,5 +1,5 @@
 import { deepEqual, equal, match, ok, throws } from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { afterEach, test } from "node:test";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -262,4 +262,60 @@ test("a service's own action reaches its own secret by bare name", when, () => {
   // And with no scope there is nothing to disambiguate two services that both declared one, so it
   // says so rather than picking.
   throws(() => system.secret("adminKey"), /no secret "adminKey" — declared: grafana\.adminKey, billing\.adminKey/);
+});
+
+/**
+ * A page that records nothing and answers one request, so the inspector has something to have seen.
+ *
+ * The whole of what is needed for a `wait` step: the events Playwright would raise, raised by hand
+ * from inside the wait. Everything the inspector asks of a request and a response, and nothing else.
+ */
+const pageAnswering = (body: string): never => {
+  const listeners = new Map<string, (arg: never) => void>();
+  const request = { method: () => "GET", url: () => "http://localhost:8080/api/graph/task/32f8", resourceType: () => "fetch", postData: () => null, failure: () => null };
+  const response = { request: () => request, status: () => 200, headers: () => ({ "content-type": "application/json" }), text: async () => body };
+  return {
+    on: (event: string, listener: (arg: never) => void) => void listeners.set(event, listener),
+    off: () => undefined,
+    waitForTimeout: async () => {
+      listeners.get("request")?.(request as never);
+      listeners.get("response")?.(response as never);
+    },
+  } as never;
+};
+
+test("a failure declared in the description reaches the story the run writes", when, async () => {
+  // The seam nothing would otherwise stand on. `Story` decides what a failure is and every test of
+  // that hands it its own rules — so the line in this constructor that gathers them off the clients
+  // could be deleted, and the engine's line that passes them to the story with it, and every one of
+  // those tests would stay green while `debug.md` went back to reading a 200 with a traceback in it as
+  // an unremarkable success. That is #145 exactly, so it is asserted through the thing that runs.
+  //
+  // Through `loadConfig`, because an `api` written inside its service is hoisted on the way in: a
+  // fixture handed to the constructor is the shape a config is WRITTEN in, not the shape this receives.
+  const dir = inCheckout();
+  const file = path.join(dir, "config.jsonc");
+  writeFileSync(
+    file,
+    JSON.stringify({
+      name: "acme",
+      root: ["marker"],
+      services: {
+        web: { port: 3000, container: "acme-web", actions: { pollTheBuild: { steps: [{ wait: 1 }] } } },
+        api: {
+          port: 8080,
+          container: "acme-api",
+          api: { failureWhen: { path: "data.error", present: true }, operations: {} },
+        },
+      },
+    }),
+  );
+  const system = new System(loadConfig(file));
+
+  const result = await system.actions.run("web.pollTheBuild", pageAnswering('{"data":{"error":"ApiError(status_code=401)","status":"failed"}}'));
+  ok(result.ok, "every step passed — which is the point: the failure is in a body nobody asserted on");
+  const written = readFileSync(result.debug?.markdown ?? "", "utf8");
+  match(written, /\*\*200 · data\.error\*\*/);
+  match(written, /ApiError\(status_code=401\)/);
+  match(written, /— ok, but 1 request failed in the body/);
 });

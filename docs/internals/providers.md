@@ -5,7 +5,7 @@
 | file | registry | registered |
 |---|---|---|
 | `registry.ts` (40) | — | the registry itself |
-| `clients.ts` (185) | `client` | `rest`, `graphql` |
+| `clients.ts` (233) | `client` | `rest`, `graphql` |
 | `auth.ts` (134) | `auth` | `apiKey`, `bearer`, `basic`, `cookie`, `login` |
 | `secrets.ts` (70) | `secret` | `containerEnv`, `secret`, `envFile`, `env`, `literal` |
 | `recorders.ts` (125) | `recorder` | `terminal` |

@@ -11,6 +11,7 @@ import { caption as drawCaption, slide as drawSlide } from "../browser/narration
 import type { Operations } from "../http/operations.ts";
 import type { Queries } from "../database/queries.ts";
 import { Inspector, type Recording } from "../diagnostics/inspector.ts";
+import type { FailureWhen } from "../providers/clients.ts";
 import { Story } from "../diagnostics/story.ts";
 import { Trace, type TraceEntry } from "../diagnostics/trace.ts";
 
@@ -40,6 +41,8 @@ export class Actions {
   private readonly secret: (name: string, scope?: string) => string;
   /** Where a service in this stack answers — the origin a step can be sent to and expect to arrive on. */
   private readonly origin: (service: string) => string;
+  /** What a failure looks like in a body, as the description's clients declare it — for the story. */
+  private readonly failureWhen: FailureWhen[];
 
 
   constructor(opts: {
@@ -55,6 +58,15 @@ export class Actions {
     secret?: (name: string, scope?: string) => string;
     /** Optional: without it, a step naming a service to land on says there is no stack to look one up in. */
     origin?: (service: string) => string;
+    /**
+     * What a failure looks like in a response body, one per client that declares one.
+     *
+     * The engine never reads these — they go straight to the debug story, which is the thing that used
+     * to judge a request by its status code alone and call a 200 carrying a traceback healthy. They
+     * change what is REPORTED and not whether a step passed: a request nobody asserted on is evidence,
+     * not a verdict.
+     */
+    failureWhen?: FailureWhen[];
   }) {
     this.operations = opts.operations;
     this.client = opts.client ?? (name => {
@@ -71,6 +83,7 @@ export class Actions {
     this.origin = opts.origin ?? (service => {
       throw new Error(`a step waits for service "${service}", and this system was built without a stack to find one in`);
     });
+    this.failureWhen = opts.failureWhen ?? [];
   }
 
   /**
@@ -568,6 +581,7 @@ export class Actions {
         steps: result.steps,
         warnings: result.warnings,
         recording: result.recording,
+        failureWhen: this.failureWhen,
         trace: result.trace,
         artefacts: evidence.artefacts(),
       });

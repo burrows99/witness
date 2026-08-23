@@ -39,6 +39,19 @@ test("the operations a client declares are its vocabulary", () => {
   deepEqual(ops.operation("orders.show"), { path: "/v1/orders/{id}" });
 });
 
+test("what a failure looks like in a body comes from the description, or from the wire format", () => {
+  // The two halves of #145's fix meet here. A description says what ITS 200s mean; a format that
+  // defines failure for itself needs nobody to say it. Both end up in the debug story, which is the
+  // thing that used to read a 200 carrying a traceback as an unremarkable success.
+  equal(operations().failureWhen, undefined);
+  deepEqual(operations({ provider: "graphql" }).failureWhen, { path: "errors", present: true });
+  // The product knows its own API better than its wire format does, so its own declaration wins.
+  deepEqual(
+    operations({ provider: "graphql", failureWhen: { path: "data.error", present: true } }).failureWhen,
+    { path: "data.error", present: true },
+  );
+});
+
 test("an operation nobody declared lists the ones that exist", () => {
   throws(() => operations({ operations: { a: {} } }).operation("nope"), /no such operation "nope" — declared: a/);
 });
