@@ -32,7 +32,7 @@ service; old files still load.
   "url": "…", "urlVar": "…",
   "probe": { "path": "/api/healthz", "contains": "pass" },
 
-  "records": "terminal", "shell": "docker exec -it … bash",
+  "records": "terminal", "shell": "docker exec -it … bash", "pane": { "height": 1350, "fontSize": 14 },
 
   "secrets":  { "adminPass": { "containerEnv": "ADMIN_PASSWORD" } },
   "api":      { "auth": {…}, "operations": {…}, "kind": "rest" },
@@ -50,8 +50,9 @@ suffix (`WT` by default). `probe` is `"http"`, `"container"`, or an object — t
 **`kind`** — `in-house` or `third-party`. A third party is not restartable, not resettable, usually
 shared, and the likeliest source of a flake that is nobody's fault.
 
-**`records: "terminal"`** — for a service with no screen. See
-[how-to/record-a-terminal.md](../how-to/record-a-terminal.md).
+**`records: "terminal"`** — for a service with no screen. `pane` is the size it is filmed at
+(`width`, `height`, `fontSize`; 1280x900 at 20pt by default, which is about thirty rows) and can be
+set on one action instead. See [how-to/record-a-terminal.md](../how-to/record-a-terminal.md).
 
 ## `api`
 

@@ -115,6 +115,7 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
         if (recordings.length > 1 || fs.existsSync(path.join(at, "slides.json"))) {
           present(at, stitched, target, encode);
         }
+        still(target);
         written.push(target);
       } catch (err) {
         // One unreadable recording must not cost the rest of the run its videos.
@@ -131,6 +132,25 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
     return written;
   },
 });
+
+/**
+ * The last frame of the video, beside it.
+ *
+ * A run is checked by opening what it recorded, and an MP4 has nothing to open. A browser lane leaves
+ * stills as it goes; a terminal lane leaves one video and nothing else, so the frame carrying the
+ * claim was being extracted by hand with the command below, once per cut, by everyone.
+ *
+ * The LAST frame rather than the first: a shell's output arrives in one write at the end, so the end
+ * screen is the one the claim is on. `-sseof` seeks from the end, which is the whole trick.
+ */
+function still(video: string): void {
+  try {
+    ffmpeg(["-sseof", "-3", "-i", video, "-frames:v", "1", video.replace(/\.mp4$/, ".png")]);
+  } catch {
+    // Best effort, like everything else here: a still that will not extract must not cost a run the
+    // video it came from.
+  }
+}
 
 type Manifest = { source: string; test: string; cut: string; group: string; dir: string };
 type SlideMark = { atMs: number; holdMs: number; image: string };

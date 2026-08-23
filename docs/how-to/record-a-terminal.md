@@ -25,6 +25,37 @@ the wrong tool for filming it.
 Needs `vhs` on the path (`brew install vhs`). Without it the run says so in `warnings` and carries on,
 the same way ffmpeg is treated.
 
+## Make the pane fit what you are showing
+
+The default is 1280x900 at 20pt — about thirty rows, and fewer as soon as anything wraps. A command
+whose output is longer than that ends the recording showing its **tail**, and a headline printed
+first is nowhere: the output arrives in one write, so there is no intermediate frame to fall back on.
+
+```jsonc
+"pane": { "height": 1350, "fontSize": 14 }
+```
+
+On the service, or on one action when only that one needs it. Raise the pane rather than piping the
+command through `head -N`: the pipe truncates the thing being demonstrated to fit the thing filming
+it, and leaves a statement about pane geometry inside a description where nobody will connect the two.
+
+The default is matched to a browser pane so the two stitch together in one `--parallel` frame without
+either being letterboxed — so change it for a pane that is recorded on its own.
+
+## Look at what it recorded
+
+A run leaves the video and, beside it, its **last frame**:
+
+```
+.witness/artifacts/cli/<action>/<cut>/
+  video.mp4
+  video.png     the last frame — the one a shell's output is on
+```
+
+A Read on an MP4 returns no pixels, which left `/flow` phase 5 — *open the frames* — with nothing to
+open for the half of this tool that has no screen. The still is the last frame rather than the first
+for the same reason the pane has to be big enough: with a shell, the claim is on the final screen.
+
 ## What translates, and what does not
 
 | step | tape |

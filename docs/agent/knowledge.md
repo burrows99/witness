@@ -119,8 +119,11 @@ recording is the deliverable; its timing is part of the work, not an afterthough
 fragment longer than the pane finished showing its last thirty lines — and the line the whole claim
 rested on, `Walked 4 pages`, had scrolled off before the recording ended. The output arrives in one
 write, so there is no intermediate frame to fall back on: the claim is either on the final screen or
-it is nowhere. Pipe the step through `head -N`, and pipe BOTH cuts the same way. A pane is 1280x900 at
-20pt — about thirty rows, and fewer as soon as anything wraps.
+it is nowhere. The default pane is 1280x900 at 20pt — about thirty rows, and fewer as soon as
+anything wraps — so make the pane fit: `"pane": { "height": …, "fontSize": … }`, on the service or on
+the one action. The first fix for this was a `head -N` inside the step, which truncates the thing
+being demonstrated to fit the thing filming it and hides a statement about pane geometry in a
+description; the pane was the part that was wrong.
 
 **Progress on stdout breaks the consumer.** Results are stdout, progress and warnings are stderr, or
 `| jq` fails for reasons nobody can see.
@@ -145,6 +148,13 @@ for.
 file that is the only thing an agent reads. The list is still worth keeping (it is read before
 anything has been run) but it must say where the real one is, or a reader told a verb does not exist
 concludes the tool cannot do it rather than asking.
+
+**`check drift` cannot be run on a terminal action.** Phase 6 says to run it when the change touched
+something a description claims, and on a `records: "terminal"` action it opens a browser and spends
+thirty seconds waiting for `locator('prompt')` before failing. `run` short-circuits on `records`
+before any browser is opened; drift never learned to, so the red says "your action is broken" when
+what it means is "this checker is the wrong one for this action". True of every terminal action on
+`main` — check it against an action you did not touch before believing it about yours.
 
 ---
 

@@ -26,6 +26,18 @@ test("a service's action gets its name and its app from where it is written", ()
   equal(config.actions?.["grafana.signIn"].app, "grafana");
 });
 
+test("how a service is filmed travels with its actions, pane and all", () => {
+  // The runner reads all of this off the ACTION — it never looks the service up again — so anything a
+  // service says about how it is captured has to be here by the time the runner asks.
+  const config = of({
+    shell: { records: "terminal", shell: "docker exec -it db bash", pane: { height: 1350 }, actions: { readIt: { steps: [] } } },
+  });
+  const action = config.actions?.["shell.readIt"];
+  equal(action?.records, "terminal");
+  equal(action?.shell, "docker exec -it db bash");
+  deepEqual(action?.pane, { height: 1350 });
+});
+
 test("an action that names itself fully is left alone", () => {
   const config = of({ grafana: { actions: { "grafana.signIn": { steps: [] } } } });
   deepEqual(Object.keys(config.actions ?? {}), ["grafana.signIn"]);

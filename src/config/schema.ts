@@ -99,6 +99,12 @@ export type ServiceConfig = ServiceSpec & {
   records?: "terminal";
   /** For a `terminal` service: what every command runs inside — `docker exec -it witness-postgres bash`. */
   shell?: string;
+  /**
+   * For a `terminal` service: the pane its actions are filmed in. Defaults to 1280x900 at 20pt —
+   * about thirty rows, and fewer as soon as anything wraps. See `ActionConfig.pane`, which is the
+   * same knob for one action.
+   */
+  pane?: { width?: number; height?: number; fontSize?: number };
   /** What this service can be asked. The first service to declare one is what `witness api` talks to. */
   api?: Omit<ApiConfig, "service"> & { service?: string };
   /** What a person sees of it: routes, the locators worth naming, forms, and how someone signs in. */

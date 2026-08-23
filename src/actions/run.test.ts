@@ -162,3 +162,41 @@ test("a retry is a fresh browser, and keeps the failed attempt's evidence", asyn
   deepEqual(filed, [undefined, "flaky-retry-2"]);
   equal(browser.closed.filter(what => what.startsWith("video panel")).length, 2);
 });
+
+test("the pane a description asks for is the pane it is filmed in", async () => {
+  // Three fields were declared, typed and honoured by the tape, and the runner handed over two of the
+  // five it had: a terminal pane was always 1280x900 at 20pt and nothing in a description could say
+  // otherwise. The workaround was piping the command through `head -30` — a statement about pane
+  // geometry, living inside the thing being demonstrated.
+  const { runActions } = await import("./run.ts");
+  const { recorderProviders } = await import("../providers/recorders.ts");
+  const browser = fakeBrowser();
+  const was = recorderProviders.get("terminal");
+  const seen: Record<string, unknown>[] = [];
+  recorderProviders.register("terminal", {
+    available: () => true,
+    record: (_steps, _values, out, opts) => (seen.push({ ...opts }), out),
+  });
+  try {
+    const action = { records: "terminal" as const, shell: "docker exec -it db bash", pane: { height: 1350, fontSize: 14 }, steps: [] };
+    await runActions(
+      {
+        workspace: { resolve: (t?: string) => `/tmp/witness-run-test/${t ?? ""}` },
+        run: async () => ({ ok: true, values: {} }) as never,
+        actionConfig: () => action,
+        evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
+        pinEvidence: () => undefined,
+        renderVideos: () => [],
+      },
+      { names: ["shell.readTheDatabase"], render: false },
+      { launch: browser.launch },
+    );
+  } finally {
+    recorderProviders.register("terminal", was);
+  }
+  equal(seen.length, 1);
+  equal(seen[0].height, 1350);
+  equal(seen[0].fontSize, 14);
+  // And what already reached it still does.
+  equal(seen[0].shell, "docker exec -it db bash");
+});

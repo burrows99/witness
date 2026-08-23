@@ -755,6 +755,18 @@ export type ActionConfig = {
   /** For a terminal action: what its commands run inside. */
   shell?: string;
   /**
+   * For a terminal action: the pane it is filmed in. Defaults to 1280x900 at 20pt.
+   *
+   * About thirty rows at the default, and fewer as soon as anything wraps — so a command whose output
+   * is longer than that finishes the recording showing its tail, and a headline printed first is
+   * nowhere. Raise the pane rather than truncating the command: piping through `head -N` puts a
+   * statement about pane geometry inside the thing being demonstrated.
+   *
+   * Matched to a browser pane by default, so the two stitch together in one `--parallel` frame
+   * without either being letterboxed. Changing it is for a pane recorded on its own.
+   */
+  pane?: { width?: number; height?: number; fontSize?: number };
+  /**
    * The note a person needs to re-walk this by hand — `manual-verification.md`, beside the frames.
    *
    * Every value is a template, so it says what THIS run saw: `{orderId}`, `{stats.users}`, whatever
