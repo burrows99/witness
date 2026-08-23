@@ -9,6 +9,9 @@ import { writeCatalogue } from "../evidence/catalogue.ts";
 /**
  * Turning a run's raw recordings into something a person will actually watch.
  *
+ * The second half of two. A recorder (see `recorders.ts`) films a service while it runs; this takes
+ * what was filmed — a browser's `.webm`, a terminal's `.mp4` — and makes one file of it.
+ *
  * A test runner leaves one webm per page in a directory named after the test — mangled to fit a
  * filesystem, and nobody opens it. This makes an MP4 per test automatically, and puts it with the rest
  * of that test's evidence rather than in a pile of videos: a spec that drove two pages is stitched side

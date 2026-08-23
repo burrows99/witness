@@ -299,8 +299,8 @@ doing any of them is a registration rather than an edit.
 | client | `rest`, `graphql` | `src/providers/clients.ts` |
 | auth | `apiKey`, `bearer`, `basic`, `cookie`, `login` | `src/providers/auth.ts` |
 | secret | `containerEnv`, `secret`, `envFile`, `env`, `literal` | `src/providers/secrets.ts` |
-| video | `ffmpeg` | `src/providers/video.ts` |
-| recorder | `terminal` (VHS) | `src/providers/recorders.ts` |
+| recorder | `terminal` (VHS) | `src/providers/recorders.ts` — captures a service *while it runs* |
+| video | `ffmpeg` | `src/providers/video.ts` — turns what was captured into one watchable file |
 | stub | `http` | `src/providers/stubs.ts` |
 
 ## Maintainers

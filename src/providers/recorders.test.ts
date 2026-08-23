@@ -68,3 +68,11 @@ test("it says whether this machine can record at all", () => {
   equal(typeof recorderProviders.get("terminal").available(), "boolean");
   deepEqual(recorderProviders.names, ["terminal"]);
 });
+
+test("the only recorder names offered are ones that resolve", () => {
+  // `records: "browser"` was in the type and never in the registry: `get("browser")` threw, and the
+  // code only ever branched on "terminal". A type offering a value nothing can serve is a lie in the
+  // one place a reader trusts.
+  for (const name of recorderProviders.names) ok(recorderProviders.get(name), name);
+  deepEqual(recorderProviders.names, ["terminal"]);
+});

@@ -125,7 +125,8 @@
     },
 
     // The half with no screen. Every stack has one — a migration, a queue worker, the psql somebody
-    // actually types — and Playwright is the wrong tool for filming it. This one is recorded by VHS.
+    // actually types — and Playwright is the wrong tool for filming it. `records` says what CAPTURES
+    // it; the `video` block is the other end, and turns whatever was captured into one file.
     "shell": {
       "kind": "in-house",
       "port": 5441,

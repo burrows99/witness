@@ -750,8 +750,8 @@ export type StepConfig = {
 
 export type ActionConfig = {
   summary?: string;
-  /** How to record it. Filled in from the service this belongs to; see `ServiceConfig.records`. */
-  records?: "browser" | "terminal";
+  /** What captures it, when a browser is wrong. Filled in from its service; see `ServiceConfig.records`. */
+  records?: "terminal";
   /** For a terminal action: what its commands run inside. */
   shell?: string;
   /**
