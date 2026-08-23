@@ -182,6 +182,7 @@ test("a terminal action is recognised as one through the real System", when, () 
   // And a service that names no recorder still gets the browser.
   equal(system.actionConfig("web.openHome")?.records, undefined);
   equal(system.actionConfig("nothing.declared"), undefined);
+});
 
 test("a service's own action reaches its own secret by bare name", when, () => {
   // The headline of the service-owned reorganisation, and the one line of it nothing stood on.
