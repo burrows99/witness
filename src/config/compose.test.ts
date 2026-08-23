@@ -4,26 +4,35 @@ import { test } from "node:test";
 
 import { Compose } from "./compose.ts";
 
-/** What `docker compose config --no-interpolate --format json` gives back for this repo's own stack. */
+/**
+ * What `docker compose config --no-interpolate --format json` gives back for this repo's own stack.
+ *
+ * **Alphabetical**, because that is what compose does, and it is load-bearing rather than tidiness:
+ * this fixture used to list `postgres` before `mariadb` — an order compose never produces — so the one
+ * bug the ordering rule exists for could not happen in it. `depends_on` is here for the same reason,
+ * in the object form compose normalises `[postgres, mailpit]` into.
+ */
 const STACK = {
   gitea: {
     image: "gitea/gitea:1.21.11",
     container_name: "witness-gitea",
     ports: ["${GITEA_PORT:-3020}:3000"],
+    depends_on: { postgres: { condition: "service_started", required: true } },
     environment: { GITEA__database__USER: "gitea", GITEA__database__PASSWD: "${POSTGRES_CREDENTIAL:-x}" },
+  },
+  // A second database, and no `container_name`: both of the things a real stack does that this used
+  // to be silent about. Nothing in the file says anything needs it — which is what makes it the wrong
+  // answer to "what does `db sql` mean", and it sorts first.
+  mariadb: {
+    image: "mariadb:11.4",
+    ports: ["${MARIADB_PORT:-3307}:3306"],
+    environment: { MARIADB_DATABASE: "witness", MARIADB_USER: "witness", MARIADB_PASSWORD: "${MARIADB_CREDENTIAL:-x}" },
   },
   postgres: {
     image: "postgres:17",
     container_name: "witness-postgres",
     ports: ["${POSTGRES_PORT:-5441}:5432"],
     environment: { POSTGRES_DB: "gitea", POSTGRES_USER: "gitea", POSTGRES_PASSWORD: "${POSTGRES_CREDENTIAL:-x}" },
-  },
-  // A second database, and no `container_name`: both of the things a real stack does that this used
-  // to be silent about.
-  mariadb: {
-    image: "mariadb:11.4",
-    ports: ["${MARIADB_PORT:-3307}:3306"],
-    environment: { MARIADB_DATABASE: "witness", MARIADB_USER: "witness", MARIADB_PASSWORD: "${MARIADB_CREDENTIAL:-x}" },
   },
   redis: { image: "redis:7-alpine", ports: ["${REDIS_PORT:-6380}:6379"] },
   worker: { build: { context: "." }, container_name: "witness-worker" },
@@ -186,4 +195,31 @@ test("a docker that is not there is not an answer", () => {
     throw new Error("docker: command not found");
   }) as typeof execFileSync;
   equal(Compose.docker(process.cwd(), exec), undefined);
+});
+
+test("the database the app says it needs is the one db sql means", () => {
+  // `db sql` runs against the FIRST service to declare a database, and `docker compose config` hands
+  // them back alphabetically — so on this stack the default was **mariadb**, and a bare `db sql` ran
+  // `psql` inside MariaDB. Nothing in the description said which one the app used; the letter `m` did.
+  const { services } = Compose.translate(STACK, "witness");
+  const withDatabase = Object.entries(services)
+    .filter(([, service]) => service.database)
+    .map(([name]) => name);
+  deepEqual(withDatabase, ["postgres", "mariadb"]);
+});
+
+test("where the file says nothing, the order is left exactly as compose gave it", () => {
+  // Most compose files declare no `depends_on` at all. A guess in a generated file is worse than an
+  // order somebody has to look at, so nothing moves and the author's own ordering decides.
+  const silent = Object.fromEntries(Object.entries(STACK).map(([name, service]) => [name, { ...service, depends_on: undefined }]));
+  deepEqual(Object.keys(Compose.translate(silent, "witness").services), Object.keys(STACK));
+});
+
+test("a stack with two databases says which one db sql means", () => {
+  // Only when it fired: the order is what decides, and a reader who tidied it back to alphabetical
+  // would repoint `db sql` without touching a field.
+  match(Compose.render("acme", Compose.translate(STACK, "witness")), /db sql` runs against the FIRST one listed — postgres/);
+  // One database needs no paragraph about which one.
+  const one = { postgres: STACK.postgres };
+  equal(/runs against the FIRST one listed/.test(Compose.render("acme", Compose.translate(one, "witness"))), false);
 });

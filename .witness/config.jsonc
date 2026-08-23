@@ -330,6 +330,24 @@
       ]
     },
 
+    // Two databases in one stack is ordinary, and only one of them is the app's. This generates a
+    // description off the compose file and then asks the question the description has to answer:
+    // which database does a bare `db sql` mean? The answer is on the last frame either way — the
+    // command names the container it shelled into, so a wrong default cannot look like a right one.
+    "theDatabaseItDefaultsTo": {
+      "summary": "which database a bare `db sql` means, on a stack that runs two",
+      "records": "terminal",
+      "steps": [
+        { "caption": { "text": "a stack with a Postgres and a MariaDB — only one of them is the app's" } },
+        { "type": { "on": "prompt", "value": "rm -rf /tmp/witness-db && mkdir -p /tmp/witness-db/witness && cp docker-compose.yml .env /tmp/witness-db/witness/ && ./bin/witness init /tmp/witness-db/witness | tail -2" } },
+        { "press": "Enter" },
+        { "wait": 11000, "note": "`docker compose config` shells out, and it is not quick on a machine running four stacks" },
+        { "type": { "on": "prompt", "value": "clear; ./bin/witness --config /tmp/witness-db/witness/.witness/config.jsonc db sql 'select version()' 2>&1 | tail -9" }, "note": "`version()` rather than `1`, so the ENGINE it reached is on the frame — an answer that merely succeeds leaves which database it came from to be inferred, and the failure names the container anyway" },
+        { "press": "Enter" },
+        { "wait": 8000 }
+      ]
+    },
+
     // The one action about the DESCRIPTION rather than the product: generate one off this repo's own
     // compose file and read the board off it. Every row on that board is a claim about a container
     // `docker ps` can be asked about, which is why both end up on the same final screen — a board

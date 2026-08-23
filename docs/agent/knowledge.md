@@ -89,6 +89,14 @@ the caller, and the fix is one size lower: inject the `execFile`, and assert the
 answer, the way `docker.test.ts` already does. Anywhere a default parameter exists so tests can avoid
 the real thing, ask what still covers the real thing.
 
+**A fixture in an order the real thing never produces cannot reproduce an ordering bug.** The `STACK`
+fixture in `compose.test.ts` is documented as "what `docker compose config` gives back", and it listed
+`postgres` before `mariadb`. Compose sorts alphabetically and never returns that, so the one defect the
+whole first-declared-wins rule can have — the default database decided by the letter `m` — could not
+happen inside the file whose job is catching it. The order of a fixture is part of its content whenever
+anything downstream reads it in order, and "realistic values" is not the same claim as "realistic
+shape".
+
 ---
 
 ## Changing this repository
