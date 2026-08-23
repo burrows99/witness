@@ -28,6 +28,14 @@ is an assertion, not something to repair.
 **Consistency tests only prove consistency.** A check comparing descriptors to schema keys cannot see
 a field missing from both. Count against the real thing.
 
+**A test that builds its own input can pin a shape nothing produces.** `Explore.likelyApp` was covered
+by a test handing it `{ services: { web: { app: … } } }` — the shape a config is WRITTEN in. Every real
+caller hands it the shape `loadConfig` RETURNS, where `app` has been hoisted into `apps` and removed
+from the service, so the function found nothing, silently fell back to the first service, and the test
+stayed green throughout. Same family as the entry above: when the fixture and the code agree about a
+shape, neither of them is checking it. Build the fixture through the loader, or assert against what
+the loader returns.
+
 ---
 
 ## Changing this repository
@@ -92,6 +100,13 @@ skill kept sending readers to it. Nothing type-checks a string in a document.
 **A demo that waits too little proves nothing.** The first `after` recording caught the frame before
 a 10-second crawl printed anything, so a green run produced a video of a command with no output. The
 recording is the deliverable; its timing is part of the work, not an afterthought.
+
+**A terminal recording ends on the tail, and the headline is at the top.** The `after` cut of a
+fragment longer than the pane finished showing its last thirty lines — and the line the whole claim
+rested on, `Walked 4 pages`, had scrolled off before the recording ended. The output arrives in one
+write, so there is no intermediate frame to fall back on: the claim is either on the final screen or
+it is nowhere. Pipe the step through `head -N`, and pipe BOTH cuts the same way. A pane is 1280x900 at
+20pt — about thirty rows, and fewer as soon as anything wraps.
 
 **Progress on stdout breaks the consumer.** Results are stdout, progress and warnings are stderr, or
 `| jq` fails for reasons nobody can see.
