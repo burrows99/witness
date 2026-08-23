@@ -136,6 +136,16 @@ bash`. With it hard-coded, `fill` could be deleted from `asTape` outright and ev
 file still passed, while every placeholder was typed into the recording literally. A helper that
 "simplifies" a call by fixing one of its arguments has removed that argument from the test suite.
 
+**A helper tested with the argument its CALLER cleans up is tested with the wrong argument.**
+`scoped(name, scope)` had a test passing `"grafana"`, a service name. Every real caller is the engine,
+which passes `"grafana.signIn"` — an ACTION name — and `System.secret` cuts the service off the front
+of it before calling `scoped`. That cut is the whole of the service-owned reorganisation's headline
+behaviour, and nothing tested it: remove it and every `{secret.…}` written inside a service's own
+action stops resolving, with `no secret "adminKey" — declared: grafana.adminKey`, which reads as the
+config being wrong rather than the tool. Third instance of one shape in this file, after
+`Explore.likelyApp` and the `RunnableSystem` fixtures: test the unit with what its caller hands it, or
+test through the caller.
+
 ---
 
 ## Changing this repository
