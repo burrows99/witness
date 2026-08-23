@@ -74,7 +74,7 @@ export class Cli {
     if (opts.api) {
       const call = opts.api;
       this.command("api", {
-        summary: "any route on the API, authenticated",
+        summary: "any route on the API, authenticated the way a declared operation is",
         verbs: Object.fromEntries(
           ["get", "post", "patch", "delete"].map(method => [
             method,

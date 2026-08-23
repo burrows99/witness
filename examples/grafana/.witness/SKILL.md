@@ -39,7 +39,9 @@ most questions ("why is this empty", "did that save") are answered in one comman
 **An action is for behaviour.** A sequence someone performs, with its narration and its claims —
 declared in the config and run outright: `npx witness action run <name> [key=value…]` drives it
 in a browser and comes back with the frames, the debug story and the video. Chain several and they
-share one browser, one recording, and whatever each one stored.
+share one browser, one recording, and whatever each one stored — and each invocation is a FRESH,
+signed-out browser, so an action that needs somebody signed in must run the one that signs in,
+in the same invocation (`… run signIn checkout`, or a `run` step inside it).
 
 **A service owns what is true about it.** Its credentials, its API, its screens and its actions
 are written under it in `services`, once — an action there needs no `app` and no `<service>.`
@@ -71,7 +73,7 @@ with more logging.
 
 - `npx witness stack` — what is up, on which ports, from which checkout
   - `stack status` — reachability of every service, and whether its container is up
-- `npx witness api` — any route on the API, authenticated
+- `npx witness api` — any route on the API, authenticated the way a declared operation is
   - `api get` — GET <path> [json]
   - `api post` — POST <path> [json]
   - `api patch` — PATCH <path> [json]

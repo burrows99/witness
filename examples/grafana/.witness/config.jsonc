@@ -151,7 +151,7 @@
           { "goto": { "route": "addConnection" } },
           { "wait": 800 },
           { "type": { "on": { "placeholder": "Search Grafana plugins" }, "value": "{search}" }, "note": "the catalogue is long; searching is what a person does" },
-          { "wait": 600 },
+          { "expect": { "on": { "text": "Adobe Analytics" }, "state": "hidden", "because": "the list has filtered — waiting for a THING, because `wait 600` stored 226 unfiltered cards on a slow run and the assertion underneath was loose enough to pass" } },
           { "store": { "from": { "css": "[data-testid^=\"data-testid Connections plugin card\"]" }, "as": "offered", "all": true }, "note": "what the catalogue is offering for that search, as data" }
         ]
       },

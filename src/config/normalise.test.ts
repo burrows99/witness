@@ -1,7 +1,7 @@
 import { deepEqual, equal, ok, throws } from "node:assert/strict";
 import { test } from "node:test";
 
-import { normalise, OLDER_NAME, qualify, scoped } from "./normalise.ts";
+import { normalise, OLDER_NAME, qualify, scoped, unfilled } from "./normalise.ts";
 import type { SystemConfig } from "./schema.ts";
 
 /** A credential is a source, so a fixture names where one would come from rather than holding one. */
@@ -109,4 +109,18 @@ test("the older word for a database credential still works", () => {
 test("a service's own database gets the same treatment", () => {
   const config = of({ pg: { database: { user: "u", database: "d", [OLDER_WORD]: FROM_THE_CONTAINER } } });
   deepEqual(config.database?.credential, FROM_THE_CONTAINER);
+});
+
+test("the generated template says it is still the template", () => {
+  // Loading `witness init`'s file unedited failed on `no client provider "…"` — an error about a
+  // registry, naming neither the field nor the file, as the very first thing a new project sees.
+  deepEqual(
+    unfilled({ name: "…", services: { web: { port: 3000, container: "…" } } } as unknown as SystemConfig),
+    ["name", "services.web.container"],
+  );
+  deepEqual(unfilled({ name: "acme", services: { web: { port: 3000 } } } as unknown as SystemConfig), []);
+});
+
+test("a placeholder inside a list is found too", () => {
+  deepEqual(unfilled({ name: "a", services: {}, root: ["…"] } as unknown as SystemConfig), ["root[0]"]);
 });
