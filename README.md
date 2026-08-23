@@ -80,62 +80,30 @@ product uses:
 {
   "name": "acme",
 
-  // A service carries everything true about it. Nothing inside names the service again — being
-  // written here is what says which one it is about.
+  // Ports and container names come from the same `.env` compose reads, so a second checkout needs no
+  // wrapper script. `kind` says whose software it is: a third party is not restartable or resettable.
   "services": {
-    "web": {
-      // Where it runs. Ports and container names come from the same `.env` compose reads, so a
-      // second checkout needs no wrapper script. `kind` says whose software it is: a third party is
-      // not restartable, not resettable, and the likeliest source of a flake that is nobody's fault.
-      "kind": "in-house", "port": 3000, "portVar": "WEB_PORT", "container": "acme-web",
-
-      // Its credentials. Its own actions reach them as `{secret.adminKey}`; anything else says
-      // `{secret.web.adminKey}`. Two services may each have a `password`.
-      "secrets": { "adminKey": { "containerEnv": { "service": "web", "key": "ADMIN_KEY" } } },
-
-      // What it can be asked. The one service with an `api` is what `witness api …` talks to;
-      // a second service's becomes a named client.
-      "api": {
-        "auth": { "service": { "provider": "apiKey", "header": "x-api-key", "from": { "env": "ADMIN_KEY" } } },
-        "operations": { "orders.show": { "path": "/v1/orders/{orderId}", "auth": "service" } }
-      },
-
-      // What a person sees of it: routes become screens, and one sign-in flow serves every action.
-      "app": { "routes": { "order": "/orders/{orderId}" }, "locators": { "cancel": { "role": "button", "name": "Cancel order" } } },
-
-      // What can be DONE with it. No prefix and no `app`: `witness action run web.cancelOrder`
-      // finds this, and one of its own steps reaches a sibling by bare name.
-      "actions": {
-        "cancelOrder": {
-          "inputs": ["orderId"],
-          "steps": [
-            { "goto": { "route": "order", "params": { "orderId": "{orderId}" } } },
-            { "click": { "role": "button", "name": "Cancel order" } },
-            { "expect": { "on": { "text": "Cancelled" }, "because": "the order should show as cancelled" } }
-          ]
-        }
-      }
-    },
-
-    "postgres": {
-      "kind": "in-house", "port": 5432, "container": "acme-postgres", "probe": "container",
-      // `password` is a secret source like any other — read out of the running container rather than
-      // written here, which is the habit worth keeping even where the value is a local one.
-      "database": { "user": "acme", "database": "acme",
-                    "password": { "containerEnv": { "service": "postgres", "key": "POSTGRES_PASSWORD" } },
-                    "queries": { "order.status": "select status from orders where id = '{orderId}'" } }
-    }
+    "web": { "kind": "in-house", "port": 3000, "portVar": "WEB_PORT", "container": "acme-web" },
+    "postgres": { "kind": "in-house", "port": 5432, "container": "acme-postgres", "probe": "container" }
   },
 
-  // Only what is SHARED, or about more than one service.
-  "secrets": { "ciToken": { "env": "CI_TOKEN" } },
+  // Every request it can make. Auth is named, and a value can come out of a running container.
+  "api": {
+    "service": "web",
+    "auth": { "service": { "provider": "apiKey", "header": "x-api-key",
+                           "from": { "containerEnv": { "service": "web", "key": "ADMIN_KEY" } } } },
+    "operations": { "orders.show": { "path": "/v1/orders/{orderId}", "auth": "service" } }
+  },
+
+  // What a person sees: routes become screens, and one sign-in flow serves every action.
+  "apps": { "customer": { "service": "web", "routes": { "order": "/orders/{orderId}" } } },
+
+  "database": { "service": "postgres", "user": "acme", "database": "acme", "password": "acme",
+                "queries": { "order.status": "select status from orders where id = '{orderId}'" } },
   "cast": { "REGULAR": { "id": "…", "why": "the only account with a saved card" } },
   "cli": { "order": { "verbs": { "show": { "operation": "orders.show", "args": ["orderId"] } } } }
 }
 ```
-
-An action about more than one service goes in a top-level `actions`, where it names them:
-`{ "run": "web.signIn" }`. Everything else about one service lives under it, written once.
 
 ### Writing an action
 

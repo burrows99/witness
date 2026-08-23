@@ -1,14 +1,12 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { normalise } from "./normalise.ts";
 import type { SystemConfig } from "./schema.ts";
 
 /** Read and parse a config file. Relative paths resolve against the working directory. */
 export function loadConfig(file: string): SystemConfig {
   const resolved = path.isAbsolute(file) ? file : path.join(process.cwd(), file);
-  // Hoisted here, once, so nothing downstream ever sees the shape it was written in.
-  return normalise(JSON.parse(withoutComments(fs.readFileSync(resolved, "utf8"))) as SystemConfig);
+  return JSON.parse(withoutComments(fs.readFileSync(resolved, "utf8"))) as SystemConfig;
 }
 
 /**

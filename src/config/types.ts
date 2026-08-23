@@ -90,23 +90,6 @@ export class TypeSource {
       return { kind: "record", of: this.parse(args[args.length - 1]) };
     }
 
-    // `Omit<AppConfig, "service">` is how a type says "this, minus what its position already says" —
-    // which is exactly what a service's own `app`, `api` and `database` are. Read as opaque, the
-    // template showed `{}` and the TypeScript source of the field an author is meant to fill in.
-    const omit = /^Omit<(.+)>$/s.exec(source);
-    if (omit) {
-      const args = TypeSource.split(omit[1], ",");
-      const inner = this.parse(args[0]);
-      const dropped = new Set(
-        TypeSource.split(args.slice(1).join(","), "|")
-          .map(part => part.trim().replace(/^["']|["']$/g, ""))
-          .filter(Boolean),
-      );
-      const resolved = inner.kind === "ref" ? this.declaration(inner.name) : inner;
-      if (resolved.kind === "object") return { kind: "object", fields: resolved.fields.filter(field => !dropped.has(field.name)) };
-      return resolved;
-    }
-
     if (/^["'].*["']$/s.test(source)) return { kind: "literal", text: source.slice(1, -1) };
     if (/^-?\d+(\.\d+)?$/.test(source) || source === "true" || source === "false") {
       return { kind: "literal", text: source, json: true };
