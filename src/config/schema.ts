@@ -28,7 +28,7 @@ export type SystemConfig = {
    * checkout — the parent — so a project using the convention needs none of this. Defaults to `.git`.
    */
   root?: string[];
-  services: Record<string, ServiceConfig>;
+  services: Record<string, ServiceSpec>;
   /**
    * Who the system can be. An identity with `cookies` is injected into every browser context the
    * system opens — the dev-auth blob a staff app trusts locally, and the reason a run needs no login.
@@ -39,25 +39,12 @@ export type SystemConfig = {
    * than in a TypeScript file nobody can read from a shell.
    */
   cast?: Record<string, unknown>;
-  /**
-   * Credentials SHARED by everything — one CI token, one org key.
-   *
-   * A credential that belongs to one service belongs under that service, where it can be called
-   * `password` without having to be called `grafanaPassword` to avoid the other one.
-   */
+  /** Where credentials come from. Never the values themselves — see the secret providers. */
   secrets?: Record<string, SecretSource>;
-  /**
-   * Sequences that are about more than one service, or about the product as a whole.
-   *
-   * An action about ONE service belongs under it: there it needs no `app`, and no `<service>.` typed
-   * into its own name. It is reachable from here as `<service>.<name>` either way.
-   */
+  /** What the product can DO — sequences of steps, with everything they touch declared. */
   actions?: Record<string, ActionConfig>;
-  /** @deprecated Declare these under the service they belong to. Still read, so old files still load. */
   api?: ApiConfig;
-  /** @deprecated Declare this under the service it runs on. */
   database?: DatabaseConfig;
-  /** @deprecated Declare a service's screens as its own `app`. */
   apps?: Record<string, AppConfig>;
   evidence?: { dir?: string; links?: string[] };
   /** How the run's recordings become MP4s. See the video providers. */
@@ -72,32 +59,6 @@ export type SystemConfig = {
   /** Extra API clients beyond the default one — a third party's GraphQL, say. */
   clients?: Record<string, ClientConfig>;
   cli?: Record<string, CliGroupConfig>;
-};
-
-/**
- * A service: where it runs, and everything that is true about it.
- *
- * The second half is the point. A description used to put every service's API, screens, database,
- * credentials and actions at the top level and make each one name its service back again — so the
- * service was written four times, and the `<service>.` prefix on an action's name was a convention
- * nothing checked. Here it is written once, by being where it is.
- */
-export type ServiceConfig = ServiceSpec & {
-  /** What this service can be asked. The first service to declare one is what `witness api` talks to. */
-  api?: Omit<ApiConfig, "service"> & { service?: string };
-  /** What a person sees of it: routes, the locators worth naming, forms, and how someone signs in. */
-  app?: Omit<AppConfig, "service">;
-  /** The database it runs on, when it is one. */
-  database?: Omit<DatabaseConfig, "service">;
-  /** Its credentials. Reached from its own actions by bare name, from anywhere as `<service>.<name>`. */
-  secrets?: Record<string, SecretSource>;
-  /**
-   * What can be DONE with it.
-   *
-   * No `app` and no prefix: both are what being here already says. `witness action run grafana.signIn`
-   * finds it, and one of its own steps reaches its siblings by bare name.
-   */
-  actions?: Record<string, ActionConfig>;
 };
 
 export type IdentityConfig = Record<string, unknown> & {
@@ -115,24 +76,15 @@ export type IdentityConfig = Record<string, unknown> & {
 export type ApiConfig = ClientConfig;
 
 export type DatabaseConfig = {
-  /** Filled in from where it is declared, when it is declared under its service. */
   service: string;
   user: string;
   database: string;
-  /**
-   * Where the password comes from — a secret source like any other, or a bare string.
-   *
-   * It was a bare string only, which made this the one credential the description FORCED into the
-   * file. A local compose password is not much of a secret, but "the config has nowhere else to put
-   * it" is the wrong reason for it to be there, and a scanner is right to ask about every one.
-   */
-  password: SecretSource;
+  password: string;
   /** Named SQL, with `{param}` placeholders. Keeping them here means one place to read what we assert. */
   queries?: Record<string, string>;
 };
 
 export type AppConfig = {
-  /** Filled in from where it is declared, when it is declared under its service. */
   service: string;
   /** Screen name → path. `{param}` makes it a route that takes an argument. */
   routes?: Record<string, string>;
