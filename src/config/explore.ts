@@ -24,6 +24,15 @@ import type { LocatorSpec } from "../browser/locator.ts";
  */
 export class Explore {
   /**
+   * The roles worth naming: what a step would assert on, and what {@link locators} offers.
+   *
+   * One list rather than two, because {@link barren} asks the same question from the other end and two
+   * would have drifted the first time either grew a role. It reads that list minus `heading`, which is
+   * the one difference between them: a title is something to read, not something to do.
+   */
+  private static readonly worth = new Set(["button", "heading", "checkbox", "radio", "tab", "switch", "combobox"]);
+
+  /**
    * Walk an app and report what it says about itself.
    *
    * Breadth-first from the routes already declared, or from `/` when there are none — so exploring a
@@ -34,6 +43,7 @@ export class Explore {
     const queue: { path: string; depth: number }[] = (input.from?.length ? input.from : ["/"]).map(path => ({ path, depth: 0 }));
     const seen = new Set<string>();
     const skipped: string[] = [];
+    const empty: string[] = [];
     const pages: PageFacts[] = [];
 
     while (queue.length) {
@@ -56,6 +66,9 @@ export class Explore {
         continue;
       }
       pages.push({ ...facts, path: next.path });
+      // A page that offered nothing is reported rather than counted. `Walked 1 page` reads exactly
+      // like "your app has one page", and for three apps in seven it meant the opposite.
+      if (Explore.barren(facts)) empty.push(next.path);
 
       if (next.depth >= input.maxDepth) continue;
       for (const link of facts.links) {
@@ -70,7 +83,20 @@ export class Explore {
       operations: Explore.operations(input.requests ?? []),
       visited: pages.map(page => page.path),
       skipped,
+      empty,
     };
+  }
+
+  /**
+   * Nowhere to go and nothing to do: no link to follow, and nothing a step could click or type into.
+   *
+   * Not "the snapshot was small" — a sign-in screen is four nodes and worth having. And a HEADING does
+   * not count, which is the difference between this firing and not: Keycloak's console answers with one
+   * heading reading "We are sorry..." and no other node, and a page a person can only read the title of
+   * is the case this is for. The heading is still offered as a locator; it is just not a way through.
+   */
+  private static barren(facts: Omit<PageFacts, "path">): boolean {
+    return !facts.links.length && !facts.nodes.some(node => node.name && node.role !== "heading" && Explore.worth.has(node.role));
   }
 
   /**
@@ -78,13 +104,35 @@ export class Explore {
    *
    * The first one that declares screens, because that is what "explore the app" means in a stack
    * where four things are running and three of them have no screen at all.
+   *
+   * Asked of `apps`, not of the services. A service's own `app` block is hoisted out of it when the
+   * config is read — "the nested halves are removed rather than left" — so a config that has been
+   * through the front door has no `services.web.app` for this to find, and this picked whichever
+   * service happened to be written first. Usually the app; on a config that opens with its database,
+   * a crawl of the database.
    */
   static likelyApp(config: ExplorableSystem["config"]): string {
-    const services = Object.entries(config.services ?? {});
-    const withScreens = services.find(([, spec]) => spec.app);
-    const first = withScreens ?? services[0];
+    const app = Object.entries(config.apps ?? {})[0];
+    if (app) return app[1].service ?? app[0];
+    // Nothing declares a screen at all — the state `init` leaves a config in, because a compose file
+    // says which services exist and not which of them a person looks at.
+    const first = Object.keys(config.services ?? {})[0];
     if (!first) throw new Error("the config declares no services to explore");
-    return first[0];
+    return first;
+  }
+
+  /**
+   * Where to start: the routes this service already declares.
+   *
+   * The other half of the same hoisting. This asked services for an `app` that is no longer on them,
+   * got `{}` every time, and fell back to `/` — so "exploring a described app deepens the description
+   * rather than starting it over" was true of the code and not of anything that ran it. On Grafana it
+   * cost `/login` and `/connections/datasources`, the two pages with anything on them.
+   */
+  static startingRoutes(config: ExplorableSystem["config"], service: string): string[] {
+    const app = Object.entries(config.apps ?? {}).find(([name, spec]) => (spec.service ?? name) === service);
+    // A route with a parameter cannot be visited without a value, so it is not a starting point.
+    return Object.values(app?.[1].routes ?? {}).filter(route => !route.includes("{"));
   }
 
   /** The same crawl, driven against a whole system — its origin, its identities, its declared routes. */
@@ -110,14 +158,19 @@ export class Explore {
 
       return await Explore.crawl({
         origin,
-        // A route with a parameter cannot be visited without a value, so it is not a starting point.
-        from: Object.values(system.config.services?.[service]?.app?.routes ?? {}).filter(route => !route.includes("{")),
+        from: Explore.startingRoutes(system.config, service),
         maxPages: opts.maxPages ?? 12,
         maxDepth: opts.maxDepth ?? 2,
         requests,
         read: async url => {
           try {
             await page.goto(url, { waitUntil: "domcontentloaded", timeout: 15_000 });
+            // The document is not the app. A client-rendered one is an empty shell when the document
+            // is done — Grafana was 4 nodes and no links there, and 32 nodes with links once it had
+            // settled — so reading immediately described the shell. Waiting for a THING rather than a
+            // time, and a timeout rather than a failure: an app that never goes idle still gets read,
+            // it is just read late.
+            await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
             return await Explore.readPage(page, new URL(origin));
           } catch {
             return undefined;
@@ -225,7 +278,6 @@ export class Explore {
    */
   static locators(pages: PageFacts[]): Record<string, LocatorSpec> {
     const out: Record<string, LocatorSpec> = {};
-    const worth = new Set(["button", "heading", "checkbox", "radio", "tab", "switch", "combobox"]);
     const already = new Set<string>();
     for (const page of pages) {
       const counts = new Map<string, number>();
@@ -233,7 +285,7 @@ export class Explore {
         if (node.name) counts.set(`${node.role} ${node.name}`, (counts.get(`${node.role} ${node.name}`) ?? 0) + 1);
       }
       for (const node of page.nodes) {
-        if (!node.name || !worth.has(node.role)) continue;
+        if (!node.name || !Explore.worth.has(node.role)) continue;
         const key = `${node.role} ${node.name}`;
         if (counts.get(key) !== 1 || already.has(key)) continue;
         const name = Explore.name(node.name, "");
@@ -278,6 +330,10 @@ export class Explore {
       } catch {
         continue;
       }
+      // An asset fetched with `fetch()` is still an asset. Grafana loads its icons that way, so the
+      // first fragment that got far enough to collect any operations at all offered four SVGs as the
+      // API — and a generated block whose every entry has to be deleted is one nobody reads.
+      if (/\.(svg|png|jpe?g|gif|webp|ico|woff2?|css|js|mjs|map)$/i.test(path)) continue;
       const templated = path
         .split("/")
         .map(segment => (/^\d+$/.test(segment) || /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(segment) ? "{id}" : segment))
@@ -315,6 +371,15 @@ export class Explore {
       `// What ${service} says about itself, read off the running app.`,
       "//",
       `// Walked ${found.visited.length} page${found.visited.length === 1 ? "" : "s"}: ${found.visited.join(", ")}`,
+      ...(found.empty.length
+        ? [
+            "//",
+            `// Nothing to do on: ${found.empty.join(", ")}`,
+            "// No link to follow and nothing a step could click or type into. A page like this is nearly",
+            "// always one that had not finished rendering, or one behind a sign-in this config declares",
+            "// no identity for — it is almost never a page with nothing on it. HEADED=1 shows you which.",
+          ]
+        : []),
       ...(found.skipped.length ? ["//", "// Not walked:", ...found.skipped.map(why => `//   ${why}`)] : []),
       "//",
       "// None of this is final, and none of it has been written anywhere. The names come from what the",
@@ -416,12 +481,16 @@ export type Discovery = {
   visited: string[];
   /** What the caps left out, said out loud. */
   skipped: string[];
+  /** Walked, and offered nothing — the case that used to be indistinguishable from a simple app. */
+  empty: string[];
 };
 
 export type ExplorableSystem = {
   stack: { endpoints: Record<string, string> };
   config: {
     identities?: Parameters<typeof identityCookies>[0];
-    services?: Record<string, { app?: { routes?: Record<string, string> } }>;
+    /** Where a screen is declared by the time anything reads a config: a service's `app` is hoisted here. */
+    apps?: Record<string, { service?: string; routes?: Record<string, string> }>;
+    services?: Record<string, unknown>;
   };
 };
