@@ -54,9 +54,17 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
    * to be installed and pay the start-up — on a fresh checkout it could not record a terminal until a
    * browser had finished downloading, and on a machine with none it failed outright, for want of a
    * thing nothing about the work touches. That contradicts the registry's whole reason for existing.
+   *
+   * What is remembered is the PROMISE, not the browser it settles into. `browser ??= await launch()`
+   * reads the variable, suspends, and only then assigns — so every lane that asked while the first
+   * launch was still in flight found nothing there and started one of its own. `--parallel` opened a
+   * browser per lane and closed the one that happened to be assigned last; the rest stayed up, holding
+   * the event loop open, so the command printed its whole result and then never exited — no exit code
+   * at all, which is a worse answer than the wrong one. Memoising the promise makes the second asker
+   * wait for the first launch, which is what "opened on the first lane" always meant.
    */
-  let browser: Browser | undefined;
-  const open = async (): Promise<Browser> => (browser ??= await launch());
+  let opening: Promise<Browser> | undefined;
+  const open = (): Promise<Browser> => (opening ??= launch());
   const cookies = request.cookies ?? [];
   // Slides are timed from here, so a card lands where the run actually showed it.
   markRecordingStart();
@@ -225,6 +233,9 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
     const attached = (failure as { result?: ActionResult }).result;
     if (attached) results.push(attached);
   } finally {
+    // Whatever `open` started, if it started anything and it came up: a launch that failed is already
+    // this run's failure, and asking after it again here would only replace that with itself.
+    const browser = await opening?.catch(() => undefined);
     // One full-frame card per slide, spliced into the timeline — rather than the same title painted
     // into every pane, which reads as several things happening at once. In the `finally`, because a
     // run that FAILED is the one whose narration somebody most wants to follow — and it had been

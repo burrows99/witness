@@ -23,7 +23,8 @@ no knowledge of its own — which is exactly why it can live outside the class t
 
 - results to **stdout as JSON**, progress and warnings to **stderr**, so `| jq` works
 - exit `0` fine, `1` a real failure (a failed action, drift found), `2` usage
-- `check drift` sets `process.exitCode` rather than exiting, so the report flushes first
+- `check drift` and `action run` set `process.exitCode` rather than exiting, so the report and the
+  run's result — the JSON, the video, the debug story — are written before the shell hears anything
 - a verb marked `raw` prints its own output — the drift report *is* the answer, not a record of a
   request nobody made
 - config-declared nouns and code-added ones **merge** rather than replacing: a noun usually comes
