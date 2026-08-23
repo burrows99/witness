@@ -1,67 +1,16 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import type { Browser, Page } from "@playwright/test";
+import type { Browser } from "@playwright/test";
 
 import { slideMarks, resetSlideMarks, type SlideMark } from "../browser/narration.ts";
 
 /**
- * Closing a recording properly, so the video that ships is the one the spec meant.
- *
- * Two things happen here that cannot happen anywhere else:
- *
- *  · PANEL ORDER. A runner names recordings after the page that made them, which puts them in
- *    page-id order — nobody's intended reading. Saving them as `panel-01…` fixes the order the
- *    reviewer will see, left to right.
- *  · THE CARDS. Each slide the spec showed is rasterised ONCE at the size of the finished frame, so
- *    the stitcher can splice a full-frame card into the timeline instead of leaving a title repeated
- *    in every panel — which reads as several things happening at once.
- */
-export async function finishRecording(opts: {
-  browser: Browser;
-  panels: Page[];
-  outputDir: string;
-  /** How the panels will be laid out, so a card is rasterised at the finished size. */
-  layout?: { columns?: number; panelWidth?: number; panelHeight?: number };
-}): Promise<void> {
-  const { browser, panels, outputDir } = opts;
-  fs.mkdirSync(outputDir, { recursive: true });
-
-  for (const [index, page] of panels.entries()) {
-    const video = page.video();
-    if (!video) continue;
-    await video.saveAs(path.join(outputDir, `panel-${String(index + 1).padStart(2, "0")}.webm`));
-    // The original stays on disk otherwise, and the stitcher picks up every panel twice.
-    await video.delete().catch(() => {});
-  }
-
-  const marks = slideMarks();
-  if (!marks.length) return;
-
-  const columns = opts.layout?.columns ?? (panels.length >= 4 ? 2 : Math.max(panels.length, 1));
-  const rows = Math.ceil(panels.length / columns);
-  const width = (opts.layout?.panelWidth ?? 960) * columns;
-  const height = (opts.layout?.panelHeight ?? 600) * rows;
-
-  // No recording on this context: it exists only to rasterise the cards.
-  const context = await browser.newContext({ viewport: { width, height } });
-  const page = await context.newPage();
-  const manifest: SlideMark[] = [];
-  for (const [index, mark] of marks.entries()) {
-    const image = `slide-${String(index + 1).padStart(2, "0")}.png`;
-    await page.setContent(card(mark, width));
-    await page.screenshot({ path: path.join(outputDir, image) });
-    manifest.push({ ...mark, image });
-  }
-  await context.close();
-
-  fs.writeFileSync(path.join(outputDir, "slides.json"), JSON.stringify(manifest, null, 2));
-  // The module outlives one test, so without this the next spec inherits these cards.
-  resetSlideMarks();
-}
-
-/**
  * Rasterise each slide the run showed, at the size of the finished frame.
+ *
+ * A card is drawn ONCE at the size of the finished frame, so the stitcher can splice a full-frame
+ * card into the timeline instead of leaving a title repeated in every panel — which reads as several
+ * things happening at once.
  *
  * The other half of `finishRecording`, on its own: the command line saves its own recordings — one per
  * lane, named for the lane — and only needs the cards. Without this, a run's slides stayed painted
