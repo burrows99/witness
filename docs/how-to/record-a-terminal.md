@@ -67,6 +67,15 @@ for the same reason the pane has to be big enough: with a shell, the claim is on
 | `caption` | a shell comment, typed |
 | `click` | **skipped** — it means nothing without a screen, and a recording that invented an interaction would be worse than one missing it |
 
+A `type` reaches the shell **exactly** as written — backslashes, quotes and all. A tape has no escapes
+inside a `Type` string, so the quote character moves to one the text does not use rather than anything
+being escaped into it; text that uses all three is refused, because a recorder that silently alters
+what it records is worse than one that stops. `tr '\n' ' '` once arrived as `tr '\\n' ' '`, which maps
+every `n` to a space — with a valid tape, an exit code of 0, and nothing to see but the pixels.
+
+Braces are the other half: `{name}` is a parameter, and `{{…}}` is text
+([steps.md](../reference/steps.md#gathering)), which is what lets `--format '{{.Names}}'` be a step.
+
 ## Why it stitches
 
 The recording comes out the same shape as a browser pane, so a shell sits **beside** a screen in one

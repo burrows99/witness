@@ -10,8 +10,9 @@ somebody disagrees with it.
 ## Verifying
 
 **Read the exit code, never the tail of the output.** `npm run check | grep …` and
-`gh pr checks --watch | tail -3` both hide a non-zero exit. Twice: once merging on a red check, once
-shipping with an undeclared binary that CI then caught. If a pipeline is needed, capture `${PIPESTATUS[0]}`.
+`gh pr checks --watch | tail -3` both hide a non-zero exit — a pipeline reports the code of its last
+command, which is the one you added. Twice: once merging on a red check, once shipping with an
+undeclared binary that CI then caught. Do not pipe: redirect, then read the file.
 
 **A green run can produce evidence that contradicts its own caption.** Twice in one session: a
 caption over the wrong scroll position, and "two ways back" written over a frame showing one. Open
@@ -49,6 +50,35 @@ a source comment as fact. npm does not — `npm i -g --prefix /tmp/… <tarball>
 nothing else, and the copy on this machine had arrived some other way. Same family as inferring a
 cause from a screenshot: the state in front of you is a result, and more than one thing produces it. A
 scratch prefix costs a second and is the only thing that can answer a question about installing.
+
+**A test on the recording cannot catch a recorder that alters what it records.** The obvious test for
+"a `Type` step must keep its backslash" reads the tape and asserts it says `\n` — and the tape DID say
+`\n`, in the `\\n` form `JSON.stringify` writes, which VHS then typed as two characters. Every
+assertion available without leaving the process passes against the defect, because the tape is exactly
+what the bug leaves intact. The test that catches it runs vhs for real on a step that writes its own
+argument to a file, and asserts on the file: the shell is the only witness to what the shell received.
+Same family as building a fixture in the shape the code expects — and it generalises past this repo, to
+anything whose output is a rendering of an instruction rather than the instruction.
+
+**The idiom this file used to recommend for pipelines is one an agent cannot type.**
+`${PIPESTATUS[0]}` is the textbook answer to a pipeline hiding an exit code, and three agents reported
+that their harness refuses to run any command containing a `${…[0]}` subscript — the whole command,
+before it runs. So the headline verification rule came with a fallback that fails on arrival, and what
+is left is eyeballing the output, which is the habit the rule exists to prevent. Redirect instead:
+`cmd > /tmp/x.log 2>&1; echo "exit=$?"`, then grep the file. No pipeline, no array, and the code still
+belongs to the command that was run. An instruction the reader cannot execute is worse than none —
+it does not fail loudly, it fails back to the old habit.
+
+**`gh pr checks` answers about the checks that EXIST, which is not the question.** For the first
+minute or two after a push ours have not been created, so the rollup holds whichever third-party app
+answered first: nothing red, nothing pending, exit `0`. `--watch` cannot help — there is nothing to
+wait for, so it returns immediately. On a pull request GitHub calls `CONFLICTING` this is not a race
+but a settled state: `check` and `analyze` are never queued at all, and the `0` is permanent. Three
+agents read that as "the tests passed" in one day, and phase 7 was telling them to. The exit code was
+honest about the question it was asked. Ask a better one: `.claude/pr-green.sh <n>` requires the jobs
+this repository's workflows define, by name, waits for them to be created, and only then watches. Same
+family as reading the tail of a pipe — a green from a command that was never asked what you wanted to
+know.
 
 **An injectable seam means the default is the one thing nothing runs.** `Compose.read(root, run =
 Compose.docker)` is injected by every test in its file, so `Compose.docker` — the only line of it that
@@ -124,6 +154,17 @@ justified a design decision by what an agent cannot do, while every front door s
 config-driven test harness. Change the sentence, grep the repository for the old one, and set the two
 that live in repository settings over the API in the same run.
 
+**A browser upload tool takes a path inside the project, and refuses every other one.** "Mint the URL
+through a logged-in browser" is the right instruction with a constraint missing from it, and the
+constraint cost two agents an afternoon each: the tool accepts what the session was started on and
+rejects the rest, so a frame under `/tmp` — or in the worktree the change was made in, beside the
+project rather than in it — cannot be uploaded from where it was recorded, however correct the path
+is. Copy it in first and upload the copy. Note that this puts two of our own rules in tension:
+`require-evidence.sh` requires the image to have been Read before it goes anywhere, and it will
+approve a path the uploader then refuses. And there is no way round it from inside the page — GitHub's
+CSP blocks a `fetch` of a local server and of a `data:` URI, a synthetic `⌘V` carries no clipboard, and
+its own uploader ignores a synthetic `drop`. A file the upload tool will accept is the only door.
+
 ---
 
 ## Writing for an agent
@@ -184,13 +225,15 @@ because the other way to be wrong here was to skip in silence and answer "all 4 
 about a description whose other half was never opened. When a field changes what a thing IS, grep
 every reader of it — not the one the change was about.
 
-**A `Type` step loses a backslash, and a `{…}` inside one is read as a parameter.** A step typing
-`tr '\n' ' '` reached the shell as `tr 'n' ' '` — VHS drops the escape out of a double-quoted `Type`
-— so every letter `n` in the recorded output became a space, on the one screen whose whole job was
-being compared with `docker ps` line by line. And `docker ps --format '{{.Names}}'` never ran at all:
-a step's text goes through `fill()`, which reads `{.Names}` as a parameter nobody supplied and throws.
-Neither is visible in the tape or the exit code; both are obvious in the pixels. Which is the argument
-for opening the frame, not an argument about escaping.
+**A `Type` step loses a backslash, and a `{…}` inside one is read as a parameter.** *(Both fixed —
+see the entry at the end of this section. Kept because the way it was FOUND is the point.)* A step
+typing `tr '\n' ' '` reached the shell as `tr '\\n' ' '` — a tape has no escapes inside a `Type`
+string, so `JSON.stringify` doubling the backslash typed two characters — and `tr` maps every `n` AND
+every backslash to a space, on the one screen whose whole job was being compared with `docker ps` line
+by line. And `docker ps --format '{{.Names}}'` never ran at all: a step's text goes through `fill()`,
+which read `{.Names}` as a parameter nobody supplied and threw. Neither was visible in the tape or the
+exit code; both were obvious in the pixels. Which is the argument for opening the frame, not an
+argument about escaping.
 
 ---
 
@@ -263,6 +306,23 @@ names itself. So a description generated from a copy of the compose file in `/tm
 exactly like a wrong one. Generate where the stack was brought up, or name the directory after the
 project. The same fact is why nine services in a nineteen-service stack had no `container` at all: the
 name is only ever in the compose file when somebody typed it there, and most of the time nobody did.
+
+**A generated description has to be the same twice, and no per-function test can tell you it is not.**
+Twenty-two tests asked twenty-two questions of `explore` and every one passed while three separate
+defects made two runs of the same command against an unchanged app disagree — an id in a route, a spam
+score in a locator's name, a page recorded where it was asked for rather than where it landed. Each is
+invisible to a test that hands one function one input, because each needs two runs and a diff to have
+a shape at all. The fix is one test: render a whole crawl twice with the app's live values moved on,
+and compare the strings. Anything committed and later regenerated needs that test, or the churn in the
+diff is the first anyone hears about it.
+
+**A rule that only half its callers got is worse than one nobody wrote.** `operations` has collapsed
+`/repos/7/issues` and `/repos/12/issues` into `{id}` since the day it was written; `routes` never
+learned to, so one fragment folded eleven observed API calls back into the single operation they came
+from and, four lines above, wrote down a route to one email that would be deleted that week. Nothing
+looked wrong: the half that was right made the file read as if the rule were being applied. When a
+rule turns out to be needed twice, move it and take both callers — a copy of the reasoning in a
+comment is not the same as a call.
 
 ---
 

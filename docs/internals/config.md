@@ -74,7 +74,16 @@ crawl, and emitting a *description* rather than test code.
 
 Two sources per page, each for what it knows: the accessibility tree for what a person can see and
 name, the DOM for placeholder attributes, because `forms` is consumed with `getByPlaceholder` and an
-accessible name is the label wherever there is one.
+accessible name is the label wherever there is one. A field carries both strings — the placeholder is
+what MATCHES it and the field's `name`/`aria-label`/label is what NAMES it. Naming from the
+placeholder called an email box `youOrganisationCh`.
+
+**The output has to be the same twice.** A description is committed, so anything read off live data
+is a false diff waiting to happen: `templated()` turns an id segment into `{id}` for routes and for
+operations both, a page is recorded where it LANDED, an identical form is written once, and
+`steady()` takes the rendered number out of a locator's name — `HTML Check 95%` stops resolving at
+94% as surely as it reads differently. The check that catches this is a whole run rendered twice and
+compared; a per-function test cannot see it, which is why three of these lived through a green suite.
 
 Same-origin is judged on where a navigation **landed**, not on the href it started from — a local
 path that answers 302 defeats the second version of the check entirely — and auth-handoff shapes are

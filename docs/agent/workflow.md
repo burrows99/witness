@@ -25,7 +25,9 @@ one — that is not overhead, it is the deliverable that outlives the ticket.
 but the bug is in the shared function, fix the shared function.
 
 **4. Record the after.** `EVIDENCE=after ./bin/witness action run <same action>`. Same action, same
-viewport, same journey — a before and after that differ in two ways prove nothing about either.
+journey, everything you did not change held still — a before and after that differ in two ways prove
+nothing about either. Unless the geometry is what changed: a fix to a viewport or a terminal pane is
+invisible in two cuts filmed at the same size, so that one varies and the body says so.
 
 **5. Read what you recorded.** Open the frames. Every claim a caption makes has to be visible in the
 frame it captions. This is where green runs get caught producing evidence that contradicts the
@@ -35,8 +37,11 @@ the video, the last frame, because that is where a shell's output is.
 **6. Check.** `npm run check` — types, lint, unused, tests. And `./bin/witness check drift` if the
 change touched anything a description claims.
 
-**7. Raise it.** Branch, commit, PR. The body carries the before and the after. Watch the checks by
-their **exit code**, not by eyeballing the tail of the output.
+**7. Raise it.** Branch, commit, PR. The body carries the before and the after — uploaded through a
+browser, from a path inside the project, because an upload tool refuses the rest. Then read the
+checks by their **exit code**, not by eyeballing the tail of the output — through `.claude/pr-green.sh
+<n>`, because `gh pr checks --watch` reports on the checks that exist and exits `0` when the ones that
+matter have not been created yet.
 
 **8. Learn.** If the run taught something that would have saved an hour, append it to
 [knowledge.md](knowledge.md). One entry, with the *why*. Nothing else in the repository gets updated
@@ -49,7 +54,9 @@ Two hooks in `.claude/hooks/`, because both of these were prose rules that got b
 - **`require-evidence.sh`** — an image cannot be surfaced, uploaded or cited in a published body
   unless it was Read back *after* it was last captured. `witness action run` overwrites the whole run
   directory, so re-running invalidates every earlier read of it. A screenshot you never opened is not
-  evidence, and neither is one you opened before re-shooting it.
+  evidence, and neither is one you opened before re-shooting it. It gates the images a body *names*:
+  a body that names none is none of its business and publishes cleanly, so this is not the thing that
+  makes a pull request carry its evidence. That is phase 7 and the person doing it.
 - **`require-before-after.sh`** — a pull request that changes behaviour must have both an
   `EVIDENCE=before` and an `EVIDENCE=after` run in the session. Docs-only changes are exempt, and
   `[no-evidence: <reason>]` in the body is a deliberate, reviewable override.

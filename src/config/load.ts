@@ -74,9 +74,16 @@ export function withoutComments(source: string): string {
  * whole answer, `{offered.length}` for how many things a `store` read off the screen. Without that,
  * comparing one layer against another meant a program, which is the one thing a description is for
  * avoiding.
+ *
+ * A **doubled** brace is not a placeholder — `{{…}}` is left exactly as it stands. Not every string
+ * that reaches here was written as a template: `docker ps --format '{{.Names}}'` is a command
+ * somebody meant literally, and reading `{.Names}` out of it threw `missing {.Names}` on a step that
+ * had no parameters in it at all. Doubling is the escape because it is also the only form anyone
+ * writes by accident, so the text that provoked the bug is the text that now works.
  */
 export function fill(template: string, params: Record<string, unknown> = {}): string {
-  return template.replace(/\{([\w.]+)\}/g, (_, key: string) => {
+  return template.replace(/\{\{[^{}]*\}\}|\{([\w.]+)\}/g, (literal: string, key: string | undefined) => {
+    if (key === undefined) return literal;
     const value = reach(params, key);
     if (value === undefined) throw new Error(`missing {${key}} for "${template}"`);
     // Objects and arrays as JSON, not as `[object Object]`. A step that stores what an API answered

@@ -212,6 +212,20 @@
             { "goto": { "route": "inbox" } },
             { "wait": 800, "note": "the inbox is a client-side app; the list arrives after the document" }
           ]
+        },
+
+        "describeItself": {
+          "summary": "what `config explore` writes down about an app whose every page is one row of live data",
+          "records": "terminal",
+          // Mailpit is the app in this stack whose screens are DATA — a message id in the path, a
+          // spam score in a tab. Grafana's fragment cannot show that; this one is the whole of it.
+          "pane": { "height": 1900, "fontSize": 12 },
+          "steps": [
+            { "caption": { "text": "asking witness what Mailpit says about itself" } },
+            { "type": { "on": "prompt", "value": "./bin/witness config explore mailpit --pages=2" } },
+            { "press": "Enter" },
+            { "wait": 25000, "note": "two pages, each waited on before it is read, and a browser has to start first" }
+          ]
         }
       }
     },
@@ -299,6 +313,23 @@
       ]
     },
 
+    // The other half of what an agent reads before it has run anything: where a run puts what it
+    // produced, and what it takes to get one of those files in front of a person. Both are claims
+    // the skill makes about the world outside this tool, and nothing type-checks either.
+    "theEvidenceItDescribes": {
+      "summary": "what the generated skill says a run leaves behind, and how to attach it",
+      "records": "terminal",
+      "pane": { "height": 1100, "fontSize": 16 },
+      "steps": [
+        { "caption": { "text": "what witness skill says a run leaves behind" } },
+        {
+          "type": { "on": "prompt", "value": "clear; ./bin/witness skill | sed -n '/^## What a run leaves behind/,/^## The description/p' | sed '$d'" }
+        },
+        { "press": "Enter" },
+        { "wait": 8000, "note": "the description loads first and the section arrives in one write; the last `sed` drops the heading the range ran on to" }
+      ]
+    },
+
     // The one action about the DESCRIPTION rather than the product: generate one off this repo's own
     // compose file and read the board off it. Every row on that board is a claim about a container
     // `docker ps` can be asked about, which is why both end up on the same final screen — a board
@@ -314,7 +345,7 @@
         { "type": { "on": "prompt", "value": "./bin/witness init /tmp/witness-board/witness | tail -4" } },
         { "press": "Enter" },
         { "wait": 9000, "note": "`docker compose config` shells out, and it is not quick on a machine running four stacks" },
-        { "type": { "on": "prompt", "value": "clear; echo 'docker ps:'; docker ps | awk 'NR>1 {print $NF}' | grep ^witness | sort; echo" }, "note": "neither `--format '{{.Names}}'` nor a backslash: a step's text is interpolated, so a brace pair reads as a missing parameter, and VHS drops a backslash out of a `Type` string" },
+        { "type": { "on": "prompt", "value": "clear; echo 'docker ps:'; docker ps --format '{{.Names}}' | grep ^witness | sort | tr '\\n' ' '; echo; echo" }, "note": "the command a person would type, which for a long time this could not record: the braces threw as a missing parameter and the backslash reached the shell doubled, so every letter n in the ground truth became a space" },
         { "press": "Enter" },
         { "wait": 2500, "note": "the ground truth every row below is a claim about" },
         { "type": { "on": "prompt", "value": "./bin/witness --config /tmp/witness-board/witness/.witness/config.jsonc stack status --quiet" } },
