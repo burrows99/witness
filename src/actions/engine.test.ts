@@ -236,6 +236,40 @@ test("a bare name that is not a sibling still means what it says", when, async (
   deepEqual(did, ["press Escape"]);
 });
 
+test("a bare name from outside means the one service that declares it", when, async () => {
+  // The description says an action written under a service needs no `<service>.` in its own name, so
+  // the bare one is the name whoever wrote it has to hand — and the command line was the only reader
+  // of that config asking for the prefix back, which is the contradiction that made #141 easy to hit.
+  const { page, did } = fakePage();
+  await engine({ "gitea.createRepo": { steps: [{ press: "Enter" }] } }).run("createRepo", page);
+  deepEqual(did, ["press Enter"]);
+});
+
+test("a bare name two services both declare is the caller's to settle", when, async () => {
+  // Three `describeItself` actions is the normal case here, and picking one of them would be picking
+  // at random. The candidates are named, so the next thing to type is in the refusal.
+  const { page } = fakePage();
+  await rejects(
+    () => engine({ "mailpit.describeItself": { steps: [] }, "grafana.describeItself": { steps: [] } }).run("describeItself", page),
+    /declared by 2 services — name the one you mean: mailpit\.describeItself, grafana\.describeItself/,
+  );
+});
+
+test("a bare name inside a service does not reach out of it, and says what it tried", when, async () => {
+  // A step in gitea's action asking for `signIn` means gitea's. Answering it with grafana's would sign
+  // into the wrong product and say nothing about having done so — the unqualified rule stops at the
+  // service boundary, and only a caller with no service to be under gets it.
+  const { page } = fakePage();
+  await rejects(
+    () =>
+      engine({
+        "grafana.signIn": { steps: [{ press: "Enter" }] },
+        "gitea.tour": { steps: [{ run: "signIn" }] },
+      }).run("gitea.tour", page),
+    /no such action "signIn" \(tried "gitea\.signIn" too\)/,
+  );
+});
+
 test("the declared actions are listed, which is what the command line offers", when, () => {
   deepEqual(engine({ a: { steps: [] }, b: { steps: [] } }).names, ["a", "b"]);
 });

@@ -23,8 +23,15 @@ own directory down, which is how a composed action's frames land inside the step
 under its `as`, and every string in a later step is a template over it. Dotted, so `{order.items.1.sku}`
 works, and objects fill as JSON rather than `[object Object]`.
 
+**One name, three ways of writing it.** `resolveAction(actions, name, from?)` is the only place that
+decides: as declared; a sibling's bare name from inside the same service; and, only from outside one,
+the bare name of an action exactly one service declares. Everything that runs an action by name goes
+through it — the engine, the runner before it opens a browser, and `check drift`.
+
 ## run
 
+- **a name** → resolved before anything else, so nothing is launched and nothing is written for one
+  that names nothing (#141)
 - **one action** → one browser, one recording
 - **several** → one browser, in order, one continuous recording (a chain is one story)
 - **`--parallel`** → one `Lane` each, stitched into panes; lanes cannot pass values

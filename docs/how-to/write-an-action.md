@@ -15,7 +15,8 @@ An action is a sequence somebody performs, its narration, and its claims — dec
 ```
 
 Written under the service it is about, so it needs no `app` and no `web.` in its own name. It is
-`web.cancelOrder` from outside, and `cancelOrder` to its siblings.
+`web.cancelOrder` from outside, and `cancelOrder` to its siblings — and to the command line, which
+takes the bare name whenever exactly one service declares it.
 
 ## Get somewhere, do something, claim something
 

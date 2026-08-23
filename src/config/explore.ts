@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { identityCookies } from "../browser/identities.ts";
 import { requirePlaywright } from "../browser/playwright.ts";
 import type { LocatorSpec } from "../browser/locator.ts";
-import type { Params } from "../actions/engine.ts";
+import { type Params, resolveAction } from "../actions/engine.ts";
 
 /**
  * A description, read off the running app.
@@ -211,11 +211,15 @@ export class Explore {
     if (!origin) {
       throw new Error(`no service "${service}" — the config declares: ${Object.keys(system.stack.endpoints).join(", ")}`);
     }
+    // Resolved before the guard below reads it and before anything is launched, by the same rule the
+    // runner uses: `--as` takes the name `action run` takes, and a guard reading the typed name while
+    // the run reads the resolved one is two readers disagreeing about which action this is.
+    const as = opts.as ? resolveAction(system.config.actions ?? {}, opts.as) : undefined;
     // The same thing `check drift` says, because `records: "terminal"` means the action has no screen
     // to sign a browser in on. Said before a browser is launched, rather than after thirty seconds of
     // waiting for a locator that will never exist.
-    if (opts.as && system.config.actions?.[opts.as]?.records === "terminal") {
-      throw new Error(`${opts.as} records a terminal, so it has no screen to sign a browser in on — --as takes the action that signs in`);
+    if (as && system.config.actions?.[as]?.records === "terminal") {
+      throw new Error(`${as} records a terminal, so it has no screen to sign a browser in on — --as takes the action that signs in`);
     }
 
     const browser = await requirePlaywright("exploring an app").chromium.launch({ headless: process.env.HEADED !== "1" });
@@ -227,9 +231,9 @@ export class Explore {
       const page = await context.newPage();
       // Signed in first, on the page the crawl then walks with — a session is a cookie jar on the
       // context, so whatever the action leaves behind is what every later navigation carries.
-      if (opts.as) {
-        if (!system.run) throw new Error(`this system cannot run actions, so --as=${opts.as} has nothing to drive`);
-        await system.run(opts.as, page, {}, { quiet: true });
+      if (as) {
+        if (!system.run) throw new Error(`this system cannot run actions, so --as=${as} has nothing to drive`);
+        await system.run(as, page, {}, { quiet: true });
       }
       // The API half, for free. Every call the app makes while being walked is a declared operation
       // waiting to be named, and a description needs those as much as it needs the screens.
@@ -855,7 +859,7 @@ export type ExplorableSystem = {
     /** Where a screen is declared by the time anything reads a config: a service's `app` is hoisted here. */
     apps?: Record<string, { service?: string; routes?: Record<string, string> }>;
     services?: Record<string, unknown>;
-    /** Only ever asked one thing: whether the action `--as` names has a screen to sign in on. */
+    /** Asked which action `--as` names, and then whether that one has a screen to sign in on. */
     actions?: Record<string, { records?: string }>;
   };
   /** How a declared sign-in gets driven, for `--as`. The same signature `check drift` asks for. */

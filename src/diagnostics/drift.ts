@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { describe, type LocatorSpec, locate } from "../browser/locator.ts";
-import type { ActionConfig, Params, StepConfig } from "../actions/engine.ts";
+import { type ActionConfig, type Params, resolveAction, type StepConfig } from "../actions/engine.ts";
 import type { IdentityConfig } from "../config/schema.ts";
 import { identityCookies } from "../browser/identities.ts";
 import { requirePlaywright } from "../browser/playwright.ts";
@@ -35,12 +35,17 @@ export class Drift {
    * knowledge, and none of it is the composite root's job to spell out a second time.
    */
   static async sweep(system: SweepableSystem, as?: string): Promise<Report> {
+    // By the same rule the runner uses, and before the browser rather than inside the sign-in: `check
+    // drift signIn` names the action `action run signIn` would, and the guard below reads the name
+    // this will actually run rather than the one that was typed — a second reader of `records` that
+    // did not know about resolution is exactly how the terminal case got here in the first place.
+    const signIn = as ? resolveAction(system.config.actions ?? {}, as) : undefined;
     // The argument names the action that SIGNS IN, and a terminal action has no screen to sign in on.
     // Driven anyway it opened a browser, waited thirty seconds for `locator('prompt')`, and reported
     // the action as broken — a red about the checker being pointed at the wrong thing, wearing the
     // words of a red about the description. Said here, before anything is launched.
-    if (as && system.config.actions?.[as]?.records === "terminal")
-      throw new Error(`${as} records a terminal, so it has no screen to sign a browser in on — \`check drift\` takes the action that signs in, and terminal actions are skipped by this check`);
+    if (signIn && system.config.actions?.[signIn]?.records === "terminal")
+      throw new Error(`${signIn} records a terminal, so it has no screen to sign a browser in on — \`check drift\` takes the action that signs in, and terminal actions are skipped by this check`);
     const browser = await requirePlaywright("checking the description").chromium.launch({ headless: process.env.HEADED !== "1" });
   const cookies = identityCookies(system.config.identities);
   try {
@@ -63,8 +68,8 @@ export class Drift {
       },
       // Quiet: this is a read-only check, and it used to leave a whole `cli/adhoc/run/actions/`
       // tree of frames and stories behind from the sign-in it drives to get in.
-      signIn: as ? async (page: Page) => void (await system.run(as, page, {}, { quiet: true })) : undefined,
-      signInAction: as,
+      signIn: signIn ? async (page: Page) => void (await system.run(signIn, page, {}, { quiet: true })) : undefined,
+      signInAction: signIn,
     });
     return report;
   } finally {

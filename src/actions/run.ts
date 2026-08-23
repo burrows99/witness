@@ -24,7 +24,14 @@ import { slug } from "../evidence/paths.ts";
  * A spec is still the place for assertions, branching and narration. This is for the sequence itself.
  */
 export async function runActions(system: RunnableSystem, request: RunRequest, deps: RunDeps = {}): Promise<RunResult> {
-  const { names, inputs = {}, headed = false, keep = false, parallel = false, retries = 0 } = request;
+  const { inputs = {}, headed = false, keep = false, parallel = false, retries = 0 } = request;
+  // Every name answered for before anything at all happens — no browser, no recorder, no directory.
+  // It used to be answered inside the engine, with the context and its video already up: a name that
+  // named nothing was filmed anyway, and left `cli/<the name that was rejected>/` with a 3.6 KB video
+  // of a blank page in it, sitting beside the real action's evidence looking like a second cut of it
+  // (#141). It also decides which directory this run files under, so the same action lands in the same
+  // place whether it was typed bare or in full.
+  const names = request.names.map(name => system.resolveAction(name));
   // Injectable so this can be tested without downloading a browser: a unit test that pulls Chromium is
   // not a unit test, and a CI job that fails for want of one stops publishing without stopping merging.
   const launch = deps.launch ?? (() => requirePlaywright("running an action from the command line").chromium.launch({ headless: !headed }));
@@ -338,6 +345,13 @@ export type RunResult = {
  */
 export type RunnableSystem = {
   workspace: { resolve: (target?: string) => string };
+  /**
+   * The declared name a typed one means, or a throw naming what is declared instead.
+   *
+   * Asked first, and asked here rather than at the command line, because this is what opens the
+   * browser: a caller reaching for the runner from a spec deserves the same refusal a shell gets.
+   */
+  resolveAction: (name: string) => string;
   run: (action: string, page: Page, inputs: Params, within?: { at?: string }) => Promise<ActionResult>;
   /**
    * What the config says about one action, so a lane can find out how to film it.
