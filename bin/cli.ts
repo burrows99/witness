@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { Cli, System, Workspace } from "../src/index.ts";
@@ -79,16 +80,27 @@ const config: Parameters<Cli["command"]>[1] = {
  * has to answer before there is one, which is the moment somebody most needs it.
  */
 const skill: Parameters<Cli["command"]>[1] = {
-  summary: "how to use this, generated from what this copy can do — regenerate after an upgrade",
-  passthrough: () => {
-    process.stdout.write(`${describe()}\n`);
+  summary: "how to use this, generated from what this copy can do — `--write` rewrites the copy on disk",
+  passthrough: (args: string[]) => {
+    const text = describe();
+    if (!args.includes("--write")) {
+      process.stdout.write(`${text}\n`);
+      return;
+    }
+    // `init` wrote this file once and nothing ever rewrote it: `Workspace.create` skips what already
+    // exists, so the copy an agent reads was true on the day the directory was made and has been
+    // drifting since. The whole argument for generating it is that wrong instructions are worse than
+    // none, and a stale snapshot is wrong instructions with a disclaimer on top.
+    const at = path.join(Workspace.find({ config: configFile }).dir, "SKILL.md");
+    fs.writeFileSync(at, `${text}\n`);
+    process.stdout.write(`wrote ${path.relative(process.cwd(), at)}\n`);
   },
 };
 
 /** With a description, the instructions name that product's own apps, actions, operations and queries. */
 function describe(opts: { quiet?: boolean } = {}): string {
   try {
-    return Skill.for({ system: System.fromConfig(Workspace.find({ config: configFile }).configFile) }).render();
+    return Skill.for({ system: System.fromConfig(Workspace.find({ config: configFile }).configFile), extra: extras }).render();
   } catch (err) {
     // Falling back is right — the instructions are useful before a description exists. Falling back
     // SILENTLY is not: the generic version names commands this project does not have, and the reader
@@ -100,7 +112,7 @@ function describe(opts: { quiet?: boolean } = {}): string {
           `${err instanceof Error ? err.message : String(err)}\n`,
       );
     }
-    return Skill.for().render();
+    return Skill.for({ extra: extras }).render();
   }
 }
 
@@ -137,6 +149,15 @@ const init: Parameters<Cli["command"]>[1] = {
   },
 };
 
+/**
+ * What the entry point adds on top of what a description generates, named ONCE.
+ *
+ * The command line registered these and the skill generator did not, because `describe()` built a
+ * second, fresh System of its own — so the instructions handed to an agent described this CLI minus
+ * `config`, `init` and `skill`. One object, both callers, and the two cannot drift apart again.
+ */
+const extras = { config, init, skill };
+
 if (rest[0] === "init") {
   init.passthrough!(rest.slice(1));
   process.exit(0);
@@ -144,7 +165,7 @@ if (rest[0] === "init") {
 
 // Before a description exists is exactly when the instructions are worth having.
 if (rest[0] === "skill") {
-  skill.passthrough!([]);
+  skill.passthrough!(rest.slice(1));
   process.exit(0);
 }
 
@@ -182,4 +203,4 @@ try {
   process.exit(2);
 }
 
-Cli.main(system.addCommands({ config, init, skill }).cli(), rest);
+Cli.main(system.addCommands(extras).cli(), rest);

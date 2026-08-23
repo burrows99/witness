@@ -7,6 +7,12 @@ npx witness <noun> <verb> [args…] [--flags]
 No arguments prints every noun and verb this description declares. Results go to **stdout as JSON**;
 progress, warnings and the "what broke" pointer go to **stderr**, so `… | jq` works.
 
+`npx witness` is for a project that has this as a dependency — npm links the bin, so the command
+resolves. **Inside a checkout of this repository it does not**: npm does not link a package's own
+`bin` into its own `node_modules/.bin`, so `npx` misses and goes to the registry for an unrelated
+package named `witness`. Run `./bin/witness` there, which is what `/flow`, `docs/agent/` and the
+tutorial say.
+
 ## Always there
 
 | command | what it does |
@@ -25,6 +31,7 @@ progress, warnings and the "what broke" pointer go to **stderr**, so `… | jq` 
 | `stub list` / `stub show <s>` | any `stubs` are declared |
 | `config explore [<service>] [--pages N] [--depth N]` | always — walks the app and prints the description it implies |
 | `init` | always — writes `.witness/`, populated from the compose file when there is one |
+| `skill [--write]` | always — the instructions, generated from what this copy can do; `--write` refreshes `.witness/SKILL.md` in place |
 | *your own nouns* | each entry in the `cli` block |
 
 ## `action run`
@@ -55,6 +62,14 @@ writes the config. What the caps left out is printed, not dropped silently.
 Each page is read once it has **settled**, not once its document is done — a client-rendered app is an
 empty shell at `domcontentloaded`. A page that still offers nothing is named in the fragment: an empty
 page is nearly always one behind a sign-in, not one with nothing on it.
+
+**It walks your app and nothing else.** A sign-in that hands off — `/login/generic_oauth`,
+`/user/oauth2/keycloak`, `/api/auth/idp/microsoft/start` — is a link on your own origin that answers
+302 to an identity provider, so those shapes are skipped before anything is requested. Whatever else
+turns out to have left this origin is judged on where the navigation **landed**, and dropped rather
+than read: a description that named the third party's screens would be describing somebody else's
+product. Both kinds are named in the fragment, so a route you do want described can be declared by
+hand.
 
 ## Your own nouns
 

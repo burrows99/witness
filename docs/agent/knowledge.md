@@ -36,6 +36,13 @@ stayed green throughout. Same family as the entry above: when the fixture and th
 shape, neither of them is checking it. Build the fixture through the loader, or assert against what
 the loader returns.
 
+**A service in the stack that nothing uses proves nothing.** The compose file has shipped an identity
+provider since the day the third-party services went in — "a sign-in that LEAVES the app, on a second
+origin, on purpose" — and not one service was pointed at it. So the single case the crawler most needed
+to get right could not happen here, and arrived instead as a bug report from somebody else's app, where
+it had already described Microsoft's login screen as that product's own. Wiring Grafana to it was five
+environment variables. A stack that cannot produce the shape cannot catch the bug.
+
 ---
 
 ## Changing this repository
@@ -51,6 +58,13 @@ threaded now. Anything that must be per-*run* rather than per-*object* has to sa
 **Registered names need a test that enumerates them.** `records?: "browser" | "terminal"` type-checked
 perfectly and threw at runtime, because `"browser"` was never registered. The type said one thing and
 the registry another.
+
+**Two constructions of the same thing will disagree, and the second one is the one nobody runs.**
+`bin/cli.ts` built the command line twice — once for `Cli.main` and once, freshly, inside `describe()`
+— so the instructions handed to an agent described the CLI minus the three nouns the entry point adds
+itself. Both were correct in isolation and neither was checked against the other. Build it once and
+pass it, or write the test that compares them; a comment saying they must stay in step is not either
+of those.
 
 **Evidence and the `finally` block.** Slide cards, the catalogue and the render all belong in
 `finally`. A failing run is exactly when the evidence matters; cards spliced only on success was a
@@ -114,6 +128,27 @@ description; the pane was the part that was wrong.
 **Progress on stdout breaks the consumer.** Results are stdout, progress and warnings are stderr, or
 `| jq` fails for reasons nobody can see.
 
+**`npx witness` is not a command in this checkout.** npm links a package's own `bin` for whatever
+DEPENDS on it, never for the package itself — so there is no `node_modules/.bin/witness` here and
+`npx` goes to the registry looking for an unrelated package named `witness`, which is worse than
+failing. `./bin/witness` is what /flow, `docs/agent/` and the tutorial say; `npx witness` stays right
+in `README.md`, `docs/how-to/` and `docs/reference/`, which are written for somebody whose project has
+this as a dependency. Two audiences, one string, and the only way to keep both honest is to know which
+document is addressed to which.
+
+**Generated instructions can carry a bug the generator has no idea about.** The skill's own examples
+came from `Skill.invocation()`, which asks npm how it was launched — and answers `npx witness` for
+anything npm did not launch. So `./bin/witness skill` produced a file telling this checkout's reader
+to type the one command that does not work here, twenty-seven times, and the copy committed to the
+repository had been saying it since PR #56. A generator only removes the staleness it was told to look
+for.
+
+**Do not transcribe what the tool can be asked.** The `## Commands` section is a copy of a list
+`witness help` prints from the registry, and the copy is what drifted — three nouns missing, in the
+file that is the only thing an agent reads. The list is still worth keeping (it is read before
+anything has been run) but it must say where the real one is, or a reader told a verb does not exist
+concludes the tool cannot do it rather than asking.
+
 **`check drift` cannot be run on a terminal action.** Phase 6 says to run it when the change touched
 something a description claims, and on a `records: "terminal"` action it opens a browser and spends
 thirty seconds waiting for `locator('prompt')` before failing. `run` short-circuits on `records`
@@ -174,6 +209,16 @@ invisible until something loaded the file:
 
 Both are lazily-resolve-it bugs, and both only exist for configs a person would not have hand-written.
 Generating input is also generating new *shapes* of input.
+
+**A same-origin check on the href is not a same-origin check.** `config explore` asked where a link
+POINTED and then walked it, so `/api/auth/idp/microsoft/start` — a path on the app's own origin —
+took the crawl to login.microsoftonline.com, and the description of a git forge offered "Email, phone,
+or Skype". Where a navigation LANDS is the only version of the question that can be answered, and it
+cannot be asked until after the navigation. Same family as checking a URL by substring: the string is
+not the request. And the check that arrives too late is not the whole fix — an OAuth start endpoint is
+a same-origin link on the login page of a very large number of applications, so the shapes that begin
+a handoff are skipped before anything is sent. A tool that walks a stack on request must reach nobody
+the person did not point it at.
 
 ---
 

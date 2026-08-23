@@ -5,10 +5,13 @@
 // a UI with routes and locators, a REST API, real rows to query, a second UI on a second service.
 //
 //   docker compose up -d
-//   npx witness stack status
-//   npx witness action run tour        # the whole stack, walked once, narrated, recorded
+//   ./bin/witness stack status
+//   ./bin/witness action run tour      # the whole stack, walked once, narrated, recorded
 {
-  "name": "stack",
+  // What the COMMAND LINE is called — not what it drives. This said `stack`, so `witness help` opened
+  // `stack — drive the local stack` while the binary is `witness`, and the name collided with the
+  // `stack` noun listed three lines below it. The first thing anybody meeting the tool reads.
+  "name": "witness",
 
   "services": {
     // The app. A git forge: a web UI, a REST API, and a database it actually writes to.
@@ -266,6 +269,22 @@
 
   // About more than one service, so they live here rather than under any of them.
   "actions": {
+    // The one output this tool cannot point a browser at: its own instructions. What an agent given
+    // the skill and nothing else can reach for is exactly this list — a command missing from it does
+    // not exist, whatever the command line can actually do.
+    "theCommandsItAdvertises": {
+      "summary": "the noun list the generated skill hands an agent",
+      "records": "terminal",
+      "steps": [
+        { "caption": { "text": "what witness skill says this copy can do" } },
+        {
+          "type": { "on": "prompt", "value": "./bin/witness skill | sed -n '/^## Commands/,/^## This project/p' | grep '^- '" }
+        },
+        { "press": "Enter" },
+        { "wait": 8000, "note": "it loads the description first, and the list arrives in one write — so it is waited on before it is read" }
+      ]
+    },
+
     "theApp": {
       "summary": "the app a person uses",
       "steps": [

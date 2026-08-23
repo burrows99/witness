@@ -33,6 +33,24 @@ export class Explore {
   private static readonly worth = new Set(["button", "heading", "checkbox", "radio", "tab", "switch", "combobox"]);
 
   /**
+   * Paths that begin a sign-in somewhere else, and are therefore not walked.
+   *
+   * `/login/generic_oauth`, `/user/oauth2/keycloak`, `/api/auth/idp/microsoft/start` — every one of
+   * them a link on the app's OWN origin, and every one of them a 302 to an identity provider. The
+   * shape is on the login page of a very large number of applications, so a tool whose pitch is
+   * "point it at your stack" must not send Microsoft a request because somebody typed
+   * `config explore`. Nothing is fetched: this is tested against the path, before any navigation.
+   *
+   * The same reasoning as `click` being skipped for terminal recordings — where the safe thing and
+   * the complete thing disagree, do less and say so. Skipped paths are named in the fragment, so a
+   * person who does want one described can declare it by hand.
+   *
+   * Bounded rather than a bare substring on each side, because `/lessons` contains `sso` and a
+   * checker that cries wolf is worse than none.
+   */
+  private static readonly handoff = /(?:^|[/_-])(?:oauth\d*|saml|sso|idp)(?:[/_-]|$)|\/auth\/[^/]+\/start/i;
+
+  /**
    * Walk an app and report what it says about itself.
    *
    * Breadth-first from the routes already declared, or from `/` when there are none — so exploring a
@@ -53,6 +71,10 @@ export class Explore {
       // pages was reported once per page that linked to it — three identical lines about
       // `/user/login`, in a list whose whole job is to be read.
       seen.add(next.path);
+      if (Explore.handoff.test(next.path)) {
+        skipped.push(`${next.path} — hands off to an identity provider; walking it would send a third party a request`);
+        continue;
+      }
       if (pages.length >= input.maxPages) {
         // Counted and named rather than truncated in silence: a fragment that stopped early looks
         // exactly like one that found everything.
@@ -63,6 +85,16 @@ export class Explore {
       const facts = await input.read(new URL(next.path, origin).toString());
       if (!facts) {
         skipped.push(`${next.path} — could not be read`);
+        continue;
+      }
+      // Where a link POINTS is not where it lands, and only the second one is same-origin in any
+      // useful sense. A path on this origin that answers 302 defeats a check on the href entirely:
+      // the first fragment this produced against an app with social sign-in described Microsoft's
+      // login screen — "Email, phone, or Skype" — as the product's own. Judged after the navigation,
+      // on the URL that ended up in the bar, and the page dropped rather than read.
+      const landed = facts.url ? Explore.elsewhere(facts.url, origin) : undefined;
+      if (landed) {
+        skipped.push(`${next.path} — left this origin for ${landed}`);
         continue;
       }
       pages.push({ ...facts, path: next.path });
@@ -171,7 +203,9 @@ export class Explore {
             // time, and a timeout rather than a failure: an app that never goes idle still gets read,
             // it is just read late.
             await page.waitForLoadState("networkidle", { timeout: 5_000 }).catch(() => undefined);
-            return await Explore.readPage(page, new URL(origin));
+            // The URL that ended up in the bar, not the one asked for — what the crawl needs to know
+            // whether the navigation stayed here.
+            return { ...(await Explore.readPage(page, new URL(origin))), url: page.url() };
           } catch {
             return undefined;
           }
@@ -403,6 +437,16 @@ export class Explore {
     }
   }
 
+  /** The origin a navigation ended up on, when that is not this one — otherwise nothing. */
+  private static elsewhere(landed: string, origin: URL): string | undefined {
+    try {
+      const url = new URL(landed);
+      return url.origin === origin.origin ? undefined : url.origin;
+    } catch {
+      return undefined;
+    }
+  }
+
   private static pathOnly(href: string): string {
     return href.split("?")[0].split("#")[0];
   }
@@ -461,7 +505,15 @@ export class Explore {
 
 export type AriaNode = { depth: number; role: string; name?: string; attrs?: string; value?: string };
 export type SeenRequest = { method: string; url: string };
-export type PageFacts = { path: string; nodes: AriaNode[]; placeholders: string[]; links: string[]; title?: string };
+export type PageFacts = {
+  path: string;
+  nodes: AriaNode[];
+  placeholders: string[];
+  links: string[];
+  title?: string;
+  /** Where the read actually landed. Absent when nothing navigated — a fixture, or a page read in place. */
+  url?: string;
+};
 
 export type CrawlInput = {
   origin: string;

@@ -10,6 +10,11 @@ One command. The phases below are not separate commands to invoke; run them in o
 Read `docs/agent/knowledge.md` **now**, before phase 1. It is short and it is the accumulated cost of
 getting these things wrong.
 
+The command here is `./bin/witness`, not `npx witness`. npm does not link a package's own `bin` into
+its own `node_modules/.bin`, so in this checkout `npx witness` misses and goes to the registry looking
+for an unrelated package — which is worse than failing. `npx witness` is right for a project that
+DEPENDS on this one, and it is what `docs/reference/`, `docs/how-to/` and the README are written for.
+
 ---
 
 ## 1 · Understand
@@ -33,7 +38,7 @@ approval unless the answer changes what gets built.
 Before touching anything, because afterwards there is nothing left to record.
 
 ```bash
-EVIDENCE=before npx witness action run <action>
+EVIDENCE=before ./bin/witness action run <action>
 ```
 
 - No action shows the behaviour? Write one. `docs/how-to/write-an-action.md`. It outlives the ticket.
@@ -59,7 +64,7 @@ is a defect, not a doc nit: it is the only thing an agent reads.
 ## 4 · Record the after
 
 ```bash
-EVIDENCE=after npx witness action run <same action>
+EVIDENCE=after ./bin/witness action run <same action>
 ```
 
 Same action, same inputs, same viewport. A before and an after that differ in two ways prove nothing
@@ -83,7 +88,7 @@ If the after does not show the fix, the fix is not done. Go back to 3.
 
 ```bash
 npm run check                    # types, lint, unused, tests
-npx witness check drift <action> # if the change touched anything a description claims
+./bin/witness check drift <action> # if the change touched anything a description claims
 ```
 
 Read the **exit code**. Do not pipe to `tail`, `head` or `grep` and judge by what you see — that has

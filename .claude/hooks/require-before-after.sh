@@ -111,9 +111,9 @@ missing=""
 deny "Before/after gate: this pull request changes code, so it needs a recording of the behaviour on both sides of the change. This tool's whole premise is that a green tick is not the deliverable; a PR from it that asserts a fix and shows nothing is the one thing it cannot ship.
 ${missing}
 Do this:
-  EVIDENCE=before npx witness action run <action>   # BEFORE the change — afterwards there is nothing left to record
+  EVIDENCE=before ./bin/witness action run <action>   # BEFORE the change — afterwards there is nothing left to record
   …make the change…
-  EVIDENCE=after  npx witness action run <action>   # same action, same inputs
+  EVIDENCE=after  ./bin/witness action run <action>   # same action, same inputs
 Both cuts land side by side under .witness/artifacts/cli/<action>/. Open the frames, then cite them in the body.
 Record the after AFTER the change — this cannot check that, and a stale after looks like evidence without being any.
 No action shows it? Write one — docs/how-to/write-an-action.md. It outlives this PR.

@@ -17,9 +17,12 @@ the compose file, which is the first thing every description gets wrong.
 operations the app called while being walked. Nothing is written: merge and trim by hand, because a
 generated name is worse than the one you would choose.
 
-Two honest limits. **`forms` finds inputs by placeholder**, so an app that labels its inputs instead
-produces a thin `forms` block — use `fillFields`, which matches by label. And anything behind a login
-is only reachable if the config declares an `identity` whose cookies get you in.
+Three honest limits. **`forms` finds inputs by placeholder**, so an app that labels its inputs instead
+produces a thin `forms` block — use `fillFields`, which matches by label. Anything behind a login
+is only reachable if the config declares an `identity` whose cookies get you in. And **a sign-in that
+leaves the app is not walked** — an OAuth or SAML start endpoint is a same-origin link that redirects
+to an identity provider, and exploring your stack must not send a third party a request. It is named
+in the fragment rather than dropped silently.
 
 Then the rest of this page is the trimming.
 
