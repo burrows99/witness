@@ -109,11 +109,13 @@ asked for something that does not exist.
 - **apps**: `gitea`, `mailpit`, `grafana` — routes open as `app.<name>.<route>.open(page)`
 - **actions**:
   - `theApp` — the app a person uses
+  - `theOutsider` — the same app, from outside, signed in as nobody
   - `theWatcher` — what is watching it
   - `theMail` — where its mail actually goes
   - `tour` — the whole stack, walked once: the app, the database it wrote to, the mail it sent, and what watches it
   - `gitea.register` — the first account, made the way a person makes one
   - `gitea.askForAReset` — the one thing a fresh install will actually send mail about
+  - `gitea.explore` — what an anonymous visitor sees
   - `gitea.createRepo` — a repository, through the screen a person uses
   - `mailpit.openInbox` — what the stack has actually sent, on the screen a person reads it on
   - `grafana.signIn` — sign in, and get past the password prompt

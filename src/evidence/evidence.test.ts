@@ -96,3 +96,24 @@ test("frames are numbered across the whole run, not per object", async () => {
     ["01-signed-in.png", "02-dashboards.png", "03-explore.png"],
   );
 });
+
+test("clearing does not delete evidence an action already wrote inside itself", async () => {
+  // An action's own frames arrive AFTER the actions it composed have written theirs inside it. Wiping
+  // the parent for its first frame took the child with it, and the story then pointed at a path that
+  // was not there.
+  const { evidence } = workspace();
+  const page = { screenshot: async ({ path: file }: { path: string }) => fs.writeFileSync(file, "") } as never;
+  const child = evidence().write("tour/02-signin/debug.md", "what the composed action did");
+  await evidence().frame(page, "and then the parent took one");
+  await evidence().actionFrame(page, "tour", 3, "frame");
+  ok(fs.existsSync(child), "the composed action's story survived the parent's first frame");
+});
+
+test("but the run before is still cleared, once", () => {
+  const { evidence } = workspace();
+  const stale = evidence().write("tour/02-signin/debug.md", "the run before");
+  // A second Evidence for the same run must NOT clear again — that was the bug this replaced.
+  const fresh = evidence().write("tour/02-signin/debug.md", "this run");
+  equal(stale, fresh);
+  equal(fs.readFileSync(fresh, "utf8"), "this run");
+});

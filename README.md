@@ -278,13 +278,24 @@ writes to, the mail it sends, and something watching all of it.**
 
 ```bash
 docker compose up -d
-npx witness stack status
-npx witness action run tour
+npx witness action run theApp theOutsider theMail theWatcher --parallel
 ```
 
-![The whole stack, walked once and narrated](docs/example/stack.gif)
+![Four services driven at once, one pane each](docs/example/parallel.gif)
 
-*(the [MP4](docs/example/stack.mp4) is what the run produced; the GIF is it, for GitHub)*
+*(the [MP4](docs/example/parallel.mp4) is what the run produced; the GIF is it, for GitHub)*
+
+Four browsers, four panes of one frame, and **each pane is a different service**. The card at the front
+is a `slide` step — spliced in full-frame once, rather than painted into all four. Each pane's header
+is its action's own `summary`, so nothing has to be guessed from position.
+
+Watch the top-left do things and the others react to them: the repository **appears** to a signed-out
+stranger, and the recovery mail **lands** in the catcher. Nothing coordinates those lanes — they are
+four independent browsers looking at the same stack.
+
+```bash
+npx witness action run tour     # or the same ground sequentially, checked against every layer
+```
 
 One action produced that — 50 seconds, six smaller actions composed, narrated with slides, and every
 claim checked against the layer it is about:

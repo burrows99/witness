@@ -79,15 +79,31 @@ export class Evidence {
    * one. In a directory whose entire purpose is being believed, that is the worst possible bug.
    */
   private prepare(dir: string): string {
+    // The RUN's directory, once — not each directory as it is first written to.
+    //
+    // Per-directory, this deleted work already done: an action's own frames arrive after the actions
+    // it composed have written theirs INSIDE it, so clearing `theoutsider/` for its first frame took
+    // `theoutsider/01-explore/` with it. The story then pointed at a path that was not there.
+    //
     // Shared across instances, because a system hands out a NEW Evidence for every call: per-instance
-    // this cleared the directory before every single frame and left only the last one. A tool that
-    // deletes the evidence it just took is worse than one that leaves a stale frame in place.
-    if (!cleared.has(dir)) {
-      fs.rmSync(dir, { recursive: true, force: true });
-      cleared.add(dir);
-    }
+    // this cleared before every single frame and left only the last one. A tool that deletes the
+    // evidence it just took is worse than one that leaves a stale frame in place.
+    this.freshRun();
     fs.mkdirSync(dir, { recursive: true });
     return dir;
+  }
+
+  /**
+   * Empty this run's directory, the first time this process writes anything into it.
+   *
+   * Every path in: a story written before the first frame was taken would otherwise be deleted by the
+   * frame, which is how a run ended up pointing at evidence it had removed itself.
+   */
+  private freshRun(): void {
+    const run = this.dir;
+    if (cleared.has(run)) return;
+    fs.rmSync(run, { recursive: true, force: true });
+    cleared.add(run);
   }
 
   async frame(page: Page, name: string, opts: { fullPage?: boolean } = {}): Promise<string> {
@@ -120,6 +136,7 @@ export class Evidence {
     this.writeManifest();
     // Each segment slugged on its own: slugging the whole thing turns `actions/x/debug.md` into one
     // flat `actions-x-debug.md`, which loses the grouping the name was expressing.
+    this.freshRun();
     const parts = name.split("/").filter(Boolean);
     const last = parts.pop() ?? "file";
     const extension = last.match(/\.\w+$/)?.[0] ?? "";
