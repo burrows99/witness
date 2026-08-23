@@ -232,7 +232,7 @@ export class Skill {
       "```bash",
       ...Skill.aligned([
         [`${tool} stack status`, "is it up, and is what is answering ours"],
-        ...(has("api") ? [[`${tool} api get /v1/whatever`, "read the real payload before theorising about it"] as const] : []),
+        ...(has("api") ? [[`${tool} api get /v1/whatever`, "read the real payload — any route, or a declared operation by name"] as const] : []),
         ...(has("db") ? [[`${tool} db sql "select …"`, "what was actually stored"] as const] : []),
         [`EVIDENCE=before ${tool} action run <name>`, "record the behaviour as it is now"],
         ["#   … make the change …", ""],
@@ -300,7 +300,14 @@ export class Skill {
       lines.push("- **actions**:");
       for (const action of actions) lines.push(`  - \`${action.name}\`${action.summary ? ` — ${action.summary}` : ""}`);
     }
-    if (operations.length) lines.push(`- **operations**: ${operations.slice(0, 20).map(o => `\`${o}\``).join(", ")}${operations.length > 20 ? ` …and ${operations.length - 20} more` : ""}`);
+    // Named the way every other bullet here is: what they are, and how to reach one. They are callable
+    // from the command line as well as from a spec, which is the whole reason they are declared.
+    if (operations.length) {
+      lines.push(
+        `- **operations**: ${operations.slice(0, 20).map(o => `\`${o}\``).join(", ")}${operations.length > 20 ? ` …and ${operations.length - 20} more` : ""}` +
+          ` — call one: \`${this.run} api get <name> [key=value…]\``,
+      );
+    }
     if (queries.length) lines.push(`- **queries**: ${queries.slice(0, 20).map(q => `\`${q}\``).join(", ")}${queries.length > 20 ? ` …and ${queries.length - 20} more` : ""}`);
     if (this.product.cast.length) lines.push(`- **cast**: ${this.product.cast.map(c => `\`${c}\``).join(", ")} — \`app.cast("name")\``);
     if (this.product.secrets.length) {

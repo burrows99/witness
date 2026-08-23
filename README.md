@@ -178,7 +178,7 @@ when a project needs it (`System.find()`, `app.run`, `app.api.call`); nothing he
 
 ```bash
 npx witness stack status                              # what is up, on which ports
-npx witness api get /v1/health                        # any route, authenticated as the config says
+npx witness api get <operation|/v1/health>            # a declared operation by name, or any route on it
 npx witness db sql "select 1" [--on=openfga-db]       # the stack's databases, default or named
 npx witness order show 1234                           # the verbs the config declares
 npx witness action list                               # what the product can DO

@@ -24,7 +24,7 @@ tutorial say.
 
 | command | present when |
 |---|---|
-| `api <get\|post\|put\|patch\|delete> <path> [json]` | any service declares an `api` — authenticated the way a declared operation is |
+| `api <get\|post\|patch\|delete> <operation\|/path> [key=value…] [json]` | any service declares an `api` — a declared operation by name, or any other route on it |
 | `db sql "<query>" [--on=<service>]` | a `database` is declared — `--on` names one of the others |
 | `video` | rebuild the MP4s from the recordings on disk — a RUN only renders what it just recorded, this re-renders everything |
 | `action list` / `action show <a>` / `action run <a…>` | any action is declared |
@@ -33,6 +33,25 @@ tutorial say.
 | `init` | always — writes `.witness/`, populated from the compose file when there is one |
 | `skill [--write]` | always — the instructions, generated from what this copy can do; `--write` refreshes `.witness/SKILL.md` in place |
 | *your own nouns* | each entry in the `cli` block |
+
+## `api`
+
+```
+npx witness api get <operation|/path> [key=value…] [json]
+```
+
+The argument is **an operation's name first, and a path second**: the `api.operations` block is the
+list of everything this description can ask the running app, and calling one by name is what it is
+for. `key=value` supplies that operation's parameters, the same way `action run` supplies an action's
+inputs — `api get getReport reportId=7`.
+
+A **path starts with `/`** and is the escape hatch it always was: any route, authenticated with the
+same credential a declared operation would use. Reach for it twice for the same route and give it a
+name in the config instead.
+
+Anything that is neither is a mistake worth naming, so it says so — with the operations that do
+exist — rather than sending it. A named operation carries its own method, so the verb is how the
+command is typed rather than what goes on the wire; `get` is the one to reach for.
 
 ## `action run`
 

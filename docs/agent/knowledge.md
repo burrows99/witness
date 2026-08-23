@@ -501,3 +501,21 @@ identical to a summary of something.
 
 **A locator you have not run is a guess.** Five of the first nine actions written here named
 something that did not exist. `npx playwright codegen` writes real ones.
+
+**A list only code can reach is documentation, not vocabulary.** `api.operations` is the config's
+answer to "what can this thing do", and `Operations.operation()` has resolved a name to one — with a
+good error listing the rest — since the day it was written. The command line never reached it: the
+`api` verb was wired straight to the raw request, so `api get listProjects` was concatenated onto the
+base URL and came back as `Failed to parse URL from http://localhost:5001listProjects`. Declaring ten
+operations with summaries and then typing their paths by hand at the prompt is the shape of the
+problem — the block was being read rather than used, by the surface most likely to want it. Found
+driving a third-party app with 59 routes, where naming them once is the entire point of naming them.
+The general shape: when a docstring promises "the same list drives X", grep X for the call, because
+the promise is the thing nobody rechecks.
+
+**An error that names a string the caller never typed points at the wrong half of the system.**
+`${baseUrl}${path}` assumes a leading slash and never checks, so the one argument shape it is wrong
+for produces something that is not a URL at all, and `Failed to parse URL from …` reads as a bad base
+URL or a service that is down. It cost a second run with a known-good path to establish that the tool
+was fine and the argument was the whole story. Normalising a join costs two `replace`s; an error
+about a string nobody wrote costs whoever reads it their first guess.

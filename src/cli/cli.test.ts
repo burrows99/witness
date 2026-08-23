@@ -153,16 +153,19 @@ test("the api, db and video verbs appear only when the config supports them", as
   equal(await run(full, ["db", "sql", "select 1", "--quiet"]), "1 row\n");
 });
 
-test("api verbs pass a path and an optional JSON body", async () => {
-  const seen: unknown[] = [];
+test("api verbs hand the positional line over whole, to the half that knows the names", async () => {
+  // A declared operation and a path arrive at the same argument and this class holds neither list; the
+  // `key=value` parser that separates an operation's parameters from a JSON body lives with the action
+  // runner, and reaching into it from here would pull a browser runner in behind `--help`.
+  const seen: { method: string; args: string[] }[] = [];
   const cli = new Cli({ name: "acme", stack }).withDefaults({
-    api: async (method, path, body) => {
-      seen.push({ method, path, body });
+    api: async (method, args) => {
+      seen.push({ method, args });
       return {};
     },
   });
-  await run(cli, ["api", "post", "/v1/things", '{"name":"x"}', "--quiet"]);
-  deepEqual(seen[0], { method: "POST", path: "/v1/things", body: { name: "x" } });
+  await run(cli, ["api", "post", "createThing", "id=3", '{"name":"x"}', "--quiet"]);
+  deepEqual(seen[0], { method: "POST", args: ["createThing", "id=3", '{"name":"x"}'] });
 });
 
 test("a verb whose output IS the artefact is printed alone", async () => {

@@ -19,8 +19,22 @@ export class HttpApi {
     this.trace = trace;
   }
 
+  /**
+   * Where a path lands, against this base URL.
+   *
+   * The separator is put in rather than assumed. `${base}${path}` is right for exactly one shape of
+   * argument, and both shapes it is wrong for fail as a URL rather than as a request: a path declared
+   * without its leading slash becomes `http://localhost:5001health`, and a base URL with a trailing one
+   * becomes `http://localhost:5001//v1/x`. What the caller then reads is `Failed to parse URL from …`
+   * naming a string nobody typed, which looks like a bad base URL or a service that is down.
+   *
+   * An empty path is the base URL itself, and stays that way: it is what the GraphQL provider asks for,
+   * where the operation lives in the document rather than in a route.
+   */
   url(path: string): string {
-    return path.startsWith("http") ? path : `${this.baseUrl}${path}`;
+    if (path.startsWith("http")) return path;
+    const base = this.baseUrl.replace(/\/+$/, "");
+    return path ? `${base}/${path.replace(/^\/+/, "")}` : base;
   }
 
   async request<T = unknown>(path: string, init: ApiInit = {}): Promise<T> {

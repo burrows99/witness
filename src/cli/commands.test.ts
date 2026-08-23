@@ -1,6 +1,9 @@
-import { equal } from "node:assert/strict";
+import { deepEqual, equal, rejects } from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
+import { HttpApi } from "../http/client.ts";
+import { Operations } from "../http/operations.ts";
+import { Trace } from "../diagnostics/trace.ts";
 import { commandsFor } from "./commands.ts";
 import type { Report } from "../diagnostics/drift.ts";
 import type { Stack } from "../environment/stack.ts";
@@ -51,8 +54,10 @@ const run = async (report: Report): Promise<{ printed: string; exitCode: typeof 
   }
 };
 
+const originalFetch = globalThis.fetch;
 afterEach(() => {
   process.exitCode = undefined;
+  globalThis.fetch = originalFetch;
 });
 
 test("a description that no longer holds exits 1, so this can gate a pipeline", async () => {
@@ -70,4 +75,78 @@ test("…and a description that still holds leaves the exit code alone", async (
   const { printed, exitCode } = await run(report(true));
   equal(exitCode, undefined);
   equal(printed.trim(), "all 1 claims still hold");
+});
+
+/**
+ * A system whose API is the real `Operations`, over a fetch that keeps what it was asked.
+ *
+ * The client is the part under test here: the defect was never in it — it has resolved these names all
+ * along — but in the wiring that reached past it, so a fake api would pass against the bug.
+ */
+const systemCalling = (): { system: System; seen: { url: string; method: string; body?: string }[] } => {
+  const seen: { url: string; method: string; body?: string }[] = [];
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    seen.push({ url, method: String(init.method ?? "GET"), ...(init.body === undefined ? {} : { body: String(init.body) }) });
+    return new Response("{}", { status: 200 });
+  }) as unknown as typeof fetch;
+  const api = new Operations(
+    new HttpApi("http://localhost:5001", () => ({}), new Trace()),
+    stack,
+    { service: "api", operations: { listProjects: { path: "/api/graph/project/list" }, getReport: { path: "/api/reports/{reportId}" } } },
+    new Trace(),
+  );
+  return {
+    seen,
+    system: {
+      config: { name: "acme" },
+      stack,
+      trace: undefined,
+      renderVideos: () => [],
+      hasApi: true,
+      hasDatabase: false,
+      actions: { names: [] },
+      added: {},
+      api,
+    } as unknown as System,
+  };
+};
+
+/** Run a command against a system, keeping what it printed. */
+const ran = async (system: System, argv: string[]): Promise<string> => {
+  const written: string[] = [];
+  const stdout = process.stdout.write.bind(process.stdout);
+  process.stdout.write = (text: string) => {
+    written.push(text);
+    return true;
+  };
+  try {
+    await commandsFor(system).run(argv);
+    return written.join("");
+  } finally {
+    process.stdout.write = stdout;
+  }
+};
+
+test("api get calls a declared operation by name, with the key=value parameters action run takes", async () => {
+  // The names in the config were unreachable from the command line: the verb went straight to the raw
+  // request, so `api get getReport` was concatenated onto the base URL as
+  // `http://localhost:5001getReport` and came back as `Failed to parse URL from` a string nobody typed.
+  const { system, seen } = systemCalling();
+  await ran(system, ["api", "get", "getReport", "reportId=7"]);
+  deepEqual(seen, [{ url: "http://localhost:5001/api/reports/7", method: "GET" }]);
+});
+
+test("…and a path is still a path, with the JSON body that follows it", async () => {
+  const { system, seen } = systemCalling();
+  await ran(system, ["api", "post", "/v1/things", '{"name":"x"}']);
+  deepEqual(seen, [{ url: "http://localhost:5001/v1/things", method: "POST", body: '{"name":"x"}' }]);
+});
+
+test("something that is neither is named as neither, before anything is sent", async () => {
+  const { system, seen } = systemCalling();
+  await rejects(
+    () => ran(system, ["api", "get", "health"]),
+    /no such operation "health" — declared: listProjects, getReport… \(paths start with \/\)/,
+  );
+  deepEqual(seen, []);
 });

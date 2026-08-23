@@ -18,8 +18,9 @@ export function commandsFor(system: System): Cli {
     // Rendering is the system's own job, done in this process. Shelling out to a script that calls
     // back into it is a loop nobody should have to read.
     renderVideos: opts => system.renderVideos(opts),
-    // Authenticated the way a declared operation would be — the client already knows how.
-    api: system.hasApi ? (method, path, body) => system.api.request(path, { method, body }) : undefined,
+    // Authenticated the way a declared operation would be — the client already knows how, and it is
+    // also the half that knows which names exist, so it is the half that decides what was meant.
+    api: system.hasApi ? (method, args) => callApi(system, method, args) : undefined,
     sql: system.hasDatabase ? (query: string, on?: string) => (on ? system.database(on) : system.db).sql(query) : undefined,
   });
 
@@ -135,4 +136,20 @@ export function commandsFor(system: System): Cli {
   }
   return cli;
 
+}
+
+/**
+ * `api <verb> <operation|/path> [key=value…] [json]`, split into what the client takes.
+ *
+ * `parseRunArgs` is the parser `action run` already uses for an action's inputs, borrowed rather than
+ * written a second time: one way of typing a parameter at this command line is one thing for a reader
+ * to learn, and two parsers drift apart the week after the second one is written. What is left over is
+ * the target and its JSON body, in the order they were always typed.
+ */
+function callApi(system: System, method: string, args: string[]): Promise<unknown> {
+  const { names, inputs } = parseRunArgs(args);
+  return system.api.callOrRequest(Cli.need(names[0], "operation or path"), inputs, {
+    method,
+    body: names[1] ? JSON.parse(names[1]) : undefined,
+  });
 }

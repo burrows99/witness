@@ -138,7 +138,7 @@ test("the command line is built from the config, without an entry point to write
   match(usage, /show\s+<orderId>/);
   match(usage, /action\s+run one of the declared actions/);
   match(usage, /stub\s+the local stand-ins/);
-  match(usage, /api\s+any route on the API/);
+  match(usage, /api\s+any operation this description declares, by name/);
 });
 
 test("a database credential is a source, not a string the config has to hold", () => {
