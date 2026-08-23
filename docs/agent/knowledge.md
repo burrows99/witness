@@ -165,12 +165,15 @@ file that is the only thing an agent reads. The list is still worth keeping (it 
 anything has been run) but it must say where the real one is, or a reader told a verb does not exist
 concludes the tool cannot do it rather than asking.
 
-**`check drift` cannot be run on a terminal action.** Phase 6 says to run it when the change touched
-something a description claims, and on a `records: "terminal"` action it opens a browser and spends
-thirty seconds waiting for `locator('prompt')` before failing. `run` short-circuits on `records`
-before any browser is opened; drift never learned to, so the red says "your action is broken" when
-what it means is "this checker is the wrong one for this action". True of every terminal action on
-`main` — check it against an action you did not touch before believing it about yours.
+**A second reader of a field does not learn what the first one knows.** `records: "terminal"` says an
+action has no screen, and `run` had short-circuited on it since terminal recording went in. `check
+drift` was written against browser actions and never asked: pointed at a terminal one it opened a
+browser, spent thirty seconds on `locator('prompt')`, and reported the action as **broken** — the
+checker's own assumption wearing the words of a finding, which is the "cries wolf" the drift design
+exists to avoid, arriving from the other side. Fixed in #95: skipped, and the count said out loud,
+because the other way to be wrong here was to skip in silence and answer "all 4 claims still hold"
+about a description whose other half was never opened. When a field changes what a thing IS, grep
+every reader of it — not the one the change was about.
 
 **A `Type` step loses a backslash, and a `{…}` inside one is read as a parameter.** A step typing
 `tr '\n' ' '` reached the shell as `tr 'n' ' '` — VHS drops the escape out of a double-quoted `Type`

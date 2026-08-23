@@ -323,6 +323,26 @@
       ]
     },
 
+    // The checker being checked. Half this description has no screen, and `check drift` is the fast
+    // path over the other half — so what it says about the terminal actions is a claim about the
+    // checker itself, and there is nowhere else in the config to point a browser at it.
+    "theActionsDriftCannotCheck": {
+      "summary": "what `check drift` says about the half of a description that has no screen",
+      "records": "terminal",
+      // Two commands and a JSON blob between them: the default thirty rows ends on the tail, and the
+      // first command's answer is the whole point of the cut.
+      "pane": { "height": 780, "fontSize": 14 },
+      "steps": [
+        { "caption": { "text": "check drift, pointed at an action with no screen" } },
+        { "type": { "on": "prompt", "value": "./bin/witness check drift keycloak.describeItself; echo \"exit=$?\"" } },
+        { "press": "Enter" },
+        { "wait": 38000, "note": "long enough for the 30s Playwright timeout this used to spend before failing" },
+        { "type": { "on": "prompt", "value": "./bin/witness check drift; echo \"exit=$?\"" } },
+        { "press": "Enter" },
+        { "wait": 8000, "note": "a browser start and three routes — measured at 3.2s" }
+      ]
+    },
+
     "theApp": {
       "summary": "the app a person uses",
       "steps": [
