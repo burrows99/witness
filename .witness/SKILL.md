@@ -220,6 +220,12 @@ Things that cost other people an afternoon:
 - `waitForUrl` takes a **regular expression** — a bare substring is the commonest useful form, and
   a glob (`**/products/**`) is a syntax error, not a pattern.
 - `store` reads ONE element; `store: { …, "all": true }` reads every match as an array.
+- **A form control is read by its VALUE**, by `store` and by `expect`'s `text` alike, so *this
+  field was prefilled correctly* is a claim you can make. Decided from the element and not from
+  the step: you named a thing on the screen and you get what it says. A `<select>` reads as the
+  label of the option CHOSEN — its text is every option it OFFERS, so a claim about the chosen
+  one would have passed against the one nobody chose — a checkbox or radio as `"true"` or
+  `"false"`, and a password field as the dots it draws rather than the credential behind them.
 - `expect` is about the screen and `check` is about the values — comparing what the API said to
   what the page shows is a `check`, and it is the whole reason an action needs no program.
 - An action that takes inputs is composed with `run: { "action": …, "with": { … } }`; the bare

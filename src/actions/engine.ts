@@ -379,8 +379,27 @@ export class Actions {
       const timeout = step.expect.timeout ?? 30_000;
       const because = step.expect.because;
       if (step.expect.state === "hidden") await expect(target, because).toBeHidden({ timeout });
-      else if (step.expect.text) await expect(target, because).toContainText(text(step.expect.text), { timeout });
-      else if (step.expect.count !== undefined) await expect(target, because).toHaveCount(step.expect.count, { timeout });
+      else if (step.expect.text) {
+        const wanted = text(step.expect.text);
+        // What it SAYS, by the same reading `store` takes — see `reading`, below. Playwright's text
+        // matcher is blind to a form control in exactly the ways `textContent` is, because it IS that
+        // reading: it cannot see an `<input>`'s value at all, so a claim about a field could never
+        // pass however right it was; and on a `<select>` it matches every option the picker OFFERS,
+        // so `"text": "OpenAI"` went green against a picker with Gemini chosen — a claim satisfied by
+        // the opposite of what happened.
+        //
+        // Attachment is asserted first because a locator that names nothing is the commonest way this
+        // step fails, and Playwright's own message for it names the locator and carries the `because` —
+        // which a polled predicate cannot. After it there is an element to ask what KIND of thing it
+        // is, and anything that is not a control stays with the matcher whose message is the better one.
+        await expect(target, because).toBeAttached({ timeout });
+        const [first] = await target.evaluate(reading);
+        if (first?.control) {
+          await expect
+            .poll(async () => (await target.evaluate(reading))[0]?.said ?? "", { message: because, timeout })
+            .toContain(wanted);
+        } else await expect(target, because).toContainText(wanted, { timeout });
+      } else if (step.expect.count !== undefined) await expect(target, because).toHaveCount(step.expect.count, { timeout });
       else await expect(target, because).toBeVisible({ timeout });
 
       // The one failure mode that produces a GREEN run and a wrong deliverable: a match on a node that
@@ -393,9 +412,17 @@ export class Actions {
       // One element, or all of them. "What is this control offering?" is a whole class of claim — every
       // option in a picker, every row in a list — and without `all` the only answer was a strict-mode
       // violation that happened to name the count.
+      //
+      // `evaluate` for one and `evaluateAll` for every match, which is what keeps that violation:
+      // `evaluateAll` is not strict, so a single-element `store` written over it would quietly take the
+      // first of 226 matches instead of failing, and failing is the whole of what the single form is for.
+      const readings = step.store.all ? await target.evaluateAll(reading) : await target.evaluate(reading);
       values[step.store.as] = step.store.all
-        ? (await target.allTextContents()).map(text => text.trim()).filter(Boolean)
-        : ((await target.textContent())?.trim() ?? "");
+        ? // A blank match is whitespace between tags rather than an option, which is why this filter
+          // exists. An EMPTY FIELD is not the same thing — it is a fact about the form, and dropping it
+          // out of the array is the silent version of the bug this reading was written to end.
+          readings.filter(one => one.control || one.said.trim()).map(one => one.said.trim())
+        : (readings[0]?.said.trim() ?? "");
     }
     if (step.waitForUrl) {
       // Copied rather than written through: `wait.url` is derived here, and writing it back into the
@@ -813,6 +840,58 @@ export class Actions {
 }
 
 /**
+ * What a person reads off an element: a form control's VALUE, anything else's text.
+ *
+ * `textContent` was the only reading this engine had, and it is wrong for every control on the page,
+ * quietly, in three different directions. An `<input>` has no text at all, so a settings dialog's
+ * prefilled endpoint came back `""` and no claim could be made about any field — which ruled out the
+ * one class of claim a description of a form is most wanted for. A `<textarea>`'s text is what the
+ * MARKUP said, so a `store` after a `type` step read the value the page shipped with rather than the
+ * one somebody had just typed into it, and looked right doing it. And a `<select>`'s text is every
+ * option it offers, concatenated — `"OpenAIGemini"` — so `"contains": "OpenAI"` passed on a picker
+ * with Gemini chosen. Empty is at least visible in a failure; the other two are green.
+ *
+ * Detected here rather than declared in the step, for two reasons. A `"value": true` flag would have
+ * to be typed by somebody who already knew which tag their locator lands on, and the whole point of
+ * naming things the way a person names them (`{ "label": "Base URL" }`) is that they do not — the
+ * step author named a thing on the screen and wants what it says. And a flag defaults to off, so
+ * every step written before it existed keeps the wrong reading: a documented trap is still a trap.
+ *
+ * Three controls where `.value` is not what is on the screen, and this reads the screen:
+ *
+ *   - a `<select>` displays the LABEL of the chosen option. `.value` is an identifier its author
+ *     picked (`"gm"`), which may appear nowhere on the page, and for a multiple select it is only
+ *     the first of the ones chosen — so this joins all of them, by the rule about taking the first
+ *     of several.
+ *   - a checkbox or a radio has a value AND a checked state, and they are different questions.
+ *     `.value` is `"on"` unless somebody set it, it is never drawn anywhere, and it does not change
+ *     when the box is ticked — so what is on the screen is whether it is ticked, as `"true"` or
+ *     `"false"`, which `"check": { "equals": "true" }` compares like every other reading here.
+ *   - a password field draws dots on purpose. Its value is a credential, and this engine's one rule
+ *     about credentials is that they must not become stored VALUES: `values` is returned to the
+ *     caller, printed as JSON by the command line and pasted into pull requests. So it reads as many
+ *     dots as the browser is drawing — enough to say a field was prefilled, and not the secret.
+ *
+ * It names itself because that name is the only one it has where it runs. Playwright serialises this
+ * function into the page, where nothing else of ours exists, so the `all` form cannot reach the rule
+ * by any other route — and one rule shared by both forms is the point of writing it here at all: a
+ * `store` reading a list was applying the same blindness one element at a time.
+ */
+const reading = function read(node: Element | Element[]): Reading[] {
+  if (Array.isArray(node)) return node.flatMap(one => read(one));
+  if (node instanceof HTMLSelectElement) {
+    return [{ said: Array.from(node.selectedOptions, option => option.label).join(", "), control: true }];
+  }
+  if (node instanceof HTMLTextAreaElement) return [{ said: node.value, control: true }];
+  if (node instanceof HTMLInputElement) {
+    if (node.type === "checkbox" || node.type === "radio") return [{ said: String(node.checked), control: true }];
+    if (node.type === "password") return [{ said: "•".repeat(node.value.length), control: true }];
+    return [{ said: node.value, control: true }];
+  }
+  return [{ said: node.textContent ?? "", control: false }];
+};
+
+/**
  * Keys that modify a step rather than being what it does. Everything else names the verb.
  *
  * Module-level and exported because `check drift` labels a step by the same rule and kept its own copy
@@ -885,6 +964,14 @@ type Running = { warning?: string; ran?: string; notices: string[] };
 
 /** What a step needs to know about its own position, to file what it runs underneath itself. */
 type StepPlace = { at?: string; index?: number; quiet?: boolean };
+
+/**
+ * One element's reading: what it says, and whether that came from a VALUE rather than from its text.
+ *
+ * `store` only wants the first half. `expect` wants both, because the half of it that is not a control
+ * is better served by Playwright's own text matcher than by anything polled here.
+ */
+type Reading = { said: string; control: boolean };
 
 /** Action inputs and stored values: whatever the caller passes, and whatever steps read back. */
 export type Params = Record<string, unknown>;
@@ -966,6 +1053,7 @@ export type StepConfig = {
   expect?: {
     on: LocatorSpec;
     state?: "visible" | "hidden";
+    /** What it says. A form control says it in its value, by the same reading `store` takes. */
     text?: string;
     count?: number;
     timeout?: number;
@@ -977,6 +1065,11 @@ export type StepConfig = {
    *
    * One element by default. `all` reads every match instead, as an array — what a picker is offering,
    * what a list contains — which `expect` can then count and `select` can pick from.
+   *
+   * A form control is read by its VALUE and everything else by its text, decided from the element
+   * rather than from the step: an `<input>` holding a prefilled endpoint says nothing as text, and a
+   * `<select>` says every option it offers rather than the one chosen. See `reading` for the three
+   * controls where the value is not what is on the screen either.
    */
   store?: { from: LocatorSpec; as: string; all?: boolean };
   /**

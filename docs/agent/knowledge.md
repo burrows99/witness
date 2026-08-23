@@ -554,3 +554,15 @@ for produces something that is not a URL at all, and `Failed to parse URL from �
 URL or a service that is down. It cost a second run with a known-good path to establish that the tool
 was fine and the argument was the whole story. Normalising a join costs two `replace`s; an error
 about a string nobody wrote costs whoever reads it their first guess.
+
+**One reading applied to every kind of node is wrong for three of them, and only one of the three is
+empty.** `store` and `expect` both asked an element for its `textContent`, which an `<input>` does not
+have — so a settings dialog's prefilled endpoint stored `""` and no claim could be made about any form
+field, which is the failure that got reported. The other two are the reason it is worth an entry. A
+`<textarea>`'s text content is what the MARKUP shipped with, so a `store` after a `type` step read a
+plausible, stale, wrong value and looked right doing it. And a `<select>`'s is every option it offers
+concatenated — `"OpenAIGemini"` — so `"contains": "OpenAI"` PASSED on a picker with Gemini chosen: a
+green assertion about the opposite of what happened, which is worse than the one that was filed. The
+empty string is the only one of the three that anybody notices, so the bug that gets reported is not
+the size of the bug. Whenever one accessor is used for a whole class of thing, list the members of the
+class and ask what that accessor returns for each; the dangerous answers are the plausible ones.
