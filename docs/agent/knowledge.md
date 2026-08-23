@@ -111,6 +111,14 @@ gets learned as noise. Render what this run recorded; a raw recording older than
 it has nothing new to say. And when the sweep is somebody's actual request — `witness video` says
 *rebuild* — that wants a flag, not the default.
 
+**A fixture in an order the real thing never produces cannot reproduce an ordering bug.** The `STACK`
+fixture in `compose.test.ts` is documented as "what `docker compose config` gives back", and it listed
+`postgres` before `mariadb`. Compose sorts alphabetically and never returns that, so the one defect the
+whole first-declared-wins rule can have — the default database decided by the letter `m` — could not
+happen inside the file whose job is catching it. The order of a fixture is part of its content whenever
+anything downstream reads it in order, and "realistic values" is not the same claim as "realistic
+shape".
+
 **A cast at the call site makes an optional field of everything.** `runActions(system as never, …)`
 silenced not just the mismatched `run` signature it was written for but every other missing property,
 so `actionConfig` — the field the terminal recorder branches on — went unsupplied by four fixtures.
