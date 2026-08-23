@@ -478,6 +478,14 @@ you pick are the ones whose habits you already build for. The first defect was l
 `/user/login` and `/user/sign_up` the whole time — neither carries a placeholder — and it took the
 three obscure ones to make anybody look.
 
+**"Say what you left out" is also a rule about the first of something.** `init` read `ports[0]` and
+stopped, on a comment reasoning that a service publishing several has one a description is about.
+That reads fine and is untrue of the ordinary dev-mode container — a UI on one port and its API on
+the other, out of one image — which came back described as the UI, with the whole API missing and the
+run saying `Read 1 service(s)`. Every failure of this rule so far has been a cap or a limit, which is
+at least visible in the code as a number; taking the first is the same omission with nothing to
+notice. Where a generator takes one of several, either take all of them or name the ones you did not.
+
 ---
 
 ## Judgement calls that keep coming back
