@@ -7,6 +7,7 @@ import { test } from "node:test";
 import type { Evidence } from "../evidence/evidence.ts";
 import type { Operations } from "../http/operations.ts";
 import type { Queries } from "../database/queries.ts";
+import type { StepResult } from "./engine.ts";
 import { Trace } from "../diagnostics/trace.ts";
 
 /**
@@ -35,6 +36,8 @@ const fakePage = (
     absent?: string;
     /** What Playwright says when `setInputFiles` is pointed at something that is not a file input. */
     uploadFails?: string;
+    /** Whether the context this page came from was opened with `recordVideo`. */
+    recording?: boolean;
   } = {},
 ): { page: never; did: Done } => {
   const did: Done = [];
@@ -77,6 +80,8 @@ const fakePage = (
     off: () => undefined,
     /** Where the browser is. Half of reading a failed wait is knowing where it ended up instead. */
     url: () => opts.at ?? "http://localhost:3000/login",
+    /** Playwright answers `null` here for a context nobody asked to record. */
+    video: () => (opts.recording ? {} : null),
   };
   return { page: page as never, did };
 };
@@ -89,11 +94,14 @@ const engine = (
     origin?: (service: string) => string;
     /** Where an `upload` step's filenames resolve against — a `.witness/fixtures`, in a test a temp dir. */
     fixtures?: () => string;
+    /** Whether a recording of this run would become an MP4 — ffmpeg, in a real checkout. */
+    watchable?: () => boolean;
   } = {},
 ) =>
   new Actions({
     ...(opts.origin ? { origin: opts.origin } : {}),
     ...(opts.fixtures ? { fixtures: opts.fixtures } : {}),
+    ...(opts.watchable ? { watchable: opts.watchable } : {}),
     operations: { call: async (name: string, params: unknown, body: unknown) => opts.api?.(name, params, body) ?? {} } as unknown as Operations,
     queries: { query: (name: string, params: unknown) => opts.sql?.(name, params) ?? "row" } as unknown as Queries,
     trace: new Trace(),
@@ -487,6 +495,76 @@ test("what counts as off-screen, and what does not", when, async () => {
     await Actions.offScreen(page, { first: () => ({ boundingBox: async () => { throw new Error("gone"); } }) } as never),
     undefined,
   );
+});
+
+test("what counts as a recording too fast to watch, and what does not", when, async () => {
+  // The sibling of the test above, one artefact along. A fourteen-step run that takes two seconds is
+  // not broken — the frames genuinely differ — but each step holds the screen for a tenth of a
+  // second, so what plays is a blank screen and then the end state (#152).
+  const { Actions } = await import("./engine.ts");
+  const steps = (many: number): StepResult[] => Array.from({ length: many }, () => ({ step: "click", ms: 0 }));
+
+  const said = Actions.tooFastToWatch(steps(14), 2000)!;
+  match(said, /^video: 14 steps in 2\.0s — 143ms of recording each/);
+  // A warning that names the remedy is worth several that only name the problem, and all three of
+  // these already exist: what was missing was anything saying they were the answer to this.
+  match(said, /`slide`, `caption` and `wait`/);
+
+  // The one that matters. The same fourteen steps, paced with the slides, captions and waits that
+  // took #152's own run to 24 seconds, say nothing at all: a warning that cries wolf gets ignored,
+  // and then the real one does too.
+  equal(Actions.tooFastToWatch(steps(14), 24_000), undefined);
+  // Per step rather than on the total, because that is the question: two seconds is plenty of
+  // recording for three steps and nowhere near enough for thirty.
+  equal(Actions.tooFastToWatch(steps(3), 2000), undefined);
+  match(Actions.tooFastToWatch(steps(30), 4000)!, /^video: 30 steps in 4\.0s/);
+  // A third of a second each is the floor, and a floor is not a target.
+  equal(Actions.tooFastToWatch(steps(10), 3000), undefined);
+  match(Actions.tooFastToWatch(steps(10), 2990)!, /299ms of recording each/);
+  // Nothing at all about a run too short to have pacing: the answer to a four-step recording that is
+  // over in an instant is that it did four things, not that it needed narrating.
+  equal(Actions.tooFastToWatch(steps(4), 4), undefined);
+});
+
+test("a run says its recording is unwatchable, and only when there is one to watch", when, async () => {
+  // Where the remark has to be made from: `running.notices` reaches the result AND the story, so an
+  // agent reading the JSON and a person opening `debug.md` are told the same thing once.
+  const tour = { a: { steps: Array.from({ length: 6 }, (_, i) => ({ press: String(i + 1) })) } };
+  const about = (result: { warnings: string[] }): string[] => result.warnings.filter(warning => warning.startsWith("video:"));
+
+  // Written down as well as returned: `debug.md` is where the off-viewport remark already lives, and
+  // it is the file somebody opens a week later when the result object is long gone.
+  const written: Record<string, string> = {};
+  const filmed = await new Actions({
+    operations: { call: async () => ({}) } as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: tour,
+    url: () => "http://app/",
+    evidence: () =>
+      ({
+        actionFrame: async () => "f.png",
+        write: (name: string, contents: string) => ((written[name] = contents), name),
+        dir: "/tmp/witness",
+        artefacts: () => ({}),
+      }) as unknown as Evidence,
+    watchable: () => true,
+  }).run("a", fakePage({ recording: true }).page);
+  equal(about(filmed).length, 1, `expected one video warning, got ${JSON.stringify(filmed.warnings)}`);
+  match(about(filmed)[0], /^video: 6 steps in /);
+  match(written["a/debug.md"], /## What it got away with \(1\)\n\n- video: 6 steps in /);
+
+  // A context opened without `recordVideo` filmed nothing, so there is no pacing to complain about.
+  deepEqual(about(await engine(tour, { watchable: () => true }).run("a", fakePage().page)), []);
+
+  // And ffmpeg is an optional binary: without it the `.webm` never becomes the `video.mp4` the story
+  // points at, and telling somebody to pace a video nobody is writing is how a warning gets skipped.
+  deepEqual(about(await engine(tour).run("a", fakePage({ recording: true }).page)), []);
+
+  // A composed action is a stretch of its caller's recording rather than a recording of its own. The
+  // same sentence said once per composed action, about one video, is a warning that stops being read.
+  const inside = await engine(tour, { watchable: () => true }).run("a", fakePage({ recording: true }).page, {}, { from: "b" });
+  deepEqual(about(inside), []);
 });
 
 test("store reads one thing, or every one of them", when, async () => {

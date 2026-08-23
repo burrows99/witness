@@ -48,6 +48,8 @@ export class Actions {
   private readonly fixtures: () => string;
   /** What a failure looks like in a body, as the description's clients declare it — for the story. */
   private readonly failureWhen: FailureWhen[];
+  /** Whether what this run records will become a video anybody can watch. See the constructor. */
+  private readonly watchable: () => boolean;
 
 
   constructor(opts: {
@@ -80,6 +82,16 @@ export class Actions {
      * not a verdict.
      */
     failureWhen?: FailureWhen[];
+    /**
+     * Whether what this run records will become a video anybody can watch.
+     *
+     * Only the caller can answer it. A recording becomes the `video.mp4` a story points at by way of
+     * ffmpeg, and ffmpeg is an optional binary — a machine without one records the same run and ends
+     * up with nothing to play. Without this nothing is assumed and the pacing remark in `run` is never
+     * made: telling somebody to pace a video that is not being written is how a section of the story
+     * teaches its own reader to skip it.
+     */
+    watchable?: () => boolean;
   }) {
     this.operations = opts.operations;
     this.client = opts.client ?? (name => {
@@ -100,6 +112,7 @@ export class Actions {
       throw new Error("an `upload` step names a file, and this system was built without a `.witness/` directory to find one in");
     });
     this.failureWhen = opts.failureWhen ?? [];
+    this.watchable = opts.watchable ?? (() => false);
   }
 
   /**
@@ -221,6 +234,13 @@ export class Actions {
     // Before the result is built, so what it got away with is IN the result — and before the story,
     // so the story carries it too.
     if (!quiet) this.note(name, action, values, running);
+    // The same remark as an `expect` that matched off-screen, one artefact along: it passed, and the
+    // evidence does not show it. Only for the action somebody actually asked for — a composed action
+    // is a stretch of its caller's recording rather than a recording, and the same sentence said four
+    // times about one video is how a warning stops being read. The arithmetic first and the questions
+    // about the world second, because one of them costs a process to answer and this one is free.
+    const flicker = quiet || from ? undefined : Actions.tooFastToWatch(steps, Date.now() - started);
+    if (flicker && Actions.filmed(page) && this.watchable()) running.notices.push(flicker);
     const result: ActionResult<T> = {
       action: name,
       warnings: running.notices,
@@ -524,6 +544,69 @@ export class Actions {
         : undefined;
     } catch {
       return undefined;
+    }
+  }
+
+  /**
+   * How long a step has to hold the screen before a viewer registers that anything changed.
+   *
+   * A third of a second — eight frames of the 24 the video provider encodes at, which is where #152
+   * put it too. Deliberately not a config field: this is a fact about watching things, not about a
+   * product, so it means the same in every checkout, and a threshold that can be turned down is one
+   * that gets turned down instead of the recording getting paced.
+   */
+  private static readonly A_GLANCE = 300;
+
+  /**
+   * How many steps a run needs before its pacing is worth a sentence.
+   *
+   * Under this there is no sequence to pace: a recording of three things is a recording of three
+   * things, and the answer to one that is over in a second is that it did one second of work.
+   */
+  private static readonly A_SEQUENCE = 5;
+
+  /**
+   * Whether the recording of this run is too fast for anybody to watch.
+   *
+   * The sibling of `offScreen`, about the video rather than about a frame. A run of fourteen steps
+   * that takes two seconds is not broken — the frames genuinely differ — but each step holds the
+   * screen for a tenth of a second, so what plays is a blank screen and then the end state. Green,
+   * and the artefact does not show the claim.
+   *
+   * The AVERAGE step rather than a count of the fast ones, because instant steps are normal and
+   * numerous: `expect`, `store`, `check` and `frame` all pass in a few milliseconds without being a
+   * pacing problem, and a rule counting them accuses every healthy action of flickering. Per step
+   * rather than on the total, because that is the question — a three-step run that takes two seconds
+   * is fine and a thirty-step one that takes four is not. An average errs towards silence, which is
+   * the right way for this to be wrong.
+   *
+   * Says what to do about it. `slide`, `caption` and `wait` already exist and are already documented;
+   * what was missing was anything telling the author of a run that they were the answer to this one.
+   */
+  static tooFastToWatch(steps: StepResult[], ms: number): string | undefined {
+    if (steps.length < Actions.A_SEQUENCE) return undefined;
+    const each = ms / steps.length;
+    if (each >= Actions.A_GLANCE) return undefined;
+    const took = ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`;
+    return (
+      `video: ${steps.length} steps in ${took} — ${Math.round(each)}ms of recording each, so it plays as one screen ` +
+      "that jumps to the end and shows none of the steps it is evidence for. " +
+      "`slide`, `caption` and `wait` are how a run is paced for whoever has to watch it."
+    );
+  }
+
+  /**
+   * Whether the page is being filmed at all.
+   *
+   * A context opened without `recordVideo` films nothing, and plenty of what drives an action never
+   * asks for one: a drift sweep, a spec whose whole point is the assertion. Best-effort and false
+   * when it cannot tell, like everything else here that exists to add a sentence to a story.
+   */
+  private static filmed(this: void, page: Page): boolean {
+    try {
+      return page.video() !== null;
+    } catch {
+      return false;
     }
   }
 
