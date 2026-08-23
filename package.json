@@ -59,7 +59,8 @@
     "lint": "eslint .",
     "deadcode": "knip",
     "package": "npm pack --dry-run --silent >/dev/null && publint --strict",
-    "check": "npm run typecheck && npm run lint && npm run deadcode && npm test"
+    "check": "npm run typecheck && npm run lint && npm run deadcode && npm test",
+    "banner": "playwright screenshot --viewport-size=1280,640 --browser=chromium docs/banner/banner.html docs/banner.png"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.40"
