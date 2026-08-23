@@ -37,5 +37,20 @@ A checker that cries wolf is worse than none. The rules it follows now:
 - more than one match is wrong only where the step needs one
 - the sign-in action's own steps are checked **before** anybody is signed in
 - a route that **redirects** is `unchecked`, not `gone`
+- a `records: "terminal"` action has no screen → it is **skipped**, and the count says so
 
 Without a sign-in action it says exactly what it could not reach rather than guessing.
+
+## The half with no screen
+
+A terminal action types at a shell. There is no route to visit and no locator to count, so a browser
+driven at one waits out a timeout on `locator('prompt')` and reports the action as broken — which is
+the checker's own assumption wearing the words of a finding. Skipped, and said:
+
+```
+all 4 claims still hold (1 could not be checked) · 7 terminal actions skipped, having no screen to check
+```
+
+Naming one as the *sign-in* action is refused before a browser opens, because a shell cannot sign one
+in. Their claims are not checked at all yet — an `expect` becomes a `Wait+Screen` in the tape, and
+verifying those needs a different checker than this one.

@@ -35,6 +35,12 @@ export class Drift {
    * knowledge, and none of it is the composite root's job to spell out a second time.
    */
   static async sweep(system: SweepableSystem, as?: string): Promise<Report> {
+    // The argument names the action that SIGNS IN, and a terminal action has no screen to sign in on.
+    // Driven anyway it opened a browser, waited thirty seconds for `locator('prompt')`, and reported
+    // the action as broken — a red about the checker being pointed at the wrong thing, wearing the
+    // words of a red about the description. Said here, before anything is launched.
+    if (as && system.config.actions?.[as]?.records === "terminal")
+      throw new Error(`${as} records a terminal, so it has no screen to sign a browser in on — \`check drift\` takes the action that signs in, and terminal actions are skipped by this check`);
     const browser = await requirePlaywright("checking the description").chromium.launch({ headless: process.env.HEADED !== "1" });
   const cookies = identityCookies(system.config.identities);
   try {
@@ -67,7 +73,13 @@ export class Drift {
   }
 
   static async check(input: CheckInput): Promise<Report> {
-    const claims = Drift.claims(input.actions, input.routeOf, input.signInAction);
+    // An action with no screen is not this checker's to check. Its steps type at a shell, so there is
+    // no route to visit and no locator to count — and a browser driven at one waits out a timeout on
+    // a locator that will never exist. Left out, and SAID: a report that quietly read half a
+    // description and answered "all claims still hold" is the same lie as one that cries wolf.
+    const onScreen = Object.entries(input.actions).filter(([, action]) => action.records !== "terminal");
+    const skipped = Object.keys(input.actions).length - onScreen.length;
+    const claims = Drift.claims(Object.fromEntries(onScreen), input.routeOf, input.signInAction);
     const findings: Finding[] = [];
 
     // Grouped, because the cost is the navigation and several claims usually share a route.
@@ -119,13 +131,15 @@ export class Drift {
     }
 
     const broken = findings.filter(finding => finding.verdict !== "unchecked");
+    const headline = broken.length
+      ? `${broken.length} of ${claims.length} claims no longer hold`
+      : `all ${claims.length} claims still hold${findings.length ? ` (${findings.length} could not be checked)` : ""}`;
     return {
       ok: !broken.length,
       findings,
       checked: claims.length,
-      summary: broken.length
-        ? `${broken.length} of ${claims.length} claims no longer hold`
-        : `all ${claims.length} claims still hold${findings.length ? ` (${findings.length} could not be checked)` : ""}`,
+      skipped,
+      summary: skipped ? `${headline} · ${skipped} terminal action${skipped === 1 ? "" : "s"} skipped, having no screen to check` : headline,
     };
   }
 
@@ -268,4 +282,11 @@ export type Finding = {
   detail?: string;
 };
 
-export type Report = { ok: boolean; findings: Finding[]; checked: number; summary: string };
+export type Report = {
+  ok: boolean;
+  findings: Finding[];
+  checked: number;
+  /** Actions this could not check: a terminal one has no screen, and its claims are made in a tape. */
+  skipped: number;
+  summary: string;
+};
