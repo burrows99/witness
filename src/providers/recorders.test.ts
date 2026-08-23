@@ -5,9 +5,18 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import { asTape, recorderProviders } from "./recorders.ts";
-import type { StepConfig } from "../actions/engine.ts";
+import type { Params, StepConfig } from "../actions/engine.ts";
 
-const tape = (steps: StepConfig[], opts = {}) => asTape(steps, {}, "/tmp/out.mp4", opts).split("\n");
+/**
+ * The tape for these steps.
+ *
+ * `values` is the argument every real caller passes and this helper used to swallow: `runActions`
+ * hands `asTape` the run's inputs, and it is what turns `{table}` in a step into a table name. With
+ * it hard-coded to `{}` here, `fill` could be removed from `asTape` entirely — leaving every
+ * placeholder typed into the recorded terminal literally, braces and all — and every assertion in
+ * this file still passed.
+ */
+const tape = (steps: StepConfig[], opts = {}, values: Params = {}) => asTape(steps, values, "/tmp/out.mp4", opts).split("\n");
 
 test("an action becomes a tape, which is why this recorder and not another", () => {
   // A `.tape` IS a step list. asciinema records a real session into its own cast format and needs a
@@ -112,4 +121,19 @@ test("the only recorder names offered are ones that resolve", () => {
   // one place a reader trusts.
   for (const name of recorderProviders.names) ok(recorderProviders.get(name), name);
   deepEqual(recorderProviders.names, ["terminal"]);
+});
+
+test("a step's placeholders are filled from the run's inputs", () => {
+  // `fill` throws on one nobody supplied — deliberately, so a half-resolved command is never typed
+  // into a recording that is somebody's evidence.
+  const lines = tape([{ type: { on: "prompt", value: "select * from {table}" } }], {}, { table: "user" });
+  ok(lines.includes(`Type "select * from user"`), lines.join(" | "));
+  throws(() => tape([{ type: { on: "prompt", value: "select * from {table}" } }]), /missing \{table\}/);
+});
+
+test("so is the shell it runs inside, and the caption over it", () => {
+  // `docker exec -it {container} bash` is the natural way to write a shell for a worktree-suffixed
+  // container, and nothing checked that it resolved.
+  ok(tape([], { shell: "docker exec -it {container} bash" }, { container: "witness-postgres" }).includes('Type "docker exec -it witness-postgres bash"'));
+  ok(tape([{ caption: { text: "what {who} wrote" } }], {}, { who: "the app" }).includes('Type "# what the app wrote"'));
 });

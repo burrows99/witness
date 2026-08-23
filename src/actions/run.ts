@@ -118,7 +118,7 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
 
   const attempt = async (name: string, at: string, values: Params, on?: Lane, dir?: string, label?: { title: string; sub?: string }): Promise<ActionResult> => {
     // No screen, no browser: the recorder is the whole of this lane.
-    const terminal = system.actionConfig?.(name);
+    const terminal = system.actionConfig(name);
     if (terminal?.records === "terminal") return recordTerminal(name, terminal, at, label);
 
     for (let n = 1; n <= retries + 1; n += 1) {
@@ -201,7 +201,7 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
       let only: Lane | undefined;
       try {
         for (const [index, name] of names.entries()) {
-          const config = system.actionConfig?.(name);
+          const config = system.actionConfig(name);
           if (config?.records === "terminal") {
             results.push(recordTerminal(name, config, String(index + 1).padStart(2, "0"), { title: name, sub: config.summary }));
             continue;
@@ -329,12 +329,27 @@ export type RunResult = {
   evidence: { dir: string; recordings: string; videos: string[] };
 };
 
-/** The part of a system this needs, so the runner does not depend on the whole composite root. */
-type RunnableSystem = {
+/**
+ * The part of a system this needs, so the runner does not depend on the whole composite root.
+ *
+ * Exported so a test fixture can be TYPED as one rather than cast to `never`. The cast is what made
+ * `actionConfig` optional in practice: it silenced the missing property along with everything else,
+ * and the field the terminal recorder depends on could go missing without a word.
+ */
+export type RunnableSystem = {
   workspace: { resolve: (target?: string) => string };
   run: (action: string, page: Page, inputs: Params, within?: { at?: string }) => Promise<ActionResult>;
-  /** What the config says about one action, so a lane can find out how to film it. */
-  actionConfig?: (name: string) => ActionConfig | undefined;
+  /**
+   * What the config says about one action, so a lane can find out how to film it.
+   *
+   * Required, though it was optional for a while — and the optionality was a fiction the tests
+   * invented. Nothing in the codebase ever passed a system without one; four fixtures omitted it, and
+   * the `?.` that let them made the omission silent. With it, `actionConfig` could be made to answer
+   * `undefined` for everything and 424 tests still passed, while every `records: "terminal"` action
+   * quietly fell through to the browser path and filmed a blank screen beside the shell it was really
+   * about. A fixture that leaves this out should not compile.
+   */
+  actionConfig: (name: string) => ActionConfig | undefined;
   evidence: () => { dir: string; writeManifest: (context: EvidenceContext) => void; readme: () => string | undefined };
   pinEvidence: (context: EvidenceContext | undefined) => void;
   renderVideos: () => string[];
