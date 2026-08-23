@@ -91,6 +91,16 @@ test("an intersection keeps the fields and drops the open half", () => {
   deepEqual(Object.keys(fields(model)), ["cookies"]);
 });
 
+test("an intersection keeps the fields of a NAMED half too", () => {
+  // `ServiceConfig = ServiceSpec & { … }` is how a service says "where it runs, and everything else
+  // that is true about it". A reference is not an object, so taking fields only from the half written
+  // inline dropped `port`, `portVar`, `container` and `kind` — every field of where a service RUNS —
+  // out of the one command that claims to print every field there is.
+  const types = read(`export type Spec = { port?: number; portVar?: string };
+  export type Service = Spec & { app?: string };`);
+  deepEqual(Object.keys(fields(types.declaration("Service"))), ["port", "portVar", "app"]);
+});
+
 test("an index signature becomes a record", () => {
   const model = read("export type A = { [key: string]: number };").declaration("A");
   ok(model.kind === "object");
@@ -147,6 +157,20 @@ test("Omit is read as the type minus what its position already says", () => {
   const app = service.fields[0].type;
   ok(app.kind === "object", `expected an object, got ${app.kind}`);
   deepEqual(app.fields.map(f => f.name), ["routes", "title"]);
+});
+
+test("a reference is followed through its aliases before its fields are taken", () => {
+  // `Omit<ApiConfig, "service">`, where `ApiConfig` is an alias for `ClientConfig`. Stopping at the
+  // first declaration found another reference, which has no fields to keep — so a service's `api`
+  // came out holding the one field the `Omit` was there to REMOVE, and nothing else.
+  const types = new TypeSource().read(`
+    export type Client = { service: string; provider?: string; operations: Record<string, string> };
+    export type Api = Client;
+    export type ServiceConfig = { api?: Omit<Api, "service"> };
+  `);
+  const service = types.declaration("ServiceConfig");
+  ok(service.kind === "object");
+  deepEqual(Object.keys(fields(service.fields[0].type)), ["provider", "operations"]);
 });
 
 test("Omit of more than one key drops all of them", () => {

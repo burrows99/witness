@@ -8,7 +8,7 @@
 | `load.ts` (125) | read, strip comments, `fill()` templates, `reach()` dotted paths |
 | `normalise.ts` (158) | hoist what a service owns to what the system reads |
 | `template.ts` (258) | generate the starter config from the types and registries |
-| `types.ts` (254) | read the config's own types back out of the source |
+| `types.ts` (278) | read the config's own types back out of the source |
 | `explore.ts` | read a description off the *running app* |
 | `compose.ts` | read a description off the *compose file* |
 
