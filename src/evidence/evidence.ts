@@ -167,6 +167,9 @@ export class Evidence {
     notes?: string[];
   }): string {
     const { title, subject = {}, signIn = [], sections = [], notes = [] } = opts;
+    // Everything that would go under `## Where to look`, gathered before the note is built so the
+    // heading can be guarded on there being something under it.
+    const where = [...this.links(), ...sections];
     const lines = [
       `# ${title} — manual verification (${this.mode}${this.keep ? " · KEEP=1" : ""})`,
       "",
@@ -183,11 +186,22 @@ export class Evidence {
         ? ["## Who", "", ...Object.entries(subject).filter(([, v]) => v).map(([k, v]) => `- ${k}: \`${v}\``), ""]
         : []),
       ...(signIn.length ? ["## Sign in as them", "", "```bash", ...signIn, "```", ""] : []),
-      "## Where to look",
-      "",
-      ...this.links(),
-      ...sections,
-      ...(notes.length ? ["", "## What the run saw", "", ...notes.map(n => `- ${n}`)] : []),
+      // Guarded like every other section here. Most descriptions name no `evidence.links`, so a run
+      // that navigated, asserted and filmed but minted no URL worth pointing at got the heading and
+      // nothing beneath it — and an empty heading reads as something that failed to render: the first
+      // thought is that the links were meant to be there and got lost, not that there were none. In
+      // this file that is the same sin as the sentence above about tearing things down.
+      //
+      // Not filled in from `Story.where`, which puts the recording and the frames under this same
+      // heading in `debug.md`. That one says where this run's ARTEFACTS are, for somebody reading what
+      // happened; this one says where to go in the product and check by hand. And the video is not
+      // ours to promise here — it is rendered after this file is written, and not at all when ffmpeg
+      // is missing, so naming it would point a person at a path that may never exist. `readme()`
+      // names it only once it is on disk, into a file sitting in this same directory.
+      ...(where.length ? ["## Where to look", "", ...where, ""] : []),
+      // Every section now ends with its own blank line, so this one no longer opens with one: a run
+      // with nowhere to point would otherwise leave two.
+      ...(notes.length ? ["## What the run saw", "", ...notes.map(n => `- ${n}`)] : []),
       "",
     ];
     return this.write("manual-verification.md", lines.join("\n"));

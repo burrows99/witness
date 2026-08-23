@@ -125,3 +125,28 @@ test("but the run before is still cleared, once", () => {
   equal(stale, fresh);
   equal(fs.readFileSync(fresh, "utf8"), "this run");
 });
+
+test("a run with nowhere to point prints no `## Where to look` at all", () => {
+  const { evidence } = workspace();
+  // The heading with nothing under it reads as something that failed to render: the first thought is
+  // that the links were meant to be there and got lost, not that this run had none to give. Most
+  // descriptions name no `evidence.links`, so this is the ordinary case, not the odd one.
+  const note = fs.readFileSync(evidence().manualVerification({ title: "The landing screen", notes: ["zh is the default locale"] }), "utf8");
+  ok(!note.includes("## Where to look"), note);
+  match(note, /leave it alone\.\n\n## What the run saw\n\n- zh is the default locale\n$/);
+});
+
+test("but the section is still there when the run has somewhere to point", () => {
+  const { root, context } = workspace();
+  // The other way to be wrong, and the one a guard invites: dropping the section on a run that DOES
+  // have links. `links` is the config's `evidence.links`, already expanded by the system.
+  const evidence = new Evidence({ root, context, links: () => ["- the dashboard it made: `http://localhost:3010/d/abc`"] });
+  const note = fs.readFileSync(evidence.manualVerification({ title: "The dashboard", notes: ["one row afterwards"] }), "utf8");
+  match(note, /## Where to look\n\n- the dashboard it made: `http:\/\/localhost:3010\/d\/abc`\n\n## What the run saw\n/);
+});
+
+test("a section the caller wrote is somewhere to point too", () => {
+  const { evidence } = workspace();
+  const note = fs.readFileSync(evidence().manualVerification({ title: "The row", sections: ["- the row it wrote: `accounts#7`"] }), "utf8");
+  match(note, /## Where to look\n\n- the row it wrote: `accounts#7`\n/);
+});
