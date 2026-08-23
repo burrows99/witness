@@ -1,18 +1,24 @@
 {
   "name": "@burrows99/witness",
   "version": "0.1.47",
-  "description": "Drive a running system from one config file, and come back with evidence rather than a pass/fail.",
+  "description": "Built for AI agents: drive and debug a running app from one config file, and come back with proof a person can watch and an agent can read — not a pass/fail, and not a guess.",
   "keywords": [
+    "ai-agents",
+    "agents",
+    "agentic",
+    "llm",
+    "ai",
+    "evidence",
+    "proof",
+    "debugging",
     "e2e",
     "testing",
-    "evidence",
     "playwright",
     "docker",
     "harness",
     "config-driven",
     "screenshots",
-    "video",
-    "agents"
+    "video"
   ],
   "license": "MIT",
   "author": "burrows99",

@@ -28,6 +28,22 @@ comparison is the artefact; neither cut is more real than the other.
 **A retry does not erase its failure.** The failed attempt keeps its own directory. A green run with
 nothing to explain it is worse than a red one.
 
+## Who reads it
+
+**An agent, mostly — and a person checking the same thing.** They need different shapes of the same
+run, which is why one directory carries both.
+
+An agent cannot watch a video or open a network tab. It lists a directory, reads `debug.md`, and gets
+the requests, the console lines and the step each was tagged to. Denied that, it does the only thing
+left: it infers from the diff and the exit code and reports a conclusion it never checked. That
+failure mode is quiet — an inaccurate answer arrives in exactly the tone of an accurate one, and the
+reader downstream has no way to tell which they were handed.
+
+A person will not read forty JSON payloads. They open `video.mp4`, or the single frame the story
+names, and see it in a second.
+
+Neither reader is the secondary one, and neither artefact is a by-product of making the other.
+
 ## What it does not replace
 
 This is not a test runner and should not become one. There is no assertion library, no fixtures, no
@@ -35,4 +51,5 @@ sharding, no flake dashboard. When the question genuinely is *did the suite pass
 answers it better and is already installed.
 
 Reach for this when the answer needs to be **watchable** — a demo, a review, a bug report, a
-before/after — or when something that is not a person has to read it.
+before/after — or when the thing that has to read it is an agent, which cannot watch anything and has
+to be handed the same proof in a form it can parse.
