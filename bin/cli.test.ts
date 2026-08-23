@@ -38,13 +38,14 @@ const checkout = (config: Record<string, unknown>): string => {
   return dir;
 };
 
-const witness = (args: string[], cwd = tmpdir()): { status: number; out: string; err: string } => {
+/** `input` is what arrives on stdin — the half of `config merge -` that makes it a pipeline. */
+const witness = (args: string[], cwd = tmpdir(), input?: string): { status: number; out: string; err: string } => {
   // A ceiling, so a command that never exits fails this suite rather than hanging it forever — and a
   // status nothing can be when it hits, because a command with no exit code is the same failure these
   // tests are about, one step further along. `spawnSync` hands back the code the process would have
   // used alongside the ETIMEDOUT, so a run that printed everything and then held the process open
   // would otherwise read here as one that answered.
-  const run = spawnSync(process.execPath, ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", binary, ...args], { cwd, encoding: "utf8", timeout: 120_000 });
+  const run = spawnSync(process.execPath, ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", binary, ...args], { cwd, encoding: "utf8", input, timeout: 120_000 });
   if (run.error) return { status: -1, out: run.stdout, err: `${run.stderr}${run.error.message}\n` };
   return { status: run.status ?? -1, out: run.stdout, err: run.stderr };
 };
@@ -334,4 +335,108 @@ test("config where says which description is in force, and why", when, () => {
   equal(where.config, path.join(realpathSync(dir), "acme.config.json"));
   equal(where.found, "--config");
   match(where.checkout, /from the config's `root` markers/);
+});
+
+/**
+ * The writing half of the description, from the command line.
+ *
+ * A JSONC file with prose in it, because that is what these verbs have to leave alone: the comments in
+ * a description are its documentation, and a writer that reformats them away turns every edit into an
+ * unreviewable diff.
+ */
+const describedFile = `// The acme stack, described.
+{
+  "name": "acme",
+  "root": ["marker"],
+  "services": {
+    // The app a person uses.
+    "web": {
+      "port": 3000
+    }
+  }
+}
+`;
+
+/** A checkout whose description carries its own prose, and the path to that description. */
+const authored = (source = describedFile): { dir: string; file: string } => {
+  const dir = mkdtempSync(path.join(tmpdir(), "witness-authored-"));
+  writeFileSync(path.join(dir, "marker"), "");
+  writeFileSync(path.join(dir, ".env"), "");
+  mkdirSync(path.join(dir, ".witness"), { recursive: true });
+  const file = path.join(dir, ".witness", "config.jsonc");
+  writeFileSync(file, source);
+  return { dir, file };
+};
+
+test("a fragment arrives down a pipe, which is what closes the loop config explore opens", when, () => {
+  // `config explore` printed exactly this shape and its own header said "merge the rest by hand". The
+  // tool generated the one thing it would not accept back.
+  const { dir, file } = authored();
+  const fragment = '// what web says about itself\n{ "services": { "web": { "app": { "routes": { "home": "/" } } } } }\n';
+  const merged = witness(["config", "merge", "-"], dir, fragment);
+  equal(merged.status, 0);
+  match(merged.out, /^wrote services\.web\.app to /);
+  const written = readFileSync(file, "utf8");
+  equal(JSON.parse(withoutComments(written)).services.web.app.routes.home, "/");
+  ok(written.includes("// The acme stack, described."), "the header survived");
+  ok(written.includes("// The app a person uses."), "and so did the note inside it");
+
+  // And a second time writes nothing at all, so a regenerated fragment is not churn in the diff.
+  const again = witness(["config", "merge", "-"], dir, fragment);
+  equal(again.status, 0);
+  match(again.out, /already what .* says — nothing written/);
+  equal(readFileSync(file, "utf8"), written);
+});
+
+test("an action is added, listed, and taken out again", when, () => {
+  const { dir, file } = authored();
+  const before = readFileSync(file, "utf8");
+  const steps = '{ "summary": "look at it", "steps": [{ "goto": { "route": "home" } }] }';
+
+  const added = witness(["action", "add", "web.look", "--from=-"], dir, steps);
+  equal(added.status, 0);
+  match(added.out, /^wrote services\.web\.actions\.look to /);
+  match(witness(["action", "list", "--quiet"], dir).out, /web\.look\s+look at it/);
+
+  const removed = witness(["action", "rm", "web.look"], dir);
+  equal(removed.status, 0);
+  equal(readFileSync(file, "utf8"), before, "and the file is what it was, byte for byte");
+});
+
+test("a refused write is one sentence and an exit code, not a stack trace", when, () => {
+  // These four run before a System is built, outside `Cli.main`'s catch — so without a catch of their
+  // own a refusal whose whole job is to say what was wrong printed a Node stack trace over it.
+  const { dir, file } = authored();
+  const refused = witness(["action", "add", "web.typo", "--from=-"], dir, '{ "steps": [{ "clik": {} }] }');
+  equal(refused.status, 1);
+  match(refused.err, /step 1 of "web\.typo" says "clik", which no step verb is called/);
+  ok(!refused.err.includes("at Object."), "no stack trace");
+  equal(readFileSync(file, "utf8"), describedFile, "and the description is byte-identical");
+
+  const noFragment = witness(["config", "merge"], dir);
+  equal(noFragment.status, 2);
+  match(noFragment.err, /missing <file, or - for stdin>/);
+
+  const noSteps = witness(["action", "add", "web.x"], dir);
+  equal(noSteps.status, 2);
+  match(noSteps.err, /missing --from=<file\|->/);
+});
+
+test("a description that will not load can still be written to, which is when it matters", when, () => {
+  // `init` writes a template every field of which is the `"…"` placeholder, so it does not load — and
+  // a writer that first insisted on assembling a System out of the file it is being asked to repair
+  // would refuse at the one moment it is useful.
+  const dir = mkdtempSync(path.join(tmpdir(), "witness-unloadable-"));
+  writeFileSync(path.join(dir, ".env"), "");
+  equal(witness(["init"], dir).status, 0);
+  const file = path.join(dir, ".witness", "config.jsonc");
+  // It really does not load: every other verb says so.
+  match(witness(["stack", "status"], dir).err, /is still the generated template/);
+
+  const set = witness(["config", "set", "name", "acme"], dir);
+  equal(set.status, 0);
+  equal(JSON.parse(withoutComments(readFileSync(file, "utf8"))).name, "acme");
+  // …and the documentation `config template` generated is still in it, which is the whole reason that
+  // file is worth starting from.
+  ok(readFileSync(file, "utf8").includes("// A witness config, generated by `witness config template`."));
 });

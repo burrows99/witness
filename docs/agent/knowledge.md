@@ -201,6 +201,17 @@ of the fixed code immediately produced a second thing no fixture would have cont
 tag box carries `placeholder=" "`, which had been going into fragments as `"tagString": " "`, a
 described field that resolves to whatever the page happens to have.
 
+**A before and an after of a NEW command are the same recording twice, unless the action records the
+old way too.** Phase 4 says same action, same inputs — and a change that ADDS a verb has nothing to
+run before it exists, so the honest-looking options are two different actions, which prove nothing
+about each other, or a before showing `unknown: config merge`, which is a cut of the tool refusing
+rather than of anybody's problem. What works is putting the status quo in the SAME action, as a
+control: #153's recording runs the Python string-splice an agent actually types, and then the command
+that ought to exist, on one screen. The splice works in both cuts, which is the point — the before is
+what it costs to do this with no verb, and the after is that same cost sitting beside one line that
+replaces it. The two frames then differ in exactly the three lines the change is about, which is a
+claim nobody has to be talked into.
+
 ---
 
 ## Changing this repository
@@ -262,6 +273,19 @@ result and then never exited: no exit code at all, which is worse than the wrong
 and hid behind it. Memoise the PROMISE (`opening ??= launch()`), and await it once at the end to close
 what it opened. Found by running `action run a b --parallel` while checking that a failed lane reports
 a failure — the case the fix was about was fine and the command it was in could not answer at all.
+
+**A writer that edits TEXT by offset needs a twin that edits VALUES, or nothing can tell it landed.**
+Keeping the comments in `.witness/config.jsonc` means never reprinting it — parse to offsets, splice,
+and every byte outside the changed span comes out as it went in. But every failure of that shape
+produces not an error but a file saying something nobody asked for: a span computed one character
+wide, an insertion aimed at the closing brace instead of at the last member, two edits over one
+comma. The only thing that can notice is the VALUE the file now holds, compared against the same
+merge done with no text involved at all — which is why `merged()` sits in `edit.ts` beside the class
+it exists to check rather than being the obvious duplication it looks like. It earned itself within
+the hour: removing the last member of an object written all on one line took the separating comma
+inside its own span and then took it again, and what came back was unparseable JSON that every
+assertion about "the comments survived" would have passed. Anywhere an edit is expressed in a
+representation other than the one it is about, keep the plain version and diff the two.
 
 ---
 

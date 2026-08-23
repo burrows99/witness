@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { Cli, System, Workspace } from "../src/index.ts";
+import { Author } from "../src/config/write.ts";
 import { Compose } from "../src/config/compose.ts";
 import { Explore } from "../src/config/explore.ts";
 import { Skill } from "../src/skill/skill.ts";
@@ -28,13 +29,27 @@ const configFile = flag >= 0 ? argv[flag + 1] : undefined;
 const rest = flag >= 0 ? [...argv.slice(0, flag), ...argv.slice(flag + 2)] : argv;
 
 /**
- * The description, and where it comes from.
+ * A fragment, from wherever the caller has one.
  *
- * Registered before anything is loaded, because both of these are what you reach for when there is no
- * description yet or when the one being read is not the one you meant.
+ * `-` is stdin and is the form that matters: `config explore <service> | config merge -` is the loop
+ * this whole writing half exists to close, and it is a pipeline or it is nothing. Required rather
+ * than defaulted to stdin, because a command typed by hand that silently waits on a terminal looks
+ * exactly like one that has hung.
+ */
+const fragment = (from: string): string => fs.readFileSync(from === "-" ? 0 : path.resolve(from), "utf8");
+
+/** Whichever description is in force — the one every one of these verbs writes to. */
+const describing = (): string => Workspace.find({ config: configFile }).configFile;
+
+/**
+ * The description: where it comes from, and how it changes.
+ *
+ * Registered before anything is loaded, because all of these are what you reach for when there is no
+ * description yet, when the one being read is not the one you meant, or when the one you have will
+ * not load — which is the moment a writer is worth most and a loaded System is impossible.
  */
 const config: Parameters<Cli["command"]>[1] = {
-  summary: "the description this tool reads, and where it comes from",
+  summary: "the description this tool reads, where it comes from, and how it changes",
   verbs: {
     template: {
       summary: "print a config file with every field witness understands, and its documentation",
@@ -74,6 +89,48 @@ const config: Parameters<Cli["command"]>[1] = {
           from: process.cwd(),
         };
       },
+    },
+    merge: {
+      summary: "<file|-> — apply a fragment (the one `explore` prints) to the description, keeping its comments",
+      // What it prints is a sentence about what it did, not a record of a request nobody made.
+      raw: true,
+      run: (args: string[]) => Author.merge(describing(), fragment(Cli.need(args[0], "file, or - for stdin"))).summary,
+    },
+    set: {
+      summary: "<field> <value> — one field, addressed the way `config template` documents it",
+      raw: true,
+      run: (args: string[]) => Author.set(describing(), Cli.need(args[0], "field"), Cli.need(args[1], "value")).summary,
+    },
+  },
+};
+
+/**
+ * `witness action add` / `action rm`: the half of the actions noun that writes.
+ *
+ * Registered here rather than beside `list`, `show` and `run` for two reasons. It validates a step
+ * list against the type the engine dispatches on, which means reading witness's own sources through
+ * `import.meta` — a thing nothing reachable from `src/index.ts` may do. And the noun those three live
+ * under is only registered once a description already declares an action, which is precisely the
+ * state the first `add` is meant to get you out of.
+ */
+const action: Parameters<Cli["command"]>[1] = {
+  summary: "the actions this description declares — write one, drop one, or drive them",
+  verbs: {
+    add: {
+      summary: "<name> --from=<file|-> — a step list, validated, placed under its service",
+      raw: true,
+      run: (args: string[], flags: string[] = []) => {
+        const from = Cli.flag(flags, "from");
+        // Refused rather than defaulted to stdin: `action add checkout` on its own would sit waiting
+        // on a terminal, which reads as the tool having hung on the one verb people try first.
+        if (!from) Cli.die("missing --from=<file|-> — the action to add, as JSONC, or `-` to read it from a pipe", 2);
+        return Author.addAction(describing(), Cli.need(args[0], "action"), fragment(from)).summary;
+      },
+    },
+    rm: {
+      summary: "<name> — drop it, and the note written above it",
+      raw: true,
+      run: (args: string[]) => Author.removeAction(describing(), Cli.need(args[0], "action")).summary,
     },
   },
 };
@@ -161,7 +218,7 @@ const init: Parameters<Cli["command"]>[1] = {
  * second, fresh System of its own — so the instructions handed to an agent described this CLI minus
  * `config`, `init` and `skill`. One object, both callers, and the two cannot drift apart again.
  */
-const extras = { config, init, skill };
+const extras = { action, config, init, skill };
 
 if (rest[0] === "init") {
   init.passthrough!(rest.slice(1));
@@ -174,28 +231,50 @@ if (rest[0] === "skill") {
   process.exit(0);
 }
 
-// `config template` describes a product before there is a description to load, and `config where` has
-// to answer when what it would load is missing or broken — which is when it is asked.
-//
-// Only those two. `config explore` needs the description (an origin, the identities, the routes it
-// already declares), so it falls through to the system-backed command line below rather than being
-// refused here — which is what this branch used to do to every verb it did not personally own,
-// including the empty one: `witness config` answered `unknown: config` about a noun its own help
-// documents.
-if (rest[0] === "config" && !configFile) {
-  const listed = Cli.listVerbs("config", config, rest[1]);
-  if (listed) {
-    process.stdout.write(listed);
-    process.exit(0);
-  }
+/**
+ * The `config` verbs that answer without a System behind them.
+ *
+ * `template` describes a product before there is a description to load, and `where` has to answer
+ * when what it would load is missing or broken — which is when it is asked. `merge` and `set` are
+ * here for the stronger version of the same reason: a description that will not load is exactly the
+ * one somebody needs to change, and a writer that first insists on assembling a browser, a stack and
+ * an API client out of the file it is being asked to repair is a writer that refuses when it matters.
+ *
+ * Not `explore`, which needs the description — an origin to walk, the identities to carry, the routes
+ * it already declares — so it falls through to the system-backed command line below.
+ */
+const withoutASystem = new Set(["template", "where", "merge", "set"]);
+
+if (rest[0] === "config") {
   const name = rest[1] ?? "";
-  // A verb that does not exist is still a clean 2 here. Falling through for ANYTHING unrecognised
-  // sent `config nonsense` on to load a description it never needed, and the reader got "no
-  // .witness/ directory" instead of being told the verb was the problem.
-  if (!config.verbs![name]) Cli.die(`unknown: config ${name}`.trim(), 2);
-  if (name === "template" || name === "where") {
-    const answer = config.verbs![name].run(rest.slice(2));
-    process.stdout.write(typeof answer === "string" ? `${answer}\n` : `${JSON.stringify(answer, null, 2)}\n`);
+  if (!configFile) {
+    // A noun with no verb is a question, not a mistake — this branch used to refuse every verb it did
+    // not personally own, including the empty one, so `witness config` answered `unknown: config`
+    // about a noun its own help documents.
+    const listed = Cli.listVerbs("config", config, rest[1]);
+    if (listed) {
+      process.stdout.write(listed);
+      process.exit(0);
+    }
+    // A verb that does not exist is still a clean 2 here. Falling through for ANYTHING unrecognised
+    // sent `config nonsense` on to load a description it never needed, and the reader got "no
+    // .witness/ directory" instead of being told the verb was the problem.
+    if (!config.verbs![name]) Cli.die(`unknown: config ${name}`.trim(), 2);
+  }
+  if (withoutASystem.has(name)) {
+    // Split the way `Cli.run` splits it, so a verb behaves the same however it was reached.
+    const given = rest.slice(2);
+    try {
+      const answer = config.verbs![name].run(
+        given.filter(argument => !argument.startsWith("--")),
+        given.filter(argument => argument.startsWith("--")),
+      );
+      process.stdout.write(typeof answer === "string" ? `${answer}\n` : `${JSON.stringify(answer, null, 2)}\n`);
+    } catch (err) {
+      // What `Cli.main` does for every other verb. Without it these four printed a Node stack trace
+      // over a refusal whose whole job is to say, in one sentence, what was wrong with the input.
+      Cli.die(err instanceof Error ? err.message : String(err));
+    }
     process.exit(0);
   }
 }

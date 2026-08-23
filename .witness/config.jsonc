@@ -502,6 +502,64 @@
       ]
     },
 
+    // The description being WRITTEN, which is the one thing this tool could not record about itself.
+    // Both halves are on one screen on purpose: the same fragment, spliced into the file by hand and
+    // then handed to the command line, so the two are compared rather than described. The Python is
+    // the control — it works in both cuts, because it is what an agent driving this tool actually
+    // types — and the only thing that moves between them is what `action add` answers.
+    //
+    // Pointed at a COPY of `unknown.config.jsonc` in /tmp: this recording edits the file it is about,
+    // and a cut that leaves the repository dirty is one nobody can run twice.
+    "theWayAnActionGetsAdded": {
+      "summary": "adding one action to a description that already exists, by hand and by command",
+      "records": "terminal",
+      // Wide, because the anchor an agent counts by hand is only meaningful at its real indentation
+      // and wrapping it would hide the whole point. Short, because the still is the LAST frame and
+      // this one is twenty rows: a pane four times taller puts the whole cut in the top fifth of the
+      // picture, which is legible on nothing anybody reads it on. Held identical across both cuts —
+      // the geometry is not what changed here.
+      "pane": { "width": 1600, "height": 500, "fontSize": 14 },
+      "steps": [
+        { "caption": { "text": "one action, added to a description that already exists" } },
+        {
+          "type": {
+            "on": "prompt",
+            "value": "cp .witness/unknown.config.jsonc /tmp/w153.jsonc && printf '%s' '{ \"summary\": \"the one app with no login\", \"steps\": [{ \"goto\": { \"url\": \"http://localhost:8096/\" } }] }' > /tmp/w153-add.json"
+          },
+          "note": "one fragment, written once, so both halves below are handed the same input"
+        },
+        { "press": "Enter" },
+        { "wait": 1200 },
+        { "type": { "on": "prompt", "value": "python3 - <<'PY'" }, "note": "the only way there is: splice it into the text, with the indentation counted by hand" },
+        { "press": "Enter" },
+        { "type": { "on": "prompt", "value": "import json; p = '/tmp/w153.jsonc'; s = open(p, encoding='utf-8').read()" } },
+        { "press": "Enter" },
+        { "type": { "on": "prompt", "value": "old = '      \"container\": \"unknown-microbin\",'" }, "note": "six spaces of indentation, counted by hand — five silently matches nothing" },
+        { "press": "Enter" },
+        { "type": { "on": "prompt", "value": "assert s.count(old) == 1" }, "note": "a uniqueness check written by hand, every time" },
+        { "press": "Enter" },
+        { "type": { "on": "prompt", "value": "add = json.dumps({'spliced': json.load(open('/tmp/w153-add.json'))})" } },
+        { "press": "Enter" },
+        { "type": { "on": "prompt", "value": "open(p, 'w', encoding='utf-8').write(s.replace(old, old + '\\n      \"actions\": ' + add + ',', 1))" } },
+        { "press": "Enter" },
+        { "type": { "on": "prompt", "value": "PY" } },
+        { "press": "Enter" },
+        { "wait": 2000 },
+        {
+          "type": { "on": "prompt", "value": "./bin/witness --config /tmp/w153.jsonc action add microbin.added --from=/tmp/w153-add.json" },
+          "note": "the same intent, said once — which in the before cut is a verb that does not exist"
+        },
+        { "press": "Enter" },
+        { "wait": 6000 },
+        { "type": { "on": "prompt", "value": "./bin/witness --config /tmp/w153.jsonc action add microbin.added --from=/tmp/w153-add.json" }, "note": "and again: adding the same action twice is one action" },
+        { "press": "Enter" },
+        { "wait": 6000 },
+        { "type": { "on": "prompt", "value": "./bin/witness --config /tmp/w153.jsonc action list --quiet; grep -c '^ *//' /tmp/w153.jsonc" }, "note": "what the file declares afterwards, and how many of its comment lines are still in it" },
+        { "press": "Enter" },
+        { "wait": 6000 }
+      ]
+    },
+
     "theApp": {
       "summary": "the app a person uses",
       "steps": [

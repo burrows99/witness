@@ -7,14 +7,26 @@ import type { SystemConfig } from "./schema.ts";
 /** Read and parse a config file. Relative paths resolve against the working directory. */
 export function loadConfig(file: string): SystemConfig {
   const resolved = path.isAbsolute(file) ? file : path.join(process.cwd(), file);
-  const config = JSON.parse(withoutComments(fs.readFileSync(resolved, "utf8"))) as SystemConfig;
+  return readConfig(fs.readFileSync(resolved, "utf8"), resolved);
+}
+
+/**
+ * The same reading, of text that is not on disk yet.
+ *
+ * Split out for the writing half of this surface, which has to decide whether a change is safe BEFORE
+ * it makes it. "Validated before written" can only honestly mean one thing — the result, read by the
+ * reader that is going to read it — and a second, kinder copy of these three steps would let through
+ * exactly the descriptions that pass the writer and fail the loader.
+ */
+export function readConfig(source: string, from: string): SystemConfig {
+  const config = JSON.parse(withoutComments(source)) as SystemConfig;
   // Said here, where the file is, rather than three layers down as `no client provider "…"` — an
   // error about a registry, naming neither the field nor the file, as the first thing a new project
   // sees. The template is meant to be cut down to what a product has; this says what is left.
   const blank = unfilled(config);
   if (blank.length) {
     throw new Error(
-      `${resolved} is still the generated template: ${blank.length} field${blank.length === 1 ? "" : "s"} ` +
+      `${from} is still the generated template: ${blank.length} field${blank.length === 1 ? "" : "s"} ` +
         `still say "…" — ${blank.slice(0, 5).join(", ")}${blank.length > 5 ? `, and ${blank.length - 5} more` : ""}. ` +
         `Cut it down to what this product actually has, and delete the rest.`,
     );

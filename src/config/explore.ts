@@ -20,8 +20,11 @@ import { type Params, resolveAction } from "../actions/engine.ts";
  * finding the pages in the first place: there is no crawler in the library or in its MCP server. That,
  * and emitting a DESCRIPTION rather than test code, is the part that had to be written.
  *
- * It never writes the config. A generated name is worse than the one a person would choose, and a
- * tool that overwrites hand-tuned names is a tool people stop running.
+ * It never writes the config itself. A generated name is worse than the one a person would choose, and
+ * a tool that overwrites hand-tuned names is a tool people stop running — so what comes out is a
+ * fragment to rename and trim. Applying what is left is `config merge -`, which takes exactly this
+ * shape: the loop was open for as long as this header ended "merge the rest by hand", and the tool was
+ * generating the one thing it would not accept back.
  */
 export class Explore {
   /**
@@ -629,7 +632,14 @@ export class Explore {
       "//",
       "// None of this is final, and none of it has been written anywhere. The names come from what the",
       "// app calls things, which is a starting point rather than a decision: rename them to what YOUR",
-      "// product calls them, delete the two thirds no action will ever reach, and merge the rest by hand.",
+      "// product calls them, and delete the two thirds no action will ever reach. Then apply what is",
+      "// left — it goes back in the way it came out:",
+      "//",
+      `//   config explore ${service} | config merge -`,
+      "//",
+      "// `merge` validates the result before it writes anything, refuses without touching the file if",
+      "// that result would not load, leaves every comment already in the description exactly where it",
+      "// is, and writes nothing at all for a field already saying this — so running it twice is one edit.",
       "",
       JSON.stringify(block, null, 2),
       "",

@@ -410,7 +410,8 @@ export class Skill {
       "```bash",
       ...Skill.aligned([
         [`${tool} action list`, "what is already described — reuse before adding"],
-        ["#   … write the action for what you changed …", ""],
+        [`${tool} config explore <service> | ${tool} config merge -`, "the routes and locators it can read for itself, applied"],
+        [`${tool} action add <yours> --from=steps.jsonc`, "your step list, validated and put under its service"],
         [`${tool} action run <yours>`, "it will fail on a locator; that is the point"],
         ["#   … open the frame the story names, fix it, run again …", ""],
         [`EVIDENCE=before ${tool} action run <yours>`, "then make the change, then EVIDENCE=after"],
@@ -419,8 +420,9 @@ export class Skill {
       "",
       `Starting from nothing, \`${tool} config explore [<service>]\` walks the running app and prints the`,
       "description it implies — routes, locators, forms, and the operations the app called while being",
-      "walked. It never writes the config: merge and trim by hand, because a generated name is worse",
-      "than the one you would choose.",
+      "walked. It never writes the config itself — a generated name is worse than the one you would",
+      "choose — so rename and trim, then apply what is left with `config merge -`, which takes exactly",
+      "that shape.",
       "",
       "**`--as=<action>` runs a declared action before that crawl**, on the page the crawl then walks",
       "with, so everything the action leaves behind — the session, whatever it wrote on the server, the",
@@ -430,6 +432,20 @@ export class Skill {
       "dropzone links nowhere until a file has been dropped on it, so it walks ONE page unaided and the",
       "routes behind the upload with `--as=<the action that uploads>`. **`Walked 1 page` is a gate,",
       "nearly never a small app** — reach for `--as` before concluding the app cannot be walked.",
+      "",
+      "**Write to the description; do not edit the text of one.** `config merge` takes the fragment",
+      "`config explore` prints, which is why those two are a pipe. `action add` takes one action — the",
+      "whole thing, or the step list on its own — and puts it under the service its name qualifies;",
+      "`action rm` takes it out again. `config set <field> <value>` is one field, addressed the way",
+      "`config template` documents it. All four **validate before they write**: a refusal leaves the",
+      "file byte-identical and says what was wrong with what you handed it, rather than what broke two",
+      "minutes into a browser run. They leave every comment in the description exactly where it is — the",
+      "comments in that file are its documentation — and they write nothing at all for a field that",
+      "already says what you asked for, so the same add twice is one action rather than two.",
+      "",
+      "Splicing strings into `.witness/config.jsonc` instead is how this used to be done and it is worth",
+      "knowing why it stopped: an anchor whose uniqueness you check yourself, an indentation you count",
+      "yourself, and nothing validating the result until the next command happens to load it.",
       "",
       `And when a run breaks that used to pass, ask \`${tool} check drift <the action that signs in>\``,
       "before rewriting anything: it re-checks every claim the description makes — each locator against",
@@ -486,7 +502,14 @@ export class Skill {
         lines.push(`- \`${field.name}\`${field.optional ? "" : " (required)"}${field.doc ? ` — ${Skill.sentence(field.doc)}` : ""}`);
       }
     }
-    lines.push("", `\`${this.run} config template\` prints every field with its full documentation.`, "");
+    lines.push(
+      "",
+      `\`${this.run} config template\` prints every field with its full documentation, and`,
+      `\`${this.run} config set <field> <value>\` writes one of them — \`services.gitea.port\`, addressed`,
+      "the way that template documents it. A block goes in with `config merge` instead; a field whose",
+      "own name has a dot in it can only be reached that way.",
+      "",
+    );
     if (this.providers.size) {
       lines.push("Anything that meets the outside world is a provider picked by name:", "");
       for (const [kind, names] of this.providers) lines.push(`- **${kind}**: ${names.map(n => `\`${n}\``).join(", ")}`);
