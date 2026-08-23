@@ -313,6 +313,34 @@
       ]
     },
 
+    // The list next door, and the one the command line's own noun list cannot vouch for: the verbs an
+    // action is WRITTEN in, documented nowhere else. This deletes nine of them from the generator —
+    // the whole "assert something" half — and then puts the shortened list and the suite's verdict on
+    // one screen, because "the tests passed" is the interesting half only when the code is broken.
+    // The source is restored by the last command on the same line; nothing survives the recording.
+    "theVocabularyItAdvertises": {
+      "summary": "nine step verbs deleted from the generated skill, and whether anything notices",
+      "records": "terminal",
+      "pane": { "height": 620, "fontSize": 16 },
+      "steps": [
+        { "caption": { "text": "delete nine step verbs from the skill — store, expect, select, capture, fillFields, waitForUrl, query, slide, caption" } },
+        {
+          "type": {
+            "on": "prompt",
+            "value": "perl -pi -e 's/field.name === \"as\"/[\"as\",\"store\",\"expect\",\"select\",\"capture\",\"fillFields\",\"waitForUrl\",\"query\",\"slide\",\"caption\"].includes(field.name)/' src/skill/skill.ts"
+          }
+        },
+        { "press": "Enter" },
+        { "wait": 2000 },
+        {
+          "type": { "on": "prompt", "value": "clear; ./bin/witness skill | sed -n '/^## Writing an action/,/^## Describing/p' | grep -E '^- .[a-zA-Z]+. — '; echo; node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/skill/skill.test.ts 2>&1 | grep -E '^not ok|error:|^# tests|^# pass|^# fail'; git checkout src/skill/skill.ts" },
+          "note": "one screen, because the still is the last frame: what the skill now advertises, what the suite makes of it, and the source put back"
+        },
+        { "press": "Enter" },
+        { "wait": 12000, "note": "the skill loads the description before it renders, and the spec reads every type declaration under src/ twice" }
+      ]
+    },
+
     // The other half of what an agent reads before it has run anything: where a run puts what it
     // produced, and what it takes to get one of those files in front of a person. Both are claims
     // the skill makes about the world outside this tool, and nothing type-checks either.

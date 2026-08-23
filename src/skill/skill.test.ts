@@ -214,3 +214,56 @@ test("it points at the Playwright CLI rather than reimplementing it", () => {
   match(out, /npx playwright codegen/);
   match(out, /--save-storage/);
 });
+
+/**
+ * The vocabulary, against the real types rather than the fixture at the top of this file.
+ *
+ * That fixture declares three step fields and two config fields; `StepConfig` declares twenty-four
+ * and `SystemConfig` seventeen. So every assertion about the step vocabulary and about the config's
+ * fields was an assertion about the fixture: nine verbs — the whole "assert something" half — could
+ * be dropped from `actionSection()` and eight fields from `configSection()`, and 424 tests passed.
+ *
+ * Same shape as the noun/verb test in `bin/cli.test.ts`: ask the real source for the list and diff it
+ * against the real skill, naming first the ones that vanished, so a parse that quietly finds nothing
+ * cannot pass. The fixture tests stay — they check the rendering RULES (`note` skipped, `(required)`
+ * marked, the doc comment carried through), which an enumeration cannot see.
+ */
+const declared = (name: string): string[] => {
+  const model = TypeSource.fromDirectory(new URL("..", import.meta.url).pathname).declaration(name);
+  ok(model.kind === "object", `${name} is an object type`);
+  return model.fields.map(field => field.name);
+};
+
+/** One `##` section of the rendered file: `api` is a step verb AND a config field, so each list has to answer for its own. */
+const section = (out: string, heading: string): string => {
+  const from = out.indexOf(`## ${heading}\n`);
+  ok(from >= 0, `the skill still has a "${heading}" section`);
+  const next = out.indexOf("\n## ", from + 1);
+  return out.slice(from, next < 0 ? undefined : next);
+};
+
+test("every step verb StepConfig declares is in the generated skill", () => {
+  const fields = declared("StepConfig");
+  const written = section(Skill.for().render(), "Writing an action");
+  // The half the audit dropped. An agent told `store` and `expect` do not exist concludes the tool
+  // cannot assert anything and writes a spec file — the one thing this tool exists to avoid.
+  for (const expected of ["store", "expect", "select", "capture", "fillFields", "waitForUrl", "query", "slide", "caption"]) {
+    ok(fields.includes(expected), `StepConfig still declares \`${expected}\``);
+  }
+  for (const field of fields) {
+    // `note` is bookkeeping and `as` is where a step's answer goes; neither is something a step DOES.
+    if (field === "note" || field === "as") continue;
+    ok(written.includes(`- \`${field}\``), `step verb \`${field}\` is declared but absent from the skill`);
+  }
+});
+
+test("every field SystemConfig declares is in the generated skill", () => {
+  const fields = declared("SystemConfig");
+  const described = section(Skill.for().render(), "The description");
+  for (const expected of ["identities", "cast", "secrets", "stubs", "clients", "databases", "video", "evidence"]) {
+    ok(fields.includes(expected), `SystemConfig still declares \`${expected}\``);
+  }
+  for (const field of fields) {
+    ok(described.includes(`- \`${field}\``), `config field \`${field}\` is declared but absent from the skill`);
+  }
+});
