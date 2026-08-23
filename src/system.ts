@@ -129,6 +129,11 @@ export class System {
       // Where a step that leaves the app expects to land. Off the stack rather than out of the step,
       // so an identity provider's port is declared in the one place every other port is.
       origin: (service: string) => this.origin(service),
+      // What a failure looks like in a body, from every client that says — its own declaration, or the
+      // one its wire format makes on its behalf. The debug story judged a request by its status code
+      // alone until this reached it, so an app answering 200 with the failure in the payload — most
+      // Python and PHP APIs, every polled job, and GraphQL by specification — read as healthy.
+      failureWhen: [this.api, ...this.clients.values()].flatMap(client => client.failureWhen ?? []),
     });
 
     this.apps = {};

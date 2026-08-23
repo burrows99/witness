@@ -6,7 +6,7 @@
 |---|---|
 | `trace.ts` (74) | every request, statement and step the *harness* made |
 | `inspector.ts` (221) | DevTools as data — the *browser's* network, console, exceptions |
-| `story.ts` (358) | all of it, told once, in the order a person wants it |
+| `story.ts` (502) | all of it, told once, in the order a person wants it |
 | `drift.ts` (292) | verify the claims the description makes, without running it |
 
 ## inspector
@@ -30,6 +30,25 @@ password *is* the username.
 Playwright's trace is a better debugger than anything hand-written, and none of it is reimplemented:
 the story **names the trace path** and adds the join the trace does not have — the step list, the
 failure, and the network and console grouped under the step that was running.
+
+**What counts as a failure was the transport, and the transport is not the question** (#145). One
+predicate — `!!request.failure || (request.status ?? 0) >= 400` — made a graph build that had 401'd
+against its provider the whole way through render as three ticks, a clean console and `ok` in the
+title, with the traceback sitting in `debug.json` two files away: captured, stored, and not looked at.
+It is the shape of most Python and PHP APIs, of every job whose failure arrives by polling, and of
+GraphQL *by specification* — so for one of the wire formats this ships a provider for, the network
+table could never show a failure at all. A description now declares what failure looks like in a body
+(`failureWhen`) and a provider may declare its own; `Story.bodies()` reads each recorded body once
+against them, and a match is bolded in the table with the marker that fired beside the status
+(`**200 · data.error**`), spelled out under it with the body, and counted in the title.
+
+Three things it is careful about, each one a way the fix could have been worse than the bug. It parses
+**nothing** when no marker was declared. A body is JSON only if it starts like one and only up to a
+size, and a malformed one answers "could not read" rather than throwing — a debug story that crashes
+is worse than one that is too quiet. And a body clipped at the recorder's 4000 characters is invalid
+JSON, so the count of those is **printed**: a marker that could not be looked for is the same silence
+one layer down. It reports; it does not decide. Whether a body-level failure should fail the ACTION is
+a question about what steps assert, and this file is not where that is answered.
 
 ## drift
 

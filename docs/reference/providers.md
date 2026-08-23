@@ -9,7 +9,12 @@ the harness. A wrong name says what *is* registered, rather than a stack trace a
 | name | |
 |---|---|
 | `rest` | path + method + JSON body (default) |
-| `graphql` | one endpoint, `query`/`variables` |
+| `graphql` | one endpoint, `query`/`variables` — and a failure is a 200 with `errors[]`, which it declares for itself |
+
+A provider may say what failure looks like in a *body*, where its format defines one: the debug story
+reads that so a GraphQL error shows up in the network table rather than as an unremarkable `200`. A
+client's own [`failureWhen`](config.md#api) wins over it — a product knows its API better than its
+wire format does.
 
 ## auth — how a request is authenticated
 

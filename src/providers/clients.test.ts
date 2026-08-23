@@ -133,3 +133,14 @@ test("both providers are registered under the names a config uses", () => {
   deepEqual(clientProviders.names, ["rest", "graphql"]);
   ok(clientProviders.has("rest"));
 });
+
+test("graphql declares what its own failures look like, so no description has to", () => {
+  // The test above it says a GraphQL error is a 200 and this client refuses it. The debug story is the
+  // other reader of that same fact — it watches the BROWSER make these calls, where nothing throws —
+  // and for as long as it judged a request by its status code the network table could never show a
+  // GraphQL failure at all. The format defines this, so the provider says it rather than every project.
+  deepEqual(clientProviders.get("graphql").failureWhen, { path: "errors", present: true });
+  // REST defines nothing of the kind: a 200 means what the application decided it means, which is
+  // exactly why `failureWhen` is a thing a description declares.
+  equal(clientProviders.get("rest").failureWhen, undefined);
+});
