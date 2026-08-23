@@ -146,6 +146,22 @@ config being wrong rather than the tool. Third instance of one shape in this fil
 `Explore.likelyApp` and the `RunnableSystem` fixtures: test the unit with what its caller hands it, or
 test through the caller.
 
+**The seam that makes something testable is the reason the real thing is not tested — and closing it
+can need a binary rather than a refactor.** `Drift.check` takes its `routeOf`, its page factory and
+its sign-in as parameters, and ten tests drove it with their own. `Drift.sweep` is what `witness check
+drift` actually runs: it is the half that builds `routeOf` out of `system.routeUrl`, launches the
+browser, carries the identity cookies and drives the sign-in action, and no test called it at all.
+Replace the body of that `routeOf` with `undefined` and the checker resolves nothing, collects no
+claims, prints `all 0 claims still hold` and exits 0 — completely inert, green, 424 tests passing.
+Second instance of the `Compose.docker` entry above, with that entry's remedy ruled out: there is no
+size lower than a browser to inject, so the test has to launch one, at a `node:http` server it starts.
+Which turned up the other half. CI installs `@playwright/test` explicitly so that "nothing is skipped
+here" — and installing that package downloads **no browser**, verified against a scratch prefix rather
+than against this machine, which had browsers and had got them some other way. The skip guard the
+suite already had would have skipped the one test that matters in the one place it matters, silently,
+and the pull request would have gone green on it. A test that needs a binary needs a line in the
+workflow that installs the binary; the package is not the binary.
+
 ---
 
 ## Changing this repository
@@ -391,6 +407,16 @@ claims the description actually makes.
 
 **Prefer waiting for a thing over waiting for time.** A `wait: 600` after typing into a search box
 stored 226 unfiltered rows on a slow run, under an assertion loose enough to pass.
+
+**Counting what you skipped is not saying what went unchecked, and it can invent an omission.**
+`check drift` answered `7 terminal actions skipped, having no screen to check` — honest, and wrong in
+both directions at once. It never named the sentence that went unverified, so a reader with a real
+`expect` in a tape learned only that a number had gone up; and every one of this repository's ten
+terminal actions asserts nothing at all, so the line reported ten silences as ten omissions. Reading
+them costs nothing and says both things properly: an action that claims nothing had nothing skipped,
+and one that claims something gets its claim quoted with what would have to happen to judge it. The
+general shape — a count is a summary of findings you have not made, and a summary of nothing looks
+identical to a summary of something.
 
 **A locator you have not run is a guess.** Five of the first nine actions written here named
 something that did not exist. `npx playwright codegen` writes real ones.

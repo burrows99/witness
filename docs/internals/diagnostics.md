@@ -39,6 +39,18 @@ point), one matching on a route no step uses it on, one matching nothing because
 a click. A checker that cries wolf is worse than none. The rules it settled on are in
 [how-to/check-for-drift.md](../how-to/check-for-drift.md).
 
-The same reasoning skips a `records: "terminal"` action rather than driving a browser at it — and
-**counts** what it skipped into the summary, because a report that quietly read half a description
-and answered "all claims still hold" is the same lie from the other end.
+The same reasoning keeps a browser away from a `records: "terminal"` action — and reads its steps
+anyway, naming each claim it cannot judge, because a report that quietly read half a description and
+answered "all claims still hold" is the same lie from the other end. A count of *actions skipped* was
+the first version of that and it said too little in one direction and too much in the other: it never
+named the unverified sentence, and it reported ten silences as ten omissions on a description whose
+terminal half asserts nothing. `Drift.inATape` reads them instead. One thing there it can judge
+outright — an `expect` with no `text` never reaches the tape and never reaches the engine, so nothing
+asserts it at all.
+
+`Drift.sweep`, not `Drift.check`, is what `System.checkDrift` and therefore `witness check drift` call:
+it builds `routeOf` out of `system.routeUrl`, launches the browser, carries the identity cookies and
+drives the sign-in action. For a long time every test drove `check` with a `routeOf` of its own, so
+`sweep` could resolve nothing at all and still print `all 0 claims still hold` and exit 0 (#103). The
+test that holds it down launches a real browser at a `node:http` server it starts, which is why CI
+installs a browser as well as the package.

@@ -1,7 +1,13 @@
-import { equal, ok, rejects } from "node:assert/strict";
+import { deepEqual, equal, ok, rejects } from "node:assert/strict";
+import { existsSync } from "node:fs";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 
 import type { Page } from "@playwright/test";
+
+import { asTape } from "../providers/recorders.ts";
+import type { SweepableSystem } from "./drift.ts";
 
 const havePlaywright = await import("@playwright/test").then(
   () => true,
@@ -9,6 +15,17 @@ const havePlaywright = await import("@playwright/test").then(
 );
 const { Drift } = havePlaywright ? await import("./drift.ts") : ({} as typeof import("./drift.ts"));
 const when = { skip: havePlaywright ? false : "needs @playwright/test" };
+
+/**
+ * The package is not the browser. `npm i @playwright/test` downloads nothing — verified against a
+ * scratch prefix, because what is on a machine is a result and more than one thing produces it — so a
+ * test that LAUNCHES one needs `npx playwright install chromium`, which is why CI now runs it. Skipped
+ * rather than failed on a checkout that has not, and CI is the one place nothing may skip.
+ */
+const executable = havePlaywright ? await import("@playwright/test").then(pw => pw.chromium.executablePath()).catch(() => "") : "";
+const withABrowser = {
+  skip: !havePlaywright ? "needs @playwright/test" : existsSync(executable) ? false : "needs a browser — npx playwright install chromium",
+};
 
 /** A page that answers with whatever each URL was said to hold. */
 const fakePage = (holds: Record<string, Record<string, number>>) => {
@@ -156,9 +173,10 @@ test("a route that sends us somewhere else is unchecked, not broken", when, asyn
   ok(report.ok, "not knowing is not the same as broken");
 });
 
-test("an action with no screen is skipped, and the report says how many", when, async () => {
-  // It types at a shell: no route to visit, no locator to count. Left out silently, a green summary
-  // claims to have read a description it only read half of.
+test("an action with no screen that claims nothing has had nothing skipped", when, async () => {
+  // It types at a shell: no route to visit, no locator to count, and — these seven steps in this
+  // repository's own description being the shape people actually write — no assertion either. Counted
+  // as skipped, it reports a silence as an omission, which reads on the board like something to fix.
   const report = await check(
     {
       onScreen: { app: "a", steps: [{ goto: { route: "list" } }, { expect: { on: { role: "table" } } }] },
@@ -167,9 +185,86 @@ test("an action with no screen is skipped, and the report says how many", when, 
     { "http://app/list": { "role=table": 1 } },
   );
   equal(report.checked, 1);
-  equal(report.skipped, 1);
+  equal(report.skipped, 0);
   ok(report.ok, Drift.render(report));
-  ok(Drift.render(report).includes("1 terminal action skipped"), Drift.render(report));
+  equal(Drift.render(report), report.summary);
+});
+
+test("…but one that asserts in a tape is named, with why nothing here can judge it", when, async () => {
+  // `expect: { text }` becomes `Wait+Screen /…/`: the same claim, held against the pane by VHS. What
+  // it matches exists only once the command has run, so this cannot judge it — and a report that says
+  // "all claims still hold" about a description whose other half it never opened is the same lie as
+  // one that cries wolf.
+  const report = await check(
+    { atAPrompt: { app: "a", records: "terminal", steps: [{ type: { on: "prompt", value: "psql -c 'select 1'" } }, { expect: { on: "screen", text: "1 row" } }] } },
+    {},
+  );
+  equal(report.skipped, 1);
+  ok(report.ok, "not knowing is not the same as broken");
+  const rendered = Drift.render(report);
+  ok(rendered.includes("1 claim made in a tape rather than on a screen"), rendered);
+  ok(rendered.includes('"1 row" is claimed in a tape as `Wait+Screen`'), rendered);
+});
+
+test("an expect a tape cannot carry is asserted by nothing at all, and that can be judged from here", when, async () => {
+  // Only `text` reaches a tape. A `state`, a `count` or a bare locator describes a screen a terminal
+  // does not have and is dropped by `asTape` — and the engine never runs a terminal action's steps,
+  // so nothing else reads it either. No vhs needed to know that: it is the same field, read twice.
+  const steps = [{ expect: { on: { role: "table" }, count: 2 } }];
+  ok(!asTape(steps, {}, "/tmp/x.mp4").includes("Wait+Screen"), "asTape drops it");
+  const report = await check({ atAPrompt: { app: "a", records: "terminal", steps } }, {});
+  ok(Drift.render(report).includes("nothing asserts it, here or in the recording"), Drift.render(report));
+});
+
+test("sweep resolves its routes off the system, opens a real browser, and counts what it finds", withABrowser, async () => {
+  // Everything above this line drives `Drift.check` with a `routeOf` the test wrote itself, and
+  // `Drift.check` is not what runs: `witness check drift` calls `System.checkDrift`, which calls
+  // `sweep`. So the part that builds `routeOf` out of `system.routeUrl`, launches the browser and
+  // wires the sign-in action had no test at all — and an audit proved what that costs. Replace the
+  // body of `sweep`'s `routeOf` with `undefined` and every claim vanishes: `all 0 claims still hold`,
+  // ok, exit 0, a completely inert checker printing a green report. This is the test that goes red.
+  const pages: Record<string, string> = {
+    "/app/list": "<table><tr><td>a row</td></tr></table>",
+    "/app/login": "<input placeholder='email'>",
+  };
+  const server = createServer((req, res) => {
+    const body = pages[String(req.url)];
+    res.writeHead(body ? 200 : 404, { "content-type": "text/html" }).end(body ?? "no");
+  });
+  await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+  const port = (server.address() as AddressInfo).port;
+
+  const ran: string[] = [];
+  // Annotated rather than cast: a cast makes every missing field optional, and the fields this hands
+  // `sweep` are exactly the ones the composite root hands it.
+  const system: SweepableSystem = {
+    config: {
+      actions: {
+        signIn: { app: "app", steps: [{ goto: { route: "login" } }, { type: { on: { placeholder: "email" }, value: "x" } }] },
+        open: { app: "app", steps: [{ goto: { route: "list" } }, { expect: { on: { role: "table" } } }, { expect: { on: { role: "button", name: "Nope" } } }] },
+        atAPrompt: { app: "app", records: "terminal", steps: [{ expect: { on: "screen", text: "1 row" } }] },
+      },
+    },
+    routeUrl: (app, route) => `http://127.0.0.1:${port}/${app}/${route}`,
+    run: async name => void ran.push(name),
+  };
+
+  try {
+    const report = await Drift.sweep(system, "signIn");
+    // The claim on a resolvable route is COUNTED — the thing an inert `routeOf` silently takes to 0.
+    equal(report.checked, 3, Drift.render(report));
+    // And judged, on the page the route actually served, through the browser sweep opened itself.
+    equal(report.ok, false, Drift.render(report));
+    const gone = report.findings.filter(finding => finding.verdict === "gone");
+    equal(gone.length, 1, Drift.render(report));
+    equal(gone[0].action, "open");
+    // The sign-in action sweep was named is the one it drove, and it drove it through the system.
+    deepEqual(ran, ["signIn"]);
+    // And the half with no screen came back in the same report rather than as a number.
+    equal(report.skipped, 1, Drift.render(report));
+  } finally {
+    server.close();
+  }
 });
 
 test("a terminal action cannot be the action that signs in, and is told so before a browser opens", when, async () => {
