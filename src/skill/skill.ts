@@ -437,6 +437,11 @@ export class Skill {
       "The two halves sit side by side and a re-run overwrites rather than accumulates. Nothing is named",
       "by hand: the path comes from what was run and which cut it was.",
       "",
+      "**Getting one of these in front of a person goes through a browser, and a browser upload tool does",
+      "not take any path you can read.** It accepts what the session was started on — the project you are",
+      "working in — and refuses the rest, so a frame under `/tmp` or in a worktree beside the project is",
+      "rejected however correct the path is. Copy it into the project first and upload the copy.",
+      "",
     ];
   }
 

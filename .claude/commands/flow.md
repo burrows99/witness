@@ -67,8 +67,12 @@ is a defect, not a doc nit: it is the only thing an agent reads.
 EVIDENCE=after ./bin/witness action run <same action>
 ```
 
-Same action, same inputs, same viewport. A before and an after that differ in two ways prove nothing
-about either.
+Same action, same inputs, and everything you did not change held still — a before and an after that
+differ in two ways prove nothing about either.
+
+The exception is when the geometry **is** the change: a viewport, a terminal pane. Holding those still
+would hide the very thing being fixed, so vary that one, hold the rest, and say in the body which one
+moved. "Same viewport" is the rule for a change that is not about the viewport.
 
 ## 5 · Look at what you recorded
 
@@ -91,8 +95,20 @@ npm run check                    # types, lint, unused, tests
 ./bin/witness check drift <action> # if the change touched anything a description claims
 ```
 
-Read the **exit code**. Do not pipe to `tail`, `head` or `grep` and judge by what you see — that has
-hidden a failure here more than once. If you must pipe, check `${PIPESTATUS[0]}`.
+Read the **exit code**. Do not pipe to `tail`, `head` or `grep` and judge by what you see — a pipeline
+reports the exit code of its *last* command, which is the one you added, and that has hidden a failure
+here more than once. Output too long to sit in front of you? Redirect it and read the file afterwards,
+so the code you read still belongs to the command you ran:
+
+```bash
+npm run check > /tmp/check.log 2>&1; echo "exit=$?"
+grep -n "error" /tmp/check.log
+```
+
+This file used to say to capture the shell's `PIPESTATUS` array instead. It is the textbook answer and
+it was the wrong one here: agent harnesses refuse to run a command containing a `${…[0]}` subscript, so
+the repository's headline verification idiom was one three agents could not type. Not piping needs no
+array.
 
 ## 7 · Raise it
 
@@ -105,14 +121,28 @@ gh pr create --title "<what changed, as a sentence>" --body-file <file>
 - **The title says what changed**, in the repository's voice — a sentence, not a ticket number.
 - **The body carries the before and the after.** `gh` cannot upload an image, so a local path in the
   body renders nothing; mint real attachment URLs through a logged-in browser and cite those.
-  `require-evidence.sh` will block the publish otherwise, and it is right to.
+  `require-evidence.sh` blocks a body that cites a **local** image path — but it only ever looks at a
+  body that cites an image at all, so a body citing none publishes cleanly. Nothing stops a pull
+  request that shows nothing. That one is yours.
+- **The upload goes through the browser too, and a browser upload tool does not take any path you can
+  read.** It accepts what the session was started on — the project directory — and refuses the rest,
+  so a frame under `/tmp`, or in the worktree you are working in beside the project, is rejected
+  however correct the path is. Copy it into the project first, Read the copy (`require-evidence.sh`
+  will have you do that anyway, and it will happily approve a path the uploader then refuses), and
+  upload the copy.
 - **Both cuts must exist**, or `require-before-after.sh` blocks it. Nothing checks that the after came
   after the change — that one is on you, and a stale after looks like evidence without being any.
-- Then watch the checks **by exit code**:
+- Then prove the checks ran, which is not the same as watching them:
   ```bash
-  gh pr checks <n> --watch; echo "exit=$?"
+  .claude/pr-green.sh <n>; echo "exit=$?"
   ```
-- Merge only when that is `0`.
+  `gh pr checks <n> --watch` on its own cannot tell you a pull request is green. It reports on the
+  checks that **exist**, and for a minute or two after a push ours do not — so it watches whichever
+  third-party app answered first, finds nothing pending and nothing red, and exits `0`. On a pull
+  request GitHub calls `CONFLICTING` it is worse: `check` and `analyze` are never queued at all, and
+  that `0` is permanent. `pr-green.sh` asks for those two by name, waits for them to be created, and
+  only then watches.
+- Merge only when that is `0`. **A green exit on an empty check set is not a green pull request.**
 
 ## 8 · Learn
 
