@@ -10,36 +10,38 @@
 
 Drive a running system from one config file, and come back with evidence rather than a pass/fail.
 
-Describe your product once in `.witness/config.jsonc` — where the services are, what the API can be
-asked, what a person sees, what they can do — and drive it against the real thing: the containers on
-this machine, the database behind them, the browser in front of them. What comes back is the requests
-with their bodies, a frame per step, a video, and a note a person can follow to check it themselves.
+[Install](#install) · [Describe a product](#describe-a-product) · [Write an action](#write-an-action) ·
+[Run it](#run-it) · [What a run leaves behind](#what-a-run-leaves-behind) ·
+[Example](#example-four-services) · [When not to use this](#when-not-to-use-this)
 
-**There is no test file to write.** An action composes other actions, narrates, asserts against the
-screen and against what the API answered or the database stored — all of it data. It exists because an
-agent (or a person) changes some code and then needs to *see it work*, and the alternative is throwaway
-curl, ad-hoc psql, a screenshot taken by hand, and nothing anyone can rerun.
+Describe your product in `.witness/config.jsonc` — where the services are, what the API can be asked,
+what a person sees, what they can do — and drive it against the real thing: the containers on this
+machine, the database behind them, the browser in front of them. What comes back is the requests with
+their bodies, a frame per step, a video, and a note a person can follow to check it themselves.
 
-The package is `@burrows99/witness` because a GitHub Packages name is always scoped to the account that
-owns the repository, and the unscoped name is taken on npmjs.com.
+**There is no test file to write.** An action composes other actions, narrates, and asserts against the
+screen, the API and the database. It exists because an agent or a person changes some code and then
+needs to *see it work* — and the alternative is throwaway curl, ad-hoc psql, a screenshot taken by hand,
+and nothing anyone can rerun.
 
 ## Table of Contents
 
 - [Install](#install)
-- [Usage](#usage)
-- [Evidence](#evidence)
-- [A worked example: a whole stack](#a-worked-example-a-whole-stack)
-- [Where a description comes from](#where-a-description-comes-from)
-- [The conventions worth keeping](#the-conventions-worth-keeping)
+- [Describe a product](#describe-a-product)
+- [Write an action](#write-an-action)
+- [Run it](#run-it)
+- [What a run leaves behind](#what-a-run-leaves-behind)
+- [Example: four services](#example-four-services)
+- [Keeping a description true](#keeping-a-description-true)
+- [When not to use this](#when-not-to-use-this)
 - [API](#api)
-- [The picture on this repository](#the-picture-on-this-repository)
 - [Maintainers](#maintainers)
 - [Contributing](#contributing)
 - [License](#license)
 
 ## Install
 
-Published to **GitHub Packages**. Point your project at it once, in `.npmrc` beside your `package.json`:
+Published to **GitHub Packages**. Point your project at it once, in `.npmrc`:
 
 ```
 @burrows99:registry=https://npm.pkg.github.com
@@ -51,107 +53,78 @@ npx witness init                          # writes .witness/{config.jsonc, SKILL
 ```
 
 GitHub Packages [asks for a token even when the package is public](https://docs.github.com/en/packages/learn-github-packages/about-permissions-for-github-packages)
-— any token with `read:packages` (`npm config set //npm.pkg.github.com/:_authToken $TOKEN`), and in CI
-`${{ secrets.GITHUB_TOKEN }}` already has it. Installing from git needs no token:
-`npm i -D github:burrows99/witness`.
+— any token with `read:packages`, and in CI `${{ secrets.GITHUB_TOKEN }}` already has it. Installing
+from git needs no token: `npm i -D github:burrows99/witness`.
 
-**Needs** Node 22.6+. Optionally: Docker (to read a container's environment or its database),
-[Playwright](https://playwright.dev) as a peer dependency (for the browser half), ffmpeg (for MP4s).
+**Needs** Node 22.6+. Optionally Docker (to read a container's environment or its database),
+[Playwright](https://playwright.dev) as a peer dependency (for the browser half), and ffmpeg (for MP4s).
 
-## Usage
+## Describe a product
+
+Everything lives under one directory, found the way git finds a repository — walk up, nearest wins.
+`--config <file>`, `WITNESS_CONFIG` and `WITNESS_DIR` override it in that order; `witness config where`
+says which is in force.
 
 ```
 your-project/
   .env                  the ports and container names compose reads
   docker-compose.yml
   .witness/
-    config.jsonc        the description of this product
+    config.jsonc        the description
     SKILL.md            how to use this, generated — `witness skill` rewrites it
-    artifacts/          what runs leave behind — ignored by the .gitignore beside it
+    artifacts/          what runs leave behind
 ```
 
-Everything witness reads and writes is under that one directory, found the way git finds a repository:
-walk up from the working directory, nearest wins. `--config <file>`, `WITNESS_CONFIG` and `WITNESS_DIR`
-override it in that order; `witness config where` says which is in force and why.
-
-### The description
-
-`witness init` writes one generated from the types, with every field documented. Cut down to what one
-product uses:
+A **service** carries everything true about it. The top level carries only what is shared:
 
 ```jsonc
 {
   "name": "acme",
-
-  // A service carries everything true about it. Nothing inside names the service again — being
-  // written here is what says which one it is about.
   "services": {
     "web": {
-      // Where it runs. Ports and container names come from the same `.env` compose reads, so a
-      // second checkout needs no wrapper script. `kind` says whose software it is: a third party is
-      // not restartable, not resettable, and the likeliest source of a flake that is nobody's fault.
       "kind": "in-house", "port": 3000, "portVar": "WEB_PORT", "container": "acme-web",
 
-      // Its credentials. Its own actions reach them as `{secret.adminKey}`; anything else says
-      // `{secret.web.adminKey}`. Two services may each have one of the same name.
-      "secrets": { "adminKey": { "containerEnv": { "service": "web", "key": "ADMIN_KEY" } } },
+      // Inside a service, `containerEnv` means THAT service's container.
+      "secrets": { "adminKey": { "containerEnv": "ADMIN_KEY" } },
 
-      // What it can be asked. The one service with an `api` is what `witness api …` talks to;
-      // a second service's becomes a named client.
+      // The first service with an `api` is what `witness api …` talks to; a second becomes a client.
       "api": {
-        "auth": { "service": { "provider": "apiKey", "header": "x-api-key", "from": { "env": "ADMIN_KEY" } } },
+        "auth": { "service": { "provider": "apiKey", "header": "x-api-key", "from": { "secret": "adminKey" } } },
         "operations": { "orders.show": { "path": "/v1/orders/{orderId}", "auth": "service" } }
       },
 
-      // What a person sees of it: routes become screens, and one sign-in flow serves every action.
-      "app": { "routes": { "order": "/orders/{orderId}" }, "locators": { "cancel": { "role": "button", "name": "Cancel order" } } },
-
-      // What can be DONE with it. No prefix and no `app`: `witness action run web.cancelOrder`
-      // finds this, and one of its own steps reaches a sibling by bare name.
-      "actions": {
-        "cancelOrder": {
-          "inputs": ["orderId"],
-          "steps": [
-            { "goto": { "route": "order", "params": { "orderId": "{orderId}" } } },
-            { "click": { "role": "button", "name": "Cancel order" } },
-            { "expect": { "on": { "text": "Cancelled" }, "because": "the order should show as cancelled" } }
-          ]
-        }
-      }
+      "app": { "routes": { "order": "/orders/{orderId}" } },
+      "actions": { "cancelOrder": { "…": "below" } }
     },
 
     "postgres": {
       "kind": "in-house", "port": 5432, "container": "acme-postgres", "probe": "container",
-      // `credential` is a secret source like any other — read out of the running container rather
-      // than written here, which is the habit worth keeping even where the value is a local one.
-      "database": { "user": "acme", "database": "acme",
-                    "credential": { "containerEnv": { "service": "postgres", "key": "POSTGRES_PASSWORD" } },
-                    "queries": { "order.status": "select status from orders where id = '{orderId}'" } }
+      "database": {
+        "user": "acme", "database": "acme",
+        "credential": { "containerEnv": "POSTGRES_PASSWORD" },
+        "queries": { "order.status": "select status from orders where id = '{orderId}'" }
+      }
     }
   },
-
-  // Only what is SHARED, or about more than one service.
-  "secrets": { "ciToken": { "env": "CI_TOKEN" } },
   "cast": { "REGULAR": { "id": "…", "why": "the only account with a saved card" } },
   "cli": { "order": { "verbs": { "show": { "operation": "orders.show", "args": ["orderId"] } } } }
 }
 ```
 
-An action about more than one service goes in a top-level `actions`, where it names them:
-`{ "run": "web.signIn" }`. Everything else about one service lives under it, written once.
+`witness config template` prints every field this version understands, generated from the type
+declarations — so it describes the version you have.
 
-### Writing an action
+## Write an action
 
-The sequence, its narration and its claims — all of it data:
+The sequence, its narration and its claims, all data:
 
 ```jsonc
 "customer.refundAnOrder": {
   "summary": "cancel an order and check the refund really landed",
-  "app": "customer",
   "inputs": ["orderId"],
   "steps": [
-    { "slide": { "title": "Refunding an order", "lines": ["What the customer sees, and what the API says."] } },
-    { "run": { "action": "customer.signIn", "with": { "email": "{email}" } } },
+    { "slide": { "title": "Refunding an order", "kicker": "before", "lines": ["What the customer sees, and what the API says."] } },
+    { "run": { "action": "signIn", "with": { "email": "{email}" } } },
     { "goto": { "route": "order", "params": { "orderId": "{orderId}" } } },
     { "click": { "role": "button", "name": "Cancel order" } },
     { "expect": { "on": { "text": "Refund on its way" }, "because": "the customer is told, not just the ledger" } },
@@ -165,37 +138,28 @@ The sequence, its narration and its claims — all of it data:
 }
 ```
 
-Say a thing once: inside a service `{"containerEnv": "KEY"}` means *that* service's container, an
-`auth` block points at a declared credential with `{"secret": "name"}` rather than respelling where it
-comes from, and `{"waitForUrl": {"route": "home"}}` resolves through the declared port instead of
-hardcoding a host that makes `portVar` a lie.
+- `run` composes small actions into big ones, and a service's action reaches its siblings by bare name.
+- `expect` is about the screen; `check` is about the values a run has gathered. Together they make a
+  cross-layer claim without a program.
+- `{secret.name}` reaches a declared credential — resolved when asked for, never stored, and redacted
+  out of recorded request bodies.
+- `{waitForUrl: {route}}` resolves through the declared port instead of hardcoding a host.
 
-`run` composes small actions into big ones without making either less usable alone. `expect` is about
-the screen and `check` is about the values, which is what makes a cross-layer claim expressible without
-a program. A credential reaches a step as `{secret.<name>}` — resolved when asked for, never typed on a
-command line and never kept as a stored value; recorded request bodies have their `password`, `token`
-and `authorization` fields redacted, because a debug story is a file people paste into pull requests.
+A third party's client and a stub server stay as code, attached with `use()`. The system is importable
+when a project needs it (`System.find()`, `app.run`, `app.api.call`); nothing here requires that.
 
-**The dividing line that keeps this honest: a route, a request, a query or a click is data; a program is
-a program.** A third party's client and a stub server stay as code, attached with `use()`. The system is
-importable when a project genuinely needs code (`System.find()`, `app.run`, `app.api.call`); nothing
-here requires it.
-
-### CLI
-
-The config above gives you all of this, with no entry point to write:
+## Run it
 
 ```bash
-npx witness config template            # every field this version understands, documented
-npx witness stack status               # what is up, on which ports, from which checkout
-npx witness api get /v1/health         # any route, authenticated the way the config says
-npx witness db sql "select 1"          # the stack's database
-npx witness order show 1234            # the verbs the config declares
-npx witness check drift app.signIn     # does the description still match what is running
-npx witness action list                # what the product can DO
+npx witness stack status                              # what is up, on which ports
+npx witness api get /v1/health                        # any route, authenticated as the config says
+npx witness db sql "select 1"                         # the stack's database
+npx witness order show 1234                           # the verbs the config declares
+npx witness action list                               # what the product can DO
 npx witness action run app.signIn email=ada@example.com
-npx witness action run checkout refund --parallel   # side by side, in one video
-npx witness action run flaky --retries=2            # a fresh browser each go
+npx witness action run checkout refund --parallel     # side by side, in one video
+npx witness action run flaky --retries=2              # a fresh browser each go
+npx witness check drift app.signIn                    # does the description still match what runs
 EVIDENCE=before npx witness action run app.checkout   # record a "before" cut
 ```
 
@@ -203,38 +167,27 @@ Every command reports the whole exchange — request, response, statement, timin
 usually an agent that cannot open a network tab. `--quiet` for the bare answer. Exit codes: `0` worked,
 `1` ran and failed, `2` no such thing.
 
-## Evidence
+## What a run leaves behind
 
-Everything about one run lands in one directory, named for what was run rather than by hand:
+One directory, named for what was run. **The directory tree is the call tree**: an action a step
+composed sits inside that step, named for it.
 
 ```
-.witness/artifacts/cli/<the actions you ran>/<cut>/
+.witness/artifacts/cli/<what you ran>/<cut>/
   README.md                       what is where, and the call tree
-  video.mp4                       the recording — one browser session, one video
-  frames/01-her-dashboard.png     the stills a `frame` step named, in order
+  video.mp4                       one browser session, one video
+  frames/01-her-dashboard.png     the stills a `frame` step named
   manual-verification.md          what the action's `verify` said, filled with what this run saw
-  refundAnOrder/                  ← a directory per action
-    01-slide.png … 12-check.png   a frame per step, numbered as they happened
-    debug.md                      what happened, with the network and console tied to each step
-    02-signIn/                    ← an action a step COMPOSED sits inside that step
+  refundAnOrder/
+    01-slide.png … 12-check.png   a frame per step
+    debug.md                      what happened, network and console tied to each step
+    02-signIn/                    ← the action step 2 ran
       01-goto.png … 05-expect.png
       debug.md
 ```
 
-**The directory tree is the call tree.** Playwright files its own artefacts in one flat, opaquely
-named directory and puts the structure in the trace viewer — right when a person is reading, useless
-when a program is. The cost of inverting that is that the layout has to explain itself, which is what
-the `README.md` and the numbered directory names are for: `02-signIn` is the action step 2 ran.
-
-`<cut>` is `before`, `after` or `run`, so the two halves of a before/after sit side by side instead of
-overwriting each other. `slide` steps are spliced into the video as full-frame cards, so it opens on
-what it means to show.
-
-`--parallel` drives every named action at once, each in its own browser, and stitches the recordings
-into **panels of one video** — two or three side by side, four or more in a grid. They cannot pass
-values to each other and each lane starts signed out, so anything needing a session must sign itself
-in. `--retries=N` gives a failing action more goes in a fresh browser and keeps the failed attempt's
-evidence in `<action>-retry-N/`, because the failure is the interesting one.
+`<cut>` is `before`, `after` or `run`, so two halves of a comparison sit side by side. `slide` steps are
+spliced in as full-frame cards; `--parallel` stitches lanes into panels of one frame.
 
 ### The debug story
 
@@ -242,7 +195,7 @@ evidence in `<action>-retry-N/`, because the failure is the interesting one.
 # customer.cancelOrder — failed at step 3 of 5 (8.4s)
 
 ## What it was doing
-1. ✓ `goto` /orders/1 — 412ms · actions/customer.cancelOrder/01-goto.png
+1. ✓ `goto` /orders/1 — 412ms · refundAnOrder/01-goto.png
 2. ✓ `click` role=button name=Cancel — 180ms · …
 3. ✗ `expect` text=Cancelled — 30.0s · …
 
@@ -254,27 +207,16 @@ evidence in `<action>-retry-N/`, because the failure is the interesting one.
 > `error` Cannot read properties of undefined (reading 'id') — app.js:12
 ```
 
-The point is the **correlation**: every request, log and exception is tagged with the step running when
-it happened. "A 500 came back" is not a diagnosis; "the 500 came back during `click Cancel`, and the
-console error a tick later says the reducer got undefined" is one — the join a person does by hand
-across three panes, which an agent reading a filesystem cannot do at all.
+Every request, log and exception is tagged with the step running when it happened. That join is what a
+person does by hand across three panes and an agent reading a filesystem cannot do at all. It is
+recorded through Playwright's own page events; the story names Playwright's trace rather than replacing
+it.
 
-This does not reimplement the tools: it is recorded through Playwright's own page events and written
-down beside the run. The story is what a *program* reads; Playwright's trace is what a *person* opens,
-and the story names it rather than replacing it.
+## Example: four services
 
-## A worked example: a whole stack
-
-Real and reproducible, and it is this repository — `docker-compose.yml` and `.witness/config.jsonc` at
-the root. Four services, because a typical stack is not one: **an app people use, the database it
-writes to, the mail it sends, and something watching all of it.**
-
-| service | what describing it needs |
-|---|---|
-| **gitea** — a git forge | a UI with routes and locators, *and* a REST API |
-| **postgres** — its database | named queries, and real rows to disagree with a screen |
-| **mailpit** — its mail catcher | a *second* UI and a *second* API on another service |
-| **grafana** — what watches it | somebody else's software, described the same way |
+This repository is the example — `docker-compose.yml` and `.witness/config.jsonc` at the root. Four
+services, because a typical stack is not one: an app people use, the database it writes to, the mail it
+sends, and something watching all of it.
 
 ```bash
 docker compose up -d
@@ -283,118 +225,64 @@ npx witness action run theApp theOutsider theMail theWatcher --parallel
 
 ![Four services driven at once, one pane each](docs/example/parallel.gif)
 
-*(the [MP4](docs/example/parallel.mp4) is what the run produced; the GIF is it, for GitHub)*
-
-Four browsers, four panes of one frame, and **each pane is a different service**. The card at the front
-is a `slide` step — spliced in full-frame once, rather than painted into all four. Each pane's header
-is its action's own `summary`, so nothing has to be guessed from position.
-
-Watch the top-left do things and the others react to them: the repository **appears** to a signed-out
-stranger, and the recovery mail **lands** in the catcher. Nothing coordinates those lanes — they are
-four independent browsers looking at the same stack.
+Four browsers, four panes, one video. The top-left registers an account, makes a repository and asks for
+a password reset; the others react — the repository appears to a signed-out stranger, the mail lands in
+the catcher. Nothing coordinates them.
 
 ```bash
-npx witness action run tour     # or the same ground sequentially, checked against every layer
+npx witness action run tour     # the same ground sequentially, checked against every layer
 ```
 
-One action produced that — 50 seconds, six smaller actions composed, narrated with slides, and every
-claim checked against the layer it is about:
+The sequential tour checks each screen against the layer underneath it:
 
 ```jsonc
-{ "slide": { "title": "2 · The database", "lines": ["The screen says there is an account.", "Postgres is the layer that can disagree."] } },
 { "query": { "name": "accounts", "as": "accounts" } },
-{ "check": { "that": "{accounts}", "contains": "1", "because": "the account the screen just made should be a row" } },
-
-{ "run": "gitea.createRepo" },
-{ "api": { "operation": "repo", "params": { "owner": "witness-admin", "repo": "witness-demo" }, "as": "repo" } },
-{ "check": { "that": "{repo.full_name}", "equals": "witness-admin/witness-demo", "because": "the screen and the API should agree that it exists" } },
-
-{ "run": "gitea.askForAReset" },
+{ "check": { "that": "{accounts}", "contains": "1", "because": "the account the screen made should be a row" } },
 { "api": { "client": "mailpit", "operation": "messages", "as": "mail" } },
 { "check": { "that": "{mail.messages_count}", "atLeast": 1, "because": "the app sends a message, and this is where it lands" } }
 ```
 
-`client` names which service answers, because more than one does. What it left behind:
+One run's output is in [`docs/example/`](docs/example): the [story](docs/example/debug.md), the
+[note](docs/example/manual-verification.md), and the [layout](docs/example/artifacts-README.md) it wrote
+to explain itself. The tour expects a fresh stack — `docker compose down -v && docker compose up -d`.
 
-```
-tour  (21 frames)
-  03-register  (9 frames)
-  11-createrepo  (6 frames)
-  18-askforareset  (4 frames)
-  19-openinbox  (3 frames)
-  24-signin  (7 frames)
-  25-opendatasources  (3 frames)
-```
+## Keeping a description true
 
-and the [note](docs/example/manual-verification.md), filled with what this run actually saw:
+A description is built by whoever is shipping, **one change at a time**: if your change touches a
+screen, the same change describes it.
 
-```md
-- Registered witness-admin through the web UI; Gitea made it an administrator.
-- Postgres held 1 account and 1 repository afterwards.
-- Gitea's own API agreed the repository exists: witness-admin/witness-demo.
-- The mail it sent was caught by Mailpit rather than delivered.
-- Nothing here was seeded by hand: every row was made through the product.
-```
-
-The whole description is [`.witness/config.jsonc`](.witness/config.jsonc); one run's output is in
-[`docs/example/`](docs/example) — the [story](docs/example/debug.md), the
-[note](docs/example/manual-verification.md), and the
-[layout](docs/example/artifacts-README.md) it wrote to explain itself.
-
-The tour expects a **fresh** stack: it registers the first account and counts the rows afterwards.
-`docker compose down -v && docker compose up -d` puts it back.
-
-## Where a description comes from
-
-Driving a product is the solved half. Describing one is a practice: a description is built by whoever is
-shipping, **one change at a time**. If your change touches a screen, the same change describes it. A
-description written that way is never out of date, because it was never written separately from the
-thing it describes.
-
-The judgment half is which flows matter and what to claim. The half that needs no judgment is what a
-screen actually renders — and that is not read out of the app's source:
+**A locator you have not run is a guess.** Of the nine actions first written against Grafana here, five
+named something that did not exist — a button styled as a link, a placeholder with different words, a
+test id with the item's name appended. None of it was visible in the source; all of it was in the frame
+from the step that failed.
 
 ```bash
-witness action run yours                   # it will fail on a locator; that is the point
-#   … open the frame the story names, fix it, run again …
+npx playwright codegen <url>        # locators, chosen the way this resolves them
+npx witness action run yours        # it will fail on one; open the frame the story names
+npx witness check drift app.signIn  # every claim the description makes, re-checked at once
 ```
 
-When a run that used to pass breaks, `witness check drift <the action that signs in>` re-checks every
-claim the description makes — each locator against the route the step using it is on — and names all of
-them at once. Measured on the example: a description written for Grafana 13.2, run against 10.4, breaks
-in three places. The run reports one, after 47 seconds. The check reports all three in 7, exits non-zero
-so a pipeline can gate on it, and says nothing at all when the description is right.
+`check drift` visits each declared route and counts each locator the step using it depends on. On the
+example's own description run against an older Grafana it reports three breakages in 7 seconds and exits
+non-zero; a single run reports one, in 47.
 
-Do not hand-write a locator you could be handed, either. **`npx playwright codegen <url>`** records what
-you do and prints a locator per step, chosen [the same way this tool resolves
-them](https://playwright.dev/docs/codegen) — *"prioritizing role, text and test id locators"*, improving
-the locator when more than one element matches. **Pick Locator** gives you one for anything you hover,
-and `--save-storage` / `--load-storage` lets you record the screen behind a login rather than the login.
-Witness does not reimplement any of that, and should not.
+Also worth keeping:
 
-**A locator you have not run is a guess.** In the Grafana example, five of nine actions named something
-that did not exist — `Skip` was a `button` styled as a link, a placeholder read "Search Grafana plugins"
-and not "Search all", a card's test id had the plugin's name appended, and a table's header is a `row`
-like any other. None of it was visible in Grafana's source. All of it was in the frame from the step
-that failed.
+- **Drive the real app.** A row written by hand is a row the app never agreed to.
+- **Assert at the right layer.** The screen for what rendered, the API for what it answered, the
+  database for what was stored.
+- **Read the running container, not the file it was built from.**
+- **Say why.** `because` on a claim becomes the failure message, which is the only sentence anyone reads.
 
-## The conventions worth keeping
+## When not to use this
 
-Not the tool's rules — what makes the output worth anything.
-
-- **Drive the real app.** A row written by hand is a row the app never agreed to, and a test built on
-  one passes for the wrong reason.
-- **Assert at the right layer.** The screen is evidence of what rendered, the API of what it answered,
-  the database of what was stored. Pick the one the claim is about.
-- **Read the running container, not the file it was built from.** They disagree the moment someone edits
-  without recreating, and the process serving requests is the one telling the truth.
-- **Narrate, and say why.** A recording nobody can follow is not evidence; `because` on a claim becomes
-  the failure message, which is the only sentence anyone reads when it breaks.
-- **Describe it in the change that makes it.** A locator added a week later is a week of runs that could
-  not see it — and by then the frame that would have told you what it is called is gone.
-- **Use the Playwright CLI for what it already does.** `codegen` for locators, `show-trace` to read a run
-  as a person, `--save-storage` for anything behind a login. This drives a product and writes down what
-  happened; it is not a second Playwright.
+- **You want a test suite.** `playwright test` gives you `--workers`, `--shard`, `--retries`,
+  `--project`, HTML reports and `merge-reports`. This drives a product and writes down what happened; it
+  is not a second Playwright. The system is importable, so a project can run actions inside
+  `playwright test` and have both.
+- **You want unit tests.** Nothing here is faster than a function call.
+- **Your product has no running instance.** Everything is driven against a real thing.
+- **You want locators generated.** `playwright codegen` already does that, better.
 
 ## API
 
@@ -403,30 +291,16 @@ same `.env` compose reads), `Docker`, `HttpApi`/`Operations`, `Postgres`/`Querie
 `Actions`, `SignIn`, `Evidence`, `Inspector`, `Story`, `Skill`, `StubServer` and `Cli`. Each stands
 alone — use `Stack` by itself to find a local service, or all of it to drive a flow and get a video.
 
-Everything that meets the outside world is a provider the config picks **by name**, so a second way of
-doing any of them is a registration rather than an edit. An unknown name fails with the list of what IS
-registered.
+Everything meeting the outside world is a provider the config picks **by name**, so a second way of
+doing any of them is a registration rather than an edit.
 
 | Kind | Registered today | Where |
 |---|---|---|
 | client | `rest`, `graphql` | `src/providers/clients.ts` |
 | auth | `apiKey`, `bearer`, `basic`, `cookie`, `login` | `src/providers/auth.ts` |
-| secret | `containerEnv`, `envFile`, `env`, `literal` | `src/providers/secrets.ts` |
+| secret | `containerEnv`, `secret`, `envFile`, `env`, `literal` | `src/providers/secrets.ts` |
 | video | `ffmpeg` | `src/providers/video.ts` |
 | stub | `http` | `src/providers/stubs.ts` |
-
-## The picture on this repository
-
-[`docs/banner.png`](docs/banner.png) is the image above and the repository's social preview. The four
-panes in it are frames `witness action run tour` actually produced — not a mock of the output.
-
-```bash
-node docs/banner/make.mjs      # redraws it from docs/banner/*.png
-```
-
-Committed as source because the preview set here before was uploaded and forgotten: it 404'd, so every
-shared link rendered a blank card, and there was nothing in the repository to regenerate it from.
-Uploading a new one is **Settings → Social preview** — GitHub has no API for it.
 
 ## Maintainers
 
@@ -434,7 +308,7 @@ Uploading a new one is **Settings → Social preview** — GitHub has no API for
 
 ## Contributing
 
-Issues and pull requests are welcome: [open an issue](https://github.com/burrows99/witness/issues) for a
+Issues and pull requests welcome: [open an issue](https://github.com/burrows99/witness/issues) for a
 question, a bug, or something that surprised you.
 
 ```bash
@@ -448,9 +322,9 @@ What the codebase asks of a change:
 - **A test beside the file it tests** (`src/thing.ts` → `src/thing.test.ts`), driving the real thing with
   the outside world handed in rather than mocking the module next door.
 - **Explicit `.ts` extensions on every import** — the same files load under Node, under a test runner and
-  from a package, and that is what makes it possible.
-- **A comment that says why, not what.** The reason a line exists is the thing a reader cannot recover.
-- No new runtime dependencies. Playwright is an optional peer, and there is nothing else.
+  from a package.
+- **A comment that says why, not what.**
+- No new runtime dependencies. Playwright is an optional peer.
 
 ## License
 
