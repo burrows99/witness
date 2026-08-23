@@ -70,7 +70,9 @@ export function normalise(config: SystemConfig): SystemConfig {
     for (const [actionName, action] of Object.entries(service.actions ?? {})) {
       // `grafana.signIn`, and it belongs to `grafana` — both of which the author had to type, and
       // either of which they could get wrong.
-      actions[qualify(name, actionName)] = { app: name, ...action };
+      // The service's recorder travels with its actions, so the runner does not have to look the
+      // service up again to find out how to film one.
+      actions[qualify(name, actionName)] = { app: name, records: service.records, shell: service.shell, ...action };
     }
     if (service.app) apps[name] = { service: name, ...service.app };
     for (const [secretName, secret] of Object.entries(service.secrets ?? {})) {

@@ -117,6 +117,7 @@ asked for something that does not exist.
   - `gitea.askForAReset` — the one thing a fresh install will actually send mail about
   - `gitea.explore` — what an anonymous visitor sees
   - `gitea.createRepo` — a repository, through the screen a person uses
+  - `shell.readTheDatabase` — the database, from a prompt, the way a person actually looks
   - `mailpit.openInbox` — what the stack has actually sent, on the screen a person reads it on
   - `grafana.signIn` — sign in, and get past the password prompt
   - `grafana.openDataSources` — what it can query — nothing yet, which is what a fresh install looks like
@@ -161,6 +162,10 @@ for how many things a `store` gathered.
 
 Things that cost other people an afternoon:
 
+- **A service with no screen is recorded by something else.** `"records": "terminal"` on a
+  service films its actions with VHS instead of a browser — `type`, `press`, `wait` and `expect`
+  become a tape, and the video comes out the same shape, so a shell sits beside a screen in one
+  `--parallel` frame. `"shell"` says what its commands run inside.
 - **Say a thing once.** Inside a service, `{ "containerEnv": "KEY" }` means THAT service's
   container — naming the service again is what being written there already says. An `auth` block
   points at a credential the `secrets` block declares with `{ "secret": "name" }` rather than

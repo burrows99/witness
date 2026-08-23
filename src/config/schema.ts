@@ -83,6 +83,16 @@ export type SystemConfig = {
  * nothing checked. Here it is written once, by being where it is.
  */
 export type ServiceConfig = ServiceSpec & {
+  /**
+   * How this service is recorded — `browser` by default, `terminal` for the half with no screen.
+   *
+   * A migration, a queue worker, a `psql` somebody actually types: recording those with a browser is
+   * not a limitation to work around, it is the wrong tool. A terminal recording comes out as a video
+   * of the same shape, so it stitches into the same grid beside a browser pane.
+   */
+  records?: "browser" | "terminal";
+  /** For a `terminal` service: what every command runs inside — `docker exec -it witness-postgres bash`. */
+  shell?: string;
   /** What this service can be asked. The first service to declare one is what `witness api` talks to. */
   api?: Omit<ApiConfig, "service"> & { service?: string };
   /** What a person sees of it: routes, the locators worth naming, forms, and how someone signs in. */
