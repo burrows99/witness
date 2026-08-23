@@ -29,6 +29,22 @@ takes the bare name whenever exactly one service declares it.
 `because` becomes the failure message. It is the only sentence anyone reads when it breaks, so write
 it for that moment.
 
+## Start where the app starts
+
+Some apps have nothing to click until something has been attached. A landing screen that is a
+dropzone plus a prompt box links nowhere, and every other route takes an id that only exists once a
+file has been uploaded:
+
+```jsonc
+{ "upload": "seed.pdf", "to": { "testId": "dropzone" } },
+{ "type": { "on": { "placeholder": "Ask about this document" }, "value": "{prompt}" } },
+{ "click": { "role": "button", "name": "Submit" } }
+```
+
+The file lives in `.witness/fixtures/seed.pdf` — a filename, not a path, so the description finds
+the same file in the next checkout. `to` names the dropzone a person can see; the hidden
+`<input type="file">` inside it is what actually gets the file. An array attaches several.
+
 ## Claim it at the layer it is about
 
 `expect` sees the screen. `check` sees the values the run has gathered:
@@ -87,6 +103,9 @@ Every value is a template filled from what the run gathered, written whether the
   `localhost:3020` disconnects `portVar`. Somewhere that is not this app at all — the identity
   provider a sign-in hands the browser to — is `{ "waitForUrl": { "service": "keycloak" } }`, the
   same idea one service along. See [reference/steps.md](../reference/steps.md#a-sign-in-that-leaves-the-app).
+- **A fixture belongs in `.witness/fixtures/`, not in your Downloads.** An `upload` step takes a
+  filename and resolves it there. An absolute path works on exactly one machine, which is the one
+  failure this convention exists to rule out.
 - **Prefer waiting for a thing over waiting for time.** `wait: 600` after typing into a search box
   stored 226 unfiltered rows here on a slow run, and the assertion under it was loose enough to pass.
 

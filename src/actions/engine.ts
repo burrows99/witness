@@ -1,4 +1,7 @@
 
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 import type { Page } from "@playwright/test";
 
 import { requirePlaywright } from "../browser/playwright.ts";
@@ -41,6 +44,8 @@ export class Actions {
   private readonly secret: (name: string, scope?: string) => string;
   /** Where a service in this stack answers — the origin a step can be sent to and expect to arrive on. */
   private readonly origin: (service: string) => string;
+  /** Where the files an `upload` step names live — `.witness/fixtures/`, asked when a step names one. */
+  private readonly fixtures: () => string;
   /** What a failure looks like in a body, as the description's clients declare it — for the story. */
   private readonly failureWhen: FailureWhen[];
 
@@ -58,6 +63,14 @@ export class Actions {
     secret?: (name: string, scope?: string) => string;
     /** Optional: without it, a step naming a service to land on says there is no stack to look one up in. */
     origin?: (service: string) => string;
+    /**
+     * Optional: the directory an `upload` step's filenames are relative to.
+     *
+     * A function rather than a string for the same reason `secret` is one: a system assembled without a
+     * `.witness/` directory has nowhere to look, and it should say so at the step that asked rather
+     * than resolve a fixture against whatever the working directory happened to be.
+     */
+    fixtures?: () => string;
     /**
      * What a failure looks like in a response body, one per client that declares one.
      *
@@ -82,6 +95,9 @@ export class Actions {
     });
     this.origin = opts.origin ?? (service => {
       throw new Error(`a step waits for service "${service}", and this system was built without a stack to find one in`);
+    });
+    this.fixtures = opts.fixtures ?? (() => {
+      throw new Error("an `upload` step names a file, and this system was built without a `.witness/` directory to find one in");
     });
     this.failureWhen = opts.failureWhen ?? [];
   }
@@ -289,6 +305,44 @@ export class Actions {
         await target.pressSequentially(String(value), { delay: 20 });
       }
     }
+    // Attach a file. For a whole class of app this is the first step of the only journey rather than a
+    // convenience on the edge of the vocabulary: an app whose landing screen is a dropzone has nothing
+    // to link to until something has been dropped on it, so an action could reach that screen, type the
+    // prompt and then stop — with the submit button greyed out in the frame beside it, the app behaving
+    // correctly and the harness out of words.
+    if (step.upload) {
+      // `to` is not optional the way `within` is: guessing at the one file input on the page is how a
+      // step ends up attaching something to a control nobody named, and a page with two of them would
+      // fail as a strict-mode violation from inside Playwright rather than as a sentence from here.
+      if (!step.to) {
+        throw new Error(`upload: name what to attach it to — \`"to"\` takes a locator, the same way \`click\` does`);
+      }
+      const to = step.to;
+      const files = (Array.isArray(step.upload) ? step.upload : [step.upload]).map(name => this.fixture(text(name)));
+      const named = at(to);
+      // The normal shape of a styled dropzone is a `<div>` with the real `<input type="file">` hidden
+      // inside it, and the half a person has a name for is the visible one — nobody calls it "the file
+      // input", and no role or label reaches a control that is `display: none`. So `to` may name either
+      // and this finds the input from whichever was named: the one inside what was named, or what was
+      // named itself. The third shape needs nothing — Playwright's own `setInputFiles` retargets a
+      // `<label>` to the control it is for.
+      const inside = named.locator("input[type=file]");
+      const target = (await inside.count()) ? inside : named;
+      if (!(await target.count())) {
+        throw new Error(`upload: nothing on the page matches \`to\` — ${describe(to)}`);
+      }
+      await target.setInputFiles(files).catch((err: unknown) => {
+        // Which of the two it could not find, because the two want opposite fixes. A `to` that matches
+        // nothing is a misspelt name; a `to` that matches a box the input is not inside is the right
+        // name on the wrong element, and Playwright's answer to the second is a sentence about an
+        // HTMLInputElement, which reads as the tool being broken rather than the locator being one off.
+        throw new Error(
+          `upload: ${describe(to)} is on the page, and neither it nor anything inside it is an \`<input type="file">\` — ` +
+            "`to` takes the dropzone the input hides behind, or the input itself — " +
+            `${err instanceof Error ? err.message.split("\n")[0] : String(err)}`,
+        );
+      });
+    }
     // Wait for a response and keep something out of its body — the id an app never puts on screen.
     if (step.capture) {
       const match = text(step.capture.url);
@@ -484,9 +538,6 @@ export class Actions {
     return url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  /** Keys that modify a step rather than being what it does. Everything else names the verb. */
-  private static readonly MODIFIERS = ["as", "note", "within", "fullPage"];
-
   /**
    * What the step IS — `goto`, `click`, `store`.
    *
@@ -494,7 +545,7 @@ export class Actions {
    * "step": anonymous in the one section of the story a person reads first.
    */
   private static verb(step: StepConfig): string {
-    return Object.keys(step).find(key => !Actions.MODIFIERS.includes(key)) ?? "step";
+    return Object.keys(step).find(key => !MODIFIERS.includes(key)) ?? "step";
   }
 
   /**
@@ -509,6 +560,12 @@ export class Actions {
     if (step.goto) return step.goto.url ?? step.goto.route ?? step.goto.app;
     if (step.run) return typeof step.run === "string" ? step.run : step.run.action;
     if (step.check) return step.check.because ?? step.check.that;
+    // The exception to the rule above, because a filename is not a value somebody typed — it is what
+    // the step IS, and "upload" on its own says nothing about which of three fixtures went where.
+    if (step.upload) {
+      const files = (Array.isArray(step.upload) ? step.upload : [step.upload]).join(", ");
+      return step.to ? `${files} → ${describe(step.to)}` : files;
+    }
     if (step.frame) return step.frame;
     if (step.api) return step.api.operation;
     if (step.query) return step.query.name;
@@ -530,6 +587,25 @@ export class Actions {
   /** The locator a step is about, for the trace line. */
   private static target(step: StepConfig): LocatorSpec | undefined {
     return step.click ?? step.fill?.on ?? step.type?.on ?? step.expect?.on ?? step.store?.from;
+  }
+
+  /**
+   * Where a file an `upload` step named actually is.
+   *
+   * `.witness/fixtures/`, beside the description that names it, so `"seed.pdf"` means the same file in
+   * every checkout — which `/Users/somebody/Downloads/seed.pdf` does not. A fixture is part of what the
+   * description says the product does, in the same way a route or an operation is, so it belongs in the
+   * one directory this tool already owns rather than wherever the person who wrote the step had it. An
+   * absolute path is still taken as written, by the rule every other path here follows, and it is the
+   * one form that cannot survive being cloned.
+   *
+   * The message names the path it looked at. A fixture that is not there is the commonest thing to get
+   * wrong about this verb and Playwright's own answer is an ENOENT with no idea what asked for it.
+   */
+  private fixture(name: string): string {
+    const found = path.isAbsolute(name) ? name : path.join(this.fixtures(), name);
+    if (!fs.existsSync(found)) throw new Error(`upload: no file "${name}" — looked for it at ${found}`);
+    return found;
   }
 
   private pick(answer: unknown, path?: string): string {
@@ -654,6 +730,15 @@ export class Actions {
 }
 
 /**
+ * Keys that modify a step rather than being what it does. Everything else names the verb.
+ *
+ * Module-level and exported because `check drift` labels a step by the same rule and kept its own copy
+ * of this list — two constructions of one fact, of which the second is the one nobody runs. `to`
+ * arrived with `upload` and would have been added to exactly one of them.
+ */
+export const MODIFIERS = ["as", "note", "within", "fullPage", "to"];
+
+/**
  * The declared name a typed one means, or the error saying why nothing does.
  *
  * One name, written three ways. As declared, which is what `action list` prints. From inside a
@@ -740,6 +825,21 @@ export type StepConfig = {
   fillFields?: unknown;
   /** Scope for `fillFields` — usually the dialog the form is in. */
   within?: LocatorSpec;
+  /**
+   * Attach a file, by its name under `.witness/fixtures/`. An array attaches several.
+   *
+   * A filename rather than a path, so the description works in the next checkout as well as this one.
+   * Everything an app does after a dropzone is behind it, so this is the first step of the journey
+   * rather than a step in the middle of one.
+   */
+  upload?: string | string[];
+  /**
+   * For `upload`: what to attach it to — the dropzone, named the way a person would name it.
+   *
+   * Either half works. A styled dropzone hides its `<input type="file">` inside itself, where no role
+   * or label can reach it; name the dropzone and the input inside it is found, or name the input.
+   */
+  to?: LocatorSpec;
   /** Wait for a response and store something from its body. */
   capture?: { url: string; method?: string; as: string; pick?: string; timeout?: number };
   /** Pick one item out of a stored list by matching fields. */

@@ -129,6 +129,10 @@ export class System {
       // Where a step that leaves the app expects to land. Off the stack rather than out of the step,
       // so an identity provider's port is declared in the one place every other port is.
       origin: (service: string) => this.origin(service),
+      // Where a file an `upload` step names lives. Under `.witness/` for the same reason the stubs and
+      // the specs are: a description naming `seed.pdf` says the same thing in every checkout, and one
+      // naming `/Users/somebody/Downloads/seed.pdf` works exactly once, on the machine that wrote it.
+      fixtures: () => this.workspace.resolve(Workspace.FIXTURES),
       // What a failure looks like in a body, from every client that says — its own declaration, or the
       // one its wire format makes on its behalf. The debug story judged a request by its status code
       // alone until this reached it, so an app answering 200 with the failure in the payload — most

@@ -1,4 +1,7 @@
 import { deepEqual, equal, match, ok, rejects } from "node:assert/strict";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import * as path from "node:path";
 import { test } from "node:test";
 
 import type { Evidence } from "../evidence/evidence.ts";
@@ -21,7 +24,19 @@ const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 type Done = string[];
 
 /** A page that says what it was asked to do, and hands back whatever it was told to. */
-const fakePage = (opts: { text?: string; all?: string[]; response?: unknown; gotoFails?: string; at?: string } = {}): { page: never; did: Done } => {
+const fakePage = (
+  opts: {
+    text?: string;
+    all?: string[];
+    response?: unknown;
+    gotoFails?: string;
+    at?: string;
+    /** A locator whose description contains this matches nothing — `">>"` is "nothing is inside anything". */
+    absent?: string;
+    /** What Playwright says when `setInputFiles` is pointed at something that is not a file input. */
+    uploadFails?: string;
+  } = {},
+): { page: never; did: Done } => {
   const did: Done = [];
   const locator = (what: string) => ({
     click: async () => void did.push(`click ${what}`),
@@ -29,10 +44,17 @@ const fakePage = (opts: { text?: string; all?: string[]; response?: unknown; got
     pressSequentially: async (value: string) => void did.push(`type ${what} ${JSON.stringify(value)}`),
     textContent: async () => opts.text ?? "  on screen  ",
     allTextContents: async () => opts.all ?? [opts.text ?? "  on screen  "],
-    count: async () => 1,
+    count: async () => (opts.absent && what.includes(opts.absent) ? 0 : 1),
     filter: () => locator(what),
     nth: (n: number) => locator(`${what}#${n}`),
     or: () => locator(what),
+    /** Chained the way Playwright chains: this thing, and then something inside it. */
+    locator: (selector: string) => locator(`${what} >> css=${selector}`),
+    setInputFiles: async (files: string[]) => {
+      if (opts.uploadFails) throw new Error(opts.uploadFails);
+      // The basename, because the rest of the path is a temporary directory this test made up.
+      did.push(`upload ${what} ${files.map(file => path.basename(file)).join(",")}`);
+    },
   });
   const page = {
     goto: async (url: string) => {
@@ -65,10 +87,13 @@ const engine = (
     api?: (name: string, params: unknown, body: unknown) => unknown;
     sql?: (name: string, params: unknown) => string;
     origin?: (service: string) => string;
+    /** Where an `upload` step's filenames resolve against — a `.witness/fixtures`, in a test a temp dir. */
+    fixtures?: () => string;
   } = {},
 ) =>
   new Actions({
     ...(opts.origin ? { origin: opts.origin } : {}),
+    ...(opts.fixtures ? { fixtures: opts.fixtures } : {}),
     operations: { call: async (name: string, params: unknown, body: unknown) => opts.api?.(name, params, body) ?? {} } as unknown as Operations,
     queries: { query: (name: string, params: unknown) => opts.sql?.(name, params) ?? "row" } as unknown as Queries,
     trace: new Trace(),
@@ -798,5 +823,97 @@ test("a system with no other services says so rather than failing obscurely", wh
   await rejects(
     () => engine({ a: { steps: [{ api: { client: "mailpit", operation: "messages" } }] } }).run("a", fakePage().page),
     /api step names client "mailpit", and this system was built without any/,
+  );
+});
+
+/** A `.witness/fixtures` with real files in it — the engine looks for one before Playwright does. */
+const seeded = (...names: string[]): string => {
+  const dir = mkdtempSync(path.join(tmpdir(), "witness-fixtures-"));
+  for (const name of names) writeFileSync(path.join(dir, name), `${name}\n`);
+  return dir;
+};
+
+test("a step can attach a file, so an app behind a dropzone can be driven past it", when, async () => {
+  // Not a convenience on the edge of the vocabulary: for a whole class of app this is the first step
+  // of the only journey. Nothing links anywhere until something has been uploaded, so an action could
+  // reach the landing screen, type the prompt and then stop — with the submit button greyed out in the
+  // frame beside it, the app behaving correctly and the harness out of words.
+  const { page, did } = fakePage();
+  const result = await engine({ a: { steps: [{ upload: "seed.pdf", to: { testId: "dropzone" } }] } }, { fixtures: () => seeded("seed.pdf") }).run("a", page);
+  ok(result.ok, result.error);
+  // The input INSIDE what was named. A styled dropzone hides one, and it is the half nobody has a
+  // name for — the name a person has is for the box they can see.
+  deepEqual(did, ["upload testId=dropzone >> css=input[type=file] seed.pdf"]);
+  // What the trace and the story say it did: the file, not just the verb. Three fixtures and one
+  // dropzone is an ordinary action, and "upload" three times over says nothing about which went where.
+  deepEqual(result.steps.map(s => `${s.step}: ${s.detail}`), ["upload: seed.pdf → testId=dropzone"]);
+});
+
+test("a dropzone that takes one file usually takes several", when, async () => {
+  const { page, did } = fakePage();
+  const result = await engine(
+    { a: { inputs: ["second"], steps: [{ upload: ["one.pdf", "{second}"], to: "#drop" }] } },
+    { fixtures: () => seeded("one.pdf", "two.pdf") },
+  ).run("a", page, { second: "two.pdf" });
+  ok(result.ok, result.error);
+  // …and a filename is a template like everything else, so which fixture a run uses can be an input.
+  deepEqual(did, ["upload css=#drop >> css=input[type=file] one.pdf,two.pdf"]);
+});
+
+test("`to` can name the file input itself", when, async () => {
+  // The other half of the bridge: `to` may name either, and an app rendering a plain visible input has
+  // nothing to look inside. `absent: ">>"` is a page where nothing is inside anything.
+  const { page, did } = fakePage({ absent: ">>" });
+  await engine({ a: { steps: [{ upload: "seed.pdf", to: "input[type=file]" }] } }, { fixtures: () => seeded("seed.pdf") }).run("a", page);
+  deepEqual(did, ["upload css=input[type=file] seed.pdf"]);
+});
+
+test("a fixture that is not there names the path it looked at", when, async () => {
+  // Playwright's own answer is an ENOENT with no idea what asked for it, and a fixture in the wrong
+  // place is the commonest thing to get wrong about this verb.
+  const dir = seeded();
+  await rejects(
+    () => engine({ a: { steps: [{ upload: "seed.pdf", to: "#drop" }] } }, { fixtures: () => dir }).run("a", fakePage().page),
+    (err: Error) => {
+      match(err.message, /upload: no file "seed\.pdf"/);
+      ok(err.message.includes(path.join(dir, "seed.pdf")), `it must say where it looked; got ${err.message}`);
+      return true;
+    },
+  );
+});
+
+test("a `to` that matches nothing is a different failure from a `to` on the wrong element", when, async () => {
+  // The two want opposite fixes — a misspelt name against the right name one element off — so the
+  // message has to say which happened rather than "the upload failed".
+  const dir = seeded("seed.pdf");
+  await rejects(
+    () => engine({ a: { steps: [{ upload: "seed.pdf", to: { testId: "nope" } }] } }, { fixtures: () => dir }).run("a", fakePage({ absent: "testId=nope" }).page),
+    /upload: nothing on the page matches `to` — testId=nope/,
+  );
+  await rejects(
+    () =>
+      engine({ a: { steps: [{ upload: "seed.pdf", to: { testId: "prompt" } }] } }, { fixtures: () => dir }).run(
+        "a",
+        // On the page, and not a file input and none inside it — which Playwright answers with a
+        // sentence about an HTMLInputElement, reading as the tool being broken rather than the locator.
+        fakePage({ absent: ">>", uploadFails: "Node is not an HTMLInputElement" }).page,
+      ),
+    /upload: testId=prompt is on the page, and neither it nor anything inside it is an `<input type="file">`/,
+  );
+});
+
+test("an upload that names nothing to attach to says so", when, async () => {
+  // Before the file is even looked for: guessing at the one file input on the page is how a step ends
+  // up attaching something to a control nobody named.
+  await rejects(
+    () => engine({ a: { steps: [{ upload: "seed.pdf" }] } }, { fixtures: () => "/nowhere-this-is-never-read" }).run("a", fakePage().page),
+    /upload: name what to attach it to — `"to"` takes a locator, the same way `click` does/,
+  );
+});
+
+test("a system with nowhere to keep fixtures says so rather than guessing at the working directory", when, async () => {
+  await rejects(
+    () => engine({ a: { steps: [{ upload: "seed.pdf", to: "#drop" }] } }).run("a", fakePage().page),
+    /an `upload` step names a file, and this system was built without a `\.witness\/` directory to find one in/,
   );
 });

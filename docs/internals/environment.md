@@ -35,3 +35,7 @@ and the CLI is the one interface that is always present and always agrees with w
 `.witness/`, for the reason `.github/`, `.claude/` and `.vscode/` exist: one well-known name means
 nothing has to be configured before anything works. The directory also names its own checkout — the
 parent — which is why a config kept there needs no `root` markers.
+
+`FIXTURES` — `fixtures/` — is where the files an `upload` step attaches live, for the same reason
+the stubs and the specs are there: `{ "upload": "seed.pdf" }` names one file in every checkout, and
+`/Users/somebody/Downloads/seed.pdf` names one on one machine.
