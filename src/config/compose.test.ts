@@ -44,10 +44,61 @@ const translate = (services: Record<string, unknown> = STACK, project = "witness
 test("a port mapping keeps the variable that sets it", () => {
   // `--no-interpolate` exists for this line. With the value substituted the variable name is gone,
   // and `portVar` is the whole reason a second checkout can run its own ports without a wrapper.
-  deepEqual(Compose.published(["${GITEA_PORT:-3020}:3000"]), { variable: "GITEA_PORT", port: 3020 });
-  deepEqual(Compose.published(["8025:8025"]), { port: 8025 });
-  deepEqual(Compose.published(["127.0.0.1:5432:5432"]), { port: 5432 });
-  equal(Compose.published(undefined), undefined);
+  deepEqual(Compose.published(["${GITEA_PORT:-3020}:3000"]), [{ variable: "GITEA_PORT", port: 3020, target: 3000 }]);
+  deepEqual(Compose.published(["8025:8025"]), [{ port: 8025, target: 8025 }]);
+  deepEqual(Compose.published(["127.0.0.1:5432:5432"]), [{ port: 5432, target: 5432 }]);
+  deepEqual(Compose.published(undefined), []);
+});
+
+test("every published port comes back, not just the first", () => {
+  // This read `ports[0]` and stopped. A container publishing a UI on one port and its API on the
+  // other — the ordinary dev-mode image — came back described as the UI, and the API was gone.
+  deepEqual(Compose.published(["3000:3000", "5001:5001"]), [
+    { port: 3000, target: 3000 },
+    { port: 5001, target: 5001 },
+  ]);
+  // Each mapping keeps its own variable: `portVar` has to work per port or the second checkout moves
+  // half a container.
+  deepEqual(Compose.published(["${UI_PORT:-3000}:3000", "${API_PORT:-5001}:5001"]), [
+    { variable: "UI_PORT", port: 3000, target: 3000 },
+    { variable: "API_PORT", port: 5001, target: 5001 },
+  ]);
+  // The long form, which is where compose puts a port somebody named.
+  deepEqual(Compose.published([{ published: "5001", target: 5001, name: "api" }]), [{ port: 5001, target: 5001, name: "api" }]);
+});
+
+test("a container publishing two ports is described twice, on one container", () => {
+  // The half that was invisible. `witness api get` and every `check` in an action are for the API,
+  // and it was not in the file at all — while `init` exited 0 saying it had read the service.
+  const services = translate({ demo: { image: "nginx:latest", container_name: "demo", ports: ["3000:3000", "5001:5001"] } }, "demo");
+  deepEqual(services.demo, { port: 3000, container: "demo" });
+  // The SAME container, deliberately: a service holds one port, so this is the only shape there is.
+  deepEqual(services["demo-5001"], { port: 5001, container: "demo" });
+  // Named by the port number, because nothing in the file said what the port was for. A role guessed
+  // off the image would be the kind of wrong a generated file cannot be argued with about.
+  deepEqual(Object.keys(services), ["demo", "demo-5001"]);
+});
+
+test("a port compose named is named that, and its variable still moves it", () => {
+  const services = translate(
+    { app: { image: "acme/app", container_name: "acme", ports: ["3000:3000", { published: "${API_PORT:-5001}", target: 5001, name: "api" }] } },
+    "acme",
+  );
+  deepEqual(services["app-api"], { port: 5001, portVar: "API_PORT", container: "acme" });
+});
+
+test("a name compose already uses is not overwritten by a derived one", () => {
+  // `app-api` is a real service in this file. Taking the name would describe one of them twice and
+  // the other not at all, so the derived entry falls back to the port number.
+  const services = translate(
+    {
+      app: { image: "acme/app", container_name: "acme-app", ports: ["3000:3000", { published: "5001", target: 5001, name: "api" }] },
+      "app-api": { image: "acme/api", container_name: "acme-api", ports: ["5002:5002"] },
+    },
+    "acme",
+  );
+  equal(services["app-api"].container, "acme-api");
+  deepEqual(services["app-5001"], { port: 5001, container: "acme-app" });
 });
 
 test("a service built here is ours; one pulled by tag says nothing either way", () => {
@@ -74,6 +125,21 @@ test("a published port is not an HTTP port", () => {
   equal(services.redis.probe, "container");
   ok(Compose.speaksHttp("grafana/grafana:13.2.0"));
   ok(!Compose.speaksHttp("bitnami/postgresql:16"));
+});
+
+test("the second port of an image the first port made look like an app", () => {
+  // Reading every mapping is what makes this reachable: one image over two protocols, where the image
+  // can only speak for the service as a whole. Writing the debugger down as a second HTTP service
+  // would report a container that is running perfectly as DOWN forever.
+  const services = translate({ app: { image: "acme/app", container_name: "acme", ports: ["3000:3000", "9229:9229"] } }, "acme");
+  equal(services.app.probe, undefined);
+  equal(services["app-9229"].probe, "container");
+  // The container side, because the published side is whatever the host had free — this repository's
+  // own stack publishes redis on 6380, and 6380 says nothing.
+  ok(!Compose.speaksHttp("acme/app", 5432));
+  ok(Compose.speaksHttp("acme/app", 6380));
+  // An engine's own HTTP surface still answers a probe: 15672 is rabbitmq's management UI.
+  ok(Compose.speaksHttp("acme/app", 15672));
 });
 
 test("where compose runs a service becomes where the description looks for it", () => {
@@ -170,6 +236,19 @@ test("the generated config says what it left out and where to get it", () => {
   match(rendered, /the actions\s+yours to write/);
   // Shaped like the file it is replacing, so it can be edited rather than transcribed.
   ok(rendered.includes('"name": "acme"') && rendered.includes('"services"'));
+});
+
+test("two services on one container say so, and one service does not", () => {
+  // Written to a file somebody commits, where two entries naming one container reads like a
+  // copy-paste — and the reader who deletes the one that looks duplicated deletes the API.
+  const two = { demo: { image: "nginx:latest", container_name: "demo", ports: ["3000:3000", "5001:5001"] } };
+  const rendered = Compose.render("acme", Compose.translate(two, "demo"));
+  match(rendered, /name the SAME container/);
+  // Every container it happened to, not one example: a reader looking at the entry that is not named
+  // has no way to tell the paragraph is about theirs too.
+  match(rendered, /^\/\/ {3}demo: demo, demo-5001$/m);
+  // Said only when it fired: a stack where every service has its own container needs no paragraph.
+  equal(/name the SAME container/.test(Compose.render("acme", Compose.translate(STACK, "witness"))), false);
 });
 
 test("the runner that actually ships asks docker for an UNinterpolated config", () => {

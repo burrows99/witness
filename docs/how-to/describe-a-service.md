@@ -92,6 +92,11 @@ A service carries everything true about it. The top level carries only what is s
 - **A second service with a `database`** is the same idea: the first is what bare `witness db sql`
   runs against, and any of them is reachable as `--on=<service>`. An app database plus an authz one
   is ordinary — it is not a shape to describe your way around.
+- **Two services naming one `container`** is how a container publishing two ports is described,
+  because a service holds one port. `init` writes them — `demo` on 3000 and `demo-5001` on 5001, or
+  `demo-api` where the compose file named the port — and it is not the copy-paste it looks like:
+  delete the one that looks duplicated and you have deleted the API. The `container` is what ties
+  them together, not the name, so rename either freely.
 - **A service with no screen** takes `"records": "terminal"` — see
   [record-a-terminal.md](record-a-terminal.md).
 

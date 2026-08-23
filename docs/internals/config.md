@@ -56,11 +56,21 @@ variable name, which is what `portVar` exists to keep, is gone. It is right for 
 `container_name`, where the same flag leaves `acme-api${WT:-}` — a container that has never existed —
 so a trailing `${VAR}` is stripped back into `suffixVar`, which is the knob already expressing it.
 
-Four things the file says that a transcription misses, and each one made a running service read as
+Five things the file says that a transcription misses. Four of them made a running service read as
 DOWN: compose NAMES a container nobody named (`<project>-<service>-1`, off the project in the same
 document); a published port is not an HTTP port, so a database or a broker needs the container probe
 however many ports it publishes; `mysql` and `mariadb` are databases; and `build:` is evidence of
 in-house while its absence is evidence of nothing, so `kind` is omitted rather than guessed.
+
+The fifth made one **disappear**. A service holds one port, so reading `ports[0]` described a dev-mode
+container's UI and left its API out of the file entirely — while `init` exited 0 saying it had read
+the service. Every mapping is now an entry, and the ones after the first carry the same `container`:
+`demo` on 3000 and `demo-5001` on 5001 are one container described twice, which is the only shape
+there is, so the generated header says so wherever it happened. The extra entry is named by what
+compose calls the port where the file says (`name: api`) and by the port number where it does not —
+a role guessed off the image is the kind of wrong a generated file cannot be argued with about. And
+with more than one mapping the image no longer decides the probe alone: the CONTAINER side of the
+mapping does, because the published side is whatever the host had free.
 
 ## explore: the other generator
 
