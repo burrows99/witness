@@ -153,8 +153,12 @@ export async function pane(page: Page, title: string, sub?: string): Promise<voi
       el.id = "__witness_pane__";
       el.style.cssText =
         "position:fixed;top:0;left:0;right:0;z-index:2147483645;background:#312e81;color:#eef2ff;" +
-        "font-family:-apple-system,system-ui,sans-serif;padding:6px 12px;pointer-events:none;" +
+        "font-family:-apple-system,system-ui,sans-serif;padding:5px 12px;pointer-events:none;" +
         "box-shadow:0 1px 0 rgba(255,255,255,.15)";
+      // Pushed down rather than covered: the band was sitting over the app's own header, which is
+      // often the part that says which app it is.
+      document.documentElement.style.setProperty("scroll-padding-top", "34px");
+      document.body.style.setProperty("padding-top", "34px", "important");
       el.innerHTML =
         `<div style="font-size:13px;font-weight:650;line-height:1.25">${title}</div>` +
         (sub ? `<div style="font-size:11px;opacity:.75;line-height:1.3">${sub}</div>` : "");

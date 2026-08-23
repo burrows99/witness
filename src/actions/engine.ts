@@ -328,7 +328,15 @@ export class Actions {
     }
     if (step.wait) await page.waitForTimeout(step.wait);
     if (step.caption) await drawCaption(page, text(step.caption.text), step.caption.sub ? text(step.caption.sub) : undefined);
-    if (step.slide) await drawSlide(page, text(step.slide.title), (step.slide.lines ?? []).map(text));
+    if (step.slide) {
+      // `kicker` and `tone` were declared, documented, and silently dropped here — a config could ask
+      // for them and get a plain card with no complaint.
+      await drawSlide(page, text(step.slide.title), (step.slide.lines ?? []).map(text), {
+        kicker: step.slide.kicker ? text(step.slide.kicker) : undefined,
+        tone: step.slide.tone,
+        ms: step.slide.ms,
+      });
+    }
     if (step.api) {
       const params = { ...values, ...this.resolveParams(step.api.params, values) };
       const body = step.api.body ? (this.resolve(step.api.body, values) as Record<string, unknown>) : undefined;
@@ -722,8 +730,13 @@ export type StepConfig = {
   wait?: number;
   /** Draw a caption into the page, so the recording says what is about to happen. */
   caption?: { text: string; sub?: string };
-  /** A full-frame card spliced into the video: what this section of the recording is about. */
-  slide?: { title: string; lines?: string[] };
+  /**
+   * A full-frame card spliced into the video: what this section of the recording is about.
+   *
+   * `kicker` is the small line above the title — a cut, a step number, whose view this is. `tone`
+   * colours it: `bad` for the state a change is fixing, `good` for the one it produces.
+   */
+  slide?: { title: string; lines?: string[]; kicker?: string; tone?: "neutral" | "bad" | "good"; ms?: number };
   /**
    * Call one of the config's declared operations, mid-flow, and keep what it answered.
    *

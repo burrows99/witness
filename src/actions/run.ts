@@ -159,10 +159,12 @@ export async function runActions(system: RunnableSystem, request: RunRequest, de
     failure = err instanceof Error ? err : new Error(String(err));
     const attached = (failure as { result?: ActionResult }).result;
     if (attached) results.push(attached);
-    // One full-frame card per slide, spliced into the timeline — rather than the same title painted
-    // into every pane, which reads as four things happening at once.
-    await writeSlideCards({ browser, outputDir, panes: parallel ? names.length : 1 }).catch(() => undefined);
   } finally {
+    // One full-frame card per slide, spliced into the timeline — rather than the same title painted
+    // into every pane, which reads as several things happening at once. In the `finally`, because a
+    // run that FAILED is the one whose narration somebody most wants to follow — and it had been
+    // sitting in the `catch`, which is the only place it could never help.
+    await writeSlideCards({ browser, outputDir, panes: parallel ? names.length : 1 }).catch(() => undefined);
     if (!keep) await browser.close();
     system.pinEvidence(undefined);
   }

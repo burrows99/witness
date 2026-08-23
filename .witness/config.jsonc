@@ -83,6 +83,14 @@
           ]
         },
 
+        "explore": {
+          "summary": "what an anonymous visitor sees",
+          "steps": [
+            { "goto": { "route": "explore" } },
+            { "wait": 700 }
+          ]
+        },
+
         "createRepo": {
           "summary": "a repository, through the screen a person uses",
           "steps": [
@@ -195,17 +203,40 @@
     "theApp": {
       "summary": "the app a person uses",
       "steps": [
-        { "slide": { "title": "The app", "kicker": "pane 1", "lines": ["A git forge. Somebody registers, and makes something."] } },
+        {
+          "slide": {
+            "title": "Four services, at once",
+            "kicker": "one description · one video",
+            "lines": [
+              "top left — the app: somebody registers and makes a repository",
+              "top right — what a stranger sees of it, signed out",
+              "bottom left — the mail it sends, caught before it leaves",
+              "bottom right — what is watching all of it"
+            ]
+          }
+        },
         { "run": "gitea.register" },
         { "run": "gitea.createRepo" },
+        { "run": "gitea.askForAReset" },
         { "frame": "the repository, on screen" }
+      ]
+    },
+
+    "theOutsider": {
+      "summary": "the same app, from outside, signed in as nobody",
+      "steps": [
+        { "run": "gitea.explore" },
+        { "wait": 5500, "note": "looking again is the point: the pane shows the repository ARRIVING, not a still of it" },
+        { "run": "gitea.explore" },
+        { "wait": 5500 },
+        { "run": "gitea.explore" },
+        { "frame": "what a stranger sees" }
       ]
     },
 
     "theWatcher": {
       "summary": "what is watching it",
       "steps": [
-        { "slide": { "title": "What watches it", "kicker": "pane 2", "lines": ["Somebody else's software, described the same way as our own."] } },
         { "run": "grafana.signIn" },
         { "run": "grafana.openDataSources" },
         { "frame": "nothing connected yet" }
@@ -215,10 +246,13 @@
     "theMail": {
       "summary": "where its mail actually goes",
       "steps": [
-        { "slide": { "title": "Where the mail goes", "kicker": "pane 3", "lines": ["Caught before it leaves the machine."] } },
         { "run": "mailpit.openInbox" },
-        { "wait": 2500, "note": "held so the pane is watchable while the others are still working" },
-        { "frame": "the inbox" }
+        { "wait": 5500, "note": "empty at first, on purpose: nothing has been sent yet" },
+        { "reload": true },
+        { "wait": 5500 },
+        { "reload": true },
+        { "wait": 800 },
+        { "frame": "the inbox, once the app had sent something" }
       ]
     },
     "tour": {

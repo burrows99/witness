@@ -542,6 +542,11 @@ export class System {
                 // Side by side in one video, each in its own browser. What `--parallel` is FOR is
                 // seeing two things happen at once, which is why it changes the recording.
                 parallel: flags.includes("--parallel"),
+                // What each pane says about itself. The summary is already written; a pane headed
+                // with a bare action name makes the reader guess what they are looking at.
+                labels: Object.fromEntries(
+                  Object.entries(this.config.actions ?? {}).flatMap(([action, spec]) => (spec.summary ? [[action, spec.summary]] : [])),
+                ),
                 retries: Number(flags.find(flag => flag.startsWith("--retries"))?.split("=")[1] ?? 0),
                 cookies: identityCookies(this.config.identities),
               });
