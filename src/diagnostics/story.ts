@@ -123,12 +123,25 @@ export class Story {
       for (const error of threwDuring.slice(0, 3)) lines.push(...Story.errorDetail(error));
     }
 
+    lines.push(...this.warnings());
     lines.push(...this.network());
     lines.push(...this.console());
     lines.push(...this.pageErrors());
     lines.push(...Story.harness(trace));
     lines.push(...this.where(artefacts));
     return lines.join("\n");
+  }
+
+  /**
+   * What the run got away with.
+   *
+   * A run can be `ok` and still have something worth reading — a note whose template named something
+   * nothing stored, an assertion that matched off-screen. Silence about those is how a green run ships
+   * a `manual-verification.md` with three of its four lines missing.
+   */
+  private warnings(): string[] {
+    const of = this.input.warnings ?? [];
+    return of.length ? [`## What it got away with (${of.length})`, "", ...of.map(warning => `- ${warning}`), ""] : [];
   }
 
   /** The network, as a table, with the interesting ones spelled out underneath. */
@@ -319,6 +332,8 @@ export type StoryInput = {
   ms: number;
   steps: StoryStep[];
   recording: Recording;
+  /** What it got away with: true but worth saying, so a green run is not silent about it. */
+  warnings?: string[];
   /** What the system itself sent and ran, as opposed to what the browser did. */
   trace?: TraceEntry[];
   artefacts?: Artefacts;

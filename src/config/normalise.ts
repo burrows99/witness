@@ -18,6 +18,30 @@ import type { ServiceConfig, SystemConfig } from "./schema.ts";
  * A description written the old way still loads. It is the same model either way, and telling somebody
  * their config is now invalid because a tool got tidier is not a trade worth making.
  */
+/**
+ * The template, still full of the placeholders it was generated with.
+ *
+ * `witness init` writes a config documenting every field, with `"…"` where a value goes. Loading it
+ * unedited failed on `no client provider "…"` — an error about a registry, naming neither the field
+ * nor the file, as the very first thing a new project sees. The first command in a new directory
+ * should say what to do.
+ */
+export function unfilled(config: SystemConfig): string[] {
+  const found: string[] = [];
+  const walk = (value: unknown, at: string): void => {
+    if (value === PLACEHOLDER) found.push(at || "(the whole file)");
+    else if (Array.isArray(value)) value.forEach((item, i) => walk(item, `${at}[${i}]`));
+    else if (value && typeof value === "object") {
+      for (const [key, inner] of Object.entries(value)) walk(inner, at ? `${at}.${key}` : key);
+    }
+  };
+  walk(config, "");
+  return found;
+}
+
+/** What the generated template writes where a value goes. */
+export const PLACEHOLDER = "…";
+
 export function normalise(config: SystemConfig): SystemConfig {
   const services = config.services ?? {};
   const owned = Object.entries(services).filter(([, service]) => hasOwnDescription(service));

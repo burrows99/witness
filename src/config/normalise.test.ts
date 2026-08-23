@@ -1,7 +1,7 @@
 import { deepEqual, equal, ok, throws } from "node:assert/strict";
 import { test } from "node:test";
 
-import { normalise, qualify, scoped } from "./normalise.ts";
+import { normalise, qualify, scoped, unfilled } from "./normalise.ts";
 import type { SystemConfig } from "./schema.ts";
 
 /** A password is a secret source, so a fixture can name where one would come from. */
@@ -83,4 +83,18 @@ test("qualify and scoped are the two halves of the same rule", () => {
   // Already qualified, or unscoped: there is only one thing it can mean.
   deepEqual(scoped("billing.password", "grafana"), ["billing.password"]);
   deepEqual(scoped("password", undefined), ["password"]);
+});
+
+test("the generated template says it is still the template", () => {
+  // Loading `witness init`'s file unedited failed on `no client provider "…"` — an error about a
+  // registry, naming neither the field nor the file, as the very first thing a new project sees.
+  deepEqual(
+    unfilled({ name: "…", services: { web: { port: 3000, container: "…" } } } as unknown as SystemConfig),
+    ["name", "services.web.container"],
+  );
+  deepEqual(unfilled({ name: "acme", services: { web: { port: 3000 } } } as unknown as SystemConfig), []);
+});
+
+test("a placeholder inside a list is found too", () => {
+  deepEqual(unfilled({ name: "a", services: {}, root: ["…"] } as unknown as SystemConfig), ["root[0]"]);
 });

@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 
 import { requirePlaywright } from "../browser/playwright.ts";
 
-import { fill } from "../config/index.ts";
+import { fill, reach } from "../config/index.ts";
 import type { Evidence } from "../evidence/evidence.ts";
 import { describe, type LocatorSpec, locate } from "../browser/locator.ts";
 import { caption as drawCaption, slide as drawSlide } from "../browser/narration.ts";
@@ -39,6 +39,8 @@ export class Actions {
   private readonly secret: (name: string, scope?: string) => string;
   /** Something the last step got away with that a reader should know about. */
   private warning?: string;
+  /** Whatever else this run got away with — collected per run, and returned with it. */
+  private notices: string[] = [];
 
   constructor(opts: {
     operations: Operations;
@@ -181,8 +183,13 @@ export class Actions {
       : action.returns
         ? (fill(action.returns, values) as unknown as T)
         : (values as unknown as T);
+    // Before the result is built, so what it got away with is IN the result — and before the story,
+    // so the story carries it too.
+    this.note(name, action, values);
     const result: ActionResult<T> = {
       action: name,
+      // Emptied per run: what an earlier action got away with is not this one's news.
+      warnings: this.notices.splice(0),
       ok: !error,
       ms: Date.now() - started,
       inputs,
@@ -202,7 +209,6 @@ export class Actions {
     // Written whether it passed or failed, because the run that passed is the one somebody compares
     // against when the next one does not.
     result.debug = this.tell(result);
-    this.note(action, values);
     if (error) throw Object.assign(new Error(`action "${name}" failed at step ${steps.length}: ${error}`), { result });
     return result;
   }
@@ -491,6 +497,7 @@ export class Actions {
         ok: result.ok,
         ms: result.ms,
         steps: result.steps,
+        warnings: result.warnings,
         recording: result.recording,
         trace: result.trace,
         artefacts: evidence.artefacts(),
@@ -511,27 +518,40 @@ export class Actions {
    * writing code, in a tool whose whole claim is that there is no file to write. So it is a field:
    * the same note, from the description, filled with what the run gathered.
    */
-  private note(action: ActionConfig, values: Params): void {
+  private note(name: string, action: ActionConfig, values: Params): void {
     if (!action.verify) return;
     const { title, subject = {}, signIn = [], notes = [] } = action.verify;
-    // Best-effort, and after the story: a note is a courtesy, and a template in it that names
-    // something no step stored must not turn a run that worked into a failure.
-    const text = (value: string): string | undefined => {
+    /**
+     * A note is a courtesy: a template naming something no step stored must not turn a run that
+     * worked into a failure. But it must not be SILENT either — dropping the line left three of four
+     * notes missing from a green run, in the one file whose whole job is being trustworthy to
+     * somebody who did not watch it. So the line stays, the gap is marked in it, and the run says so.
+     */
+    const text = (value: string): string => {
       try {
-        return fill(value, values);
-      } catch {
-        return undefined;
+        // The same bag a step is filled from, scoped the same way: a note saying WHICH account the
+        // run was about is the commonest one there is, and that account's name is usually a secret.
+        return fill(value, this.bag(values, name));
+      } catch (err) {
+        this.notices.push(`verify: ${err instanceof Error ? err.message : String(err)}`);
+        return value.replace(/\{([\w.]+)\}/g, (whole, key: string) => (reach(values, key) === undefined ? `«${key} — nothing stored that»` : whole));
       }
     };
+    // Resolved first, and then available to the notes: `subject` names who the run was about, and a
+    // note saying so is the commonest thing anybody writes. Stored values still win — a step that
+    // read something off the screen is the more specific answer.
+    const who = Object.fromEntries(Object.entries(subject).map(([key, value]) => [key, text(value)]));
+    values = { ...who, ...values };
+
     try {
       this.evidence().manualVerification({
-        title: text(title) ?? title,
-        subject: Object.fromEntries(Object.entries(subject).map(([key, value]) => [key, text(value)])),
-        signIn: signIn.map(text).filter((line): line is string => line !== undefined),
-        notes: notes.map(text).filter((line): line is string => line !== undefined),
+        title: text(title),
+        subject: who,
+        signIn: signIn.map(text),
+        notes: notes.map(text),
       });
-    } catch {
-      // Nowhere to write it, or nothing to write it about.
+    } catch (err) {
+      this.notices.push(`verify: the note could not be written — ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -694,6 +714,8 @@ export type ActionResult<T = unknown> = {
   inputs: Params;
   /** The action's declared return, or every stored value if it declares none. */
   value: T;
+  /** What it got away with. A run can be `ok` and still have something worth reading. */
+  warnings: string[];
   values: Params;
   steps: StepResult[];
   screenshots: string[];

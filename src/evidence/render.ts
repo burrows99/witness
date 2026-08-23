@@ -22,6 +22,8 @@ export function renderVideos(where: Workspace | string): string[] {
   }
   // Recordings and videos live where everything else this run produced lives.
   const written = provider.render(spec, workspace.dir);
-  for (const file of written) process.stdout.write(`wrote ${file.replace(`${workspace.dir}/`, "")}\n`);
+  // On stderr, not stdout: stdout carries the answer, and a progress line printed before the JSON
+  // means the tool's own output cannot be piped into anything that parses it.
+  for (const file of written) process.stderr.write(`wrote ${file.replace(`${workspace.dir}/`, "")}\n`);
   return written;
 }

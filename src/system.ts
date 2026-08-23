@@ -537,16 +537,19 @@ export class System {
     return cli;
   }
 
-  /** `<tool> api get /v1/whatever` — any route, with the config's service-key auth attached. */
+  /**
+   * `<tool> api get /v1/whatever` — any route, authenticated the way a declared operation would be.
+   *
+   * This hand-rolled its own headers, looking for a `header`/`value`/`fromContainerEnv` scheme — the
+   * shape auth had before it became providers. A `basic` or `bearer` scheme has none of those fields,
+   * so it matched nothing and the request went out with NO Authorization at all, while the help text
+   * said "authenticated". On a public route that reads as proof the credential works; the first route
+   * that needs one comes back 401 and looks like the app's fault.
+   *
+   * The client already knows how to do this. There is no second way of doing it now.
+   */
   private callByPath(method: string, path: string, body?: unknown): Promise<unknown> {
-    const scheme = Object.values(this.config.api?.auth ?? {}).find(a => a.fromContainerEnv || a.value);
-    const headers: Record<string, string> = {};
-    if (scheme?.header) {
-      headers[scheme.header] = scheme.fromContainerEnv
-        ? this.stack.env(scheme.fromContainerEnv.service, scheme.fromContainerEnv.key)
-        : (scheme.value ?? "");
-    }
-    return this.http!.request(path, { method, body, headers });
+    return this.api.request(path, { method, body });
   }
 }
 
