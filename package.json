@@ -53,9 +53,13 @@
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build --if-present",
     "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"src/**/*.test.ts\" \"bin/**/*.test.ts\"",
-    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json",
     "witness": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON bin/cli.ts",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "lint": "eslint .",
+    "deadcode": "knip",
+    "package": "npm pack --dry-run --silent >/dev/null && publint --strict",
+    "check": "npm run typecheck && npm run lint && npm run deadcode && npm test"
   },
   "peerDependencies": {
     "@playwright/test": ">=1.40"
@@ -66,9 +70,14 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.50.0",
     "@types/node": "^22.10.0",
-    "typescript": "^5.7.0"
+    "eslint": "^10.9.0",
+    "knip": "^6.32.2",
+    "publint": "^0.3.24",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.67.0"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com",

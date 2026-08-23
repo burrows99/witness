@@ -40,7 +40,7 @@ export function unfilled(config: SystemConfig): string[] {
 }
 
 /** What the generated template writes where a value goes. */
-export const PLACEHOLDER = "…";
+const PLACEHOLDER = "…";
 
 export function normalise(config: SystemConfig): SystemConfig {
   const services = config.services ?? {};
@@ -48,7 +48,7 @@ export function normalise(config: SystemConfig): SystemConfig {
   // word appears once, in the one place that explains it, rather than as a key beside a value.
   const renamed = <T extends Record<string, unknown> | undefined>(database: T): T => {
     const older = database?.[OLDER_NAME];
-    return database && older !== undefined && database.credential === undefined ? ({ ...database, credential: older } as T) : database;
+    return database && older !== undefined && database.credential === undefined ? ({ ...database, credential: older }) : database;
   };
   if (config.database) config = { ...config, database: renamed(config.database) };
   for (const service of Object.values(services)) {
@@ -120,8 +120,8 @@ function inThisService<T>(within: T, service: string): T {
   if (!within || typeof within !== "object") return within;
   const from = within as Record<string, unknown>;
   if (typeof from.containerEnv === "string") return { ...from, containerEnv: { service, key: from.containerEnv } } as T;
-  if (from.containerEnv && typeof from.containerEnv === "object" && !("service" in (from.containerEnv as object))) {
-    return { ...from, containerEnv: { service, ...(from.containerEnv as object) } } as T;
+  if (from.containerEnv && typeof from.containerEnv === "object" && !("service" in (from.containerEnv))) {
+    return { ...from, containerEnv: { service, ...(from.containerEnv) } } as T;
   }
   // Anywhere inside the service, not just under `secrets`: a database's credential and an `auth`
   // block's are the same kind of thing, and a rule that only held in one place is a rule nobody can

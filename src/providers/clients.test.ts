@@ -24,7 +24,7 @@ const context = (config: Partial<ClientConfig> = {}) => ({
   http: new HttpApi("http://api"),
   stack: { env: () => "" } as unknown as Stack,
   trace: new Trace(),
-  config: { service: "api", operations: {}, ...config } as ClientConfig,
+  config: { service: "api", operations: {}, ...config },
 });
 
 const rest = clientProviders.get("rest");

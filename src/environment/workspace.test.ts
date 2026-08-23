@@ -1,4 +1,4 @@
-import { deepEqual, equal, match, ok, throws } from "node:assert/strict";
+import { deepEqual, equal, ok, throws } from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { afterEach, test } from "node:test";
 import { tmpdir } from "node:os";

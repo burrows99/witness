@@ -228,7 +228,7 @@ export class Evidence {
   /** The call tree, read back off the directories it produced. */
   private tree(at: string, indent: string): string[] {
     let out: string[] = [];
-    let entries: string[] = [];
+    let entries: string[];
     try {
       entries = fs
         .readdirSync(at, { withFileTypes: true })

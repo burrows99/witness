@@ -79,8 +79,25 @@ export function fill(template: string, params: Record<string, unknown> = {}): st
   return template.replace(/\{([\w.]+)\}/g, (_, key: string) => {
     const value = reach(params, key);
     if (value === undefined) throw new Error(`missing {${key}} for "${template}"`);
-    return String(value);
+    // Objects and arrays as JSON, not as `[object Object]`. A step that stores what an API answered
+    // stores an object, and a note or a caption interpolating it got the useless form — silently, in
+    // the files whose whole job is being readable afterwards.
+    return asText(value);
   });
+}
+
+/**
+ * Whatever it is, as text — and never as `[object Object]`.
+ *
+ * Each branch is a type that has a sensible string form, so nothing has to be cast into pretending.
+ */
+export function asText(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
+  if (typeof value === "symbol") return value.description ?? "";
+  if (typeof value === "function") return value.name;
+  return JSON.stringify(value);
 }
 
 /**

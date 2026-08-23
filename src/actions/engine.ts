@@ -1,5 +1,3 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 import type { Page } from "@playwright/test";
 
@@ -145,7 +143,7 @@ export class Actions {
     const screenshots: string[] = [];
     const network: NetworkRecord[] = [];
     const logs: { type: string; text: string }[] = [];
-    let recording: Recording = { requests: [], console: [], errors: [], dropped: 0 };
+    let recording: Recording;
 
     // The network tab, the console tab and the exceptions — recorded through Playwright's own page
     // events, and tagged with the step that was running when each one happened.

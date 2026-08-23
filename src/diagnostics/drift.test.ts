@@ -1,4 +1,4 @@
-import { deepEqual, equal, ok } from "node:assert/strict";
+import { equal, ok } from "node:assert/strict";
 import { test } from "node:test";
 
 import type { Page } from "@playwright/test";
@@ -7,7 +7,7 @@ const havePlaywright = await import("@playwright/test").then(
   () => true,
   () => false,
 );
-const { Drift } = havePlaywright ? await import("./drift.ts") : ({ Drift: null } as never);
+const { Drift } = havePlaywright ? await import("./drift.ts") : ({} as typeof import("./drift.ts"));
 const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 
 /** A page that answers with whatever each URL was said to hold. */
@@ -137,7 +137,7 @@ test("a route that sends us somewhere else is unchecked, not broken", when, asyn
   // asked for would come back as gone, and every one of those would be a lie.
   const holds: Record<string, Record<string, number>> = { "http://app/home": {} };
   const report = await Drift.check({
-    actions: { a: { app: "a", steps: [{ goto: { route: "home" } }, { expect: { on: { text: "Hello" } } }] } } as never,
+    actions: { a: { app: "a", steps: [{ goto: { route: "home" } }, { expect: { on: { text: "Hello" } } }] } },
     routeOf: (app, route) => (app ? `http://app/${route}` : undefined),
     page: async () => {
       const page = fakePage(holds) as unknown as { goto: (u: string) => Promise<unknown>; url: () => string };

@@ -54,7 +54,7 @@ export class Template {
    * Found rather than listed: a registry is recognisable at runtime, so a sixth kind of provider needs
    * no edit here to appear in the template.
    */
-  static providers(from: Record<string, unknown> = providers as unknown as Record<string, unknown>): Map<string, string[]> {
+  static providers(from: Record<string, unknown> = providers): Map<string, string[]> {
     const found = new Map<string, string[]>();
     for (const value of Object.values(from)) {
       if (value instanceof Registry) found.set(value.kind, value.names);
@@ -171,7 +171,7 @@ export class Template {
     }
     const best = [...options].sort((a, b) => this.weight(b) - this.weight(a))[0];
     const rendered = this.value(best, at);
-    const others = options.filter(o => o !== best).map(o => Template.name(o));
+    const others = options.filter(o => o !== best).map(o => Template.typeName(o));
     return { lines: rendered.lines, note: others.length ? `or: ${others.join(" | ")}` : rendered.note };
   }
 
@@ -192,7 +192,7 @@ export class Template {
     return 0;
   }
 
-  private static name(model: TypeModel): string {
+  private static typeName(model: TypeModel): string {
     switch (model.kind) {
       case "primitive":
         return model.name;
@@ -201,13 +201,13 @@ export class Template {
       case "ref":
         return model.name;
       case "record":
-        return `{ "<name>": ${Template.name(model.of)} }`;
+        return `{ "<name>": ${Template.typeName(model.of)} }`;
       case "array":
-        return `${Template.name(model.of)}[]`;
+        return `${Template.typeName(model.of)}[]`;
       case "object":
         return `{ ${model.fields.map(f => f.name).join(", ")} }`;
       case "union":
-        return model.of.map(Template.name).join(" | ");
+        return model.of.map(part => Template.typeName(part)).join(" | ");
       case "opaque":
         return model.text;
     }

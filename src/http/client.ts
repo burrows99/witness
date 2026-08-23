@@ -74,7 +74,9 @@ export class HttpApi {
       if (/json/i.test(res.headers.get("content-type") ?? "")) {
         throw new Error(
           `${init.method ?? "GET"} ${path} → ${res.status} said it was JSON and was not: ` +
-            `${String(err).slice(0, 120)} — body began ${text.slice(0, 120)}`,
+            `${String(err)} — body began ${text.slice(0, 120)}`,
+          // The parse failure itself, kept: the message says what happened, the cause says where.
+          { cause: err },
         );
       }
       return text as T;

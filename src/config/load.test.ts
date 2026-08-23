@@ -65,3 +65,13 @@ test("a dotted name that leads nowhere is the same error as a missing one", () =
   throws(() => fill("{stats.dashboards}", { stats: { users: 1 } }), /missing \{stats\.dashboards\}/);
   throws(() => fill("{nope.deep}", {}), /missing \{nope\.deep\}/);
 });
+
+test("an object is filled in as JSON, not as [object Object]", () => {
+  // A step that keeps what an API answered keeps an object. Interpolated into a caption, a note or a
+  // URL it produced the useless form — silently, in the files written to be read afterwards.
+  equal(fill("it said {answer}", { answer: { status: "ok" } }), 'it said {"status":"ok"}');
+  equal(fill("rows: {rows}", { rows: [1, 2] }), "rows: [1,2]");
+  // Everything else is unchanged.
+  equal(fill("{n} of {total}", { n: 8, total: 226 }), "8 of 226");
+  equal(fill("{flag}", { flag: false }), "false");
+});

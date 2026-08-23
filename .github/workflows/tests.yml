@@ -6,20 +6,33 @@ on:
   pull_request:
 
 jobs:
-  unit:
+  check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      # There is no package.json on purpose — this is a source directory a product drops beside its own
-      # code, and it takes its Playwright from that product. The suite skips the browser half when it is
-      # absent, so it is installed here to make sure nothing is skipped in CI.
-      - run: npm init -y && npm install --no-save @playwright/test@^1
+      # Playwright is an optional peer: the suite skips its browser half when it is absent, and CI is
+      # the one place nothing should be skipped.
+      - run: npm ci
+      - run: npm install --no-save @playwright/test@^1
+
+      # The types, including the TESTS — `tsconfig.build.json` excludes them because they do not ship,
+      # and for a long time that meant nothing checked them at all.
+      - run: npm run typecheck
+
+      # What the type checker cannot say: a promise nobody awaited, an export nothing reaches.
+      - run: npm run lint
+      - run: npm run deadcode
 
       - run: node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON "src/**/*.test.ts" "bin/**/*.test.ts"
 
       - name: the template must still describe the schema
         run: bin/witness config template > /dev/null
+
+      # What consumers get: the exports map, the files list, the types beside them.
+      - run: npm run build
+      - run: npx publint --strict

@@ -11,7 +11,7 @@ const havePlaywright = await import("@playwright/test").then(
   () => true,
   () => false,
 );
-const { System } = havePlaywright ? await import("./system.ts") : ({ System: null } as never);
+const { System } = havePlaywright ? await import("./system.ts") : ({} as typeof import("./system.ts"));
 const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 
 const originalCwd = process.cwd();
@@ -136,7 +136,7 @@ test("a database credential is a source, not a string the config has to hold", (
     name: "t",
     services: { postgres: { port: 5432, container: "c" } },
     database: { service: "postgres", user: "u", database: "d", credential: { env: "WITNESS_TEST_DB_CREDENTIAL_SOURCE" } },
-  } as never);
+  });
   // Nothing is set in the environment and nothing needs to be: what this asserts is that the config
   // can NAME a source instead of holding a value, which is the whole point of the change.
   ok(system.db, "the database is built without the password being written down");

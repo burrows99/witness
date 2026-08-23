@@ -1,0 +1,11 @@
+{
+  "//": "Everything, including the tests. `tsconfig.build.json` is what SHIPS and excludes them; nothing was checking them, so a test file could reference a function that no longer exists and only fail when it ran.",
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src/**/*.ts", "bin/**/*.ts", "docs/**/*.mjs", "eslint.config.mjs"],
+  "exclude": ["dist", "node_modules"]
+}

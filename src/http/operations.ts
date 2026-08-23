@@ -71,7 +71,11 @@ export class Operations {
     if (op.undo) {
       let cursor: unknown = answer;
       for (const key of (op.undo.idPath ?? "id").split(".")) cursor = (cursor as Record<string, unknown> | undefined)?.[key];
-      if (cursor) this.created.push({ operation: op.undo.operation, param: op.undo.param, id: String(cursor) });
+      // Only if it is something an id can BE. A path that lands on an object would otherwise be
+      // remembered as the literal "[object Object]" and undone against nothing.
+      if (typeof cursor === "string" || typeof cursor === "number") {
+        this.created.push({ operation: op.undo.operation, param: op.undo.param, id: String(cursor) });
+      }
     }
     return answer;
   }

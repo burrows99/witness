@@ -102,13 +102,13 @@ test("the operation a request came from is recorded with it", async () => {
 test("a 200 that is not JSON comes back as what it said", async () => {
   // A readiness probe answering `pong` is a working endpoint, and `Unexpected token 'p'` is a worse
   // answer than `pong`.
-  globalThis.fetch = (async () => new Response("pong", { status: 200, headers: { "content-type": "text/plain" } })) as typeof fetch;
+  globalThis.fetch = (async () => new Response("pong", { status: 200, headers: { "content-type": "text/plain" } }));
   equal(await new HttpApi("http://api").get("/ping"), "pong");
 });
 
 test("something that CLAIMS to be JSON and is not says so, with the request and the body", async () => {
   globalThis.fetch = (async () =>
-    new Response("<!doctype html><title>login</title>", { status: 200, headers: { "content-type": "application/json" } })) as typeof fetch;
+    new Response("<!doctype html><title>login</title>", { status: 200, headers: { "content-type": "application/json" } }));
   await rejects(
     () => new HttpApi("http://api").get("/v1/orders"),
     /GET \/v1\/orders → 200 said it was JSON and was not: .*body began <!doctype html>/,
@@ -118,6 +118,6 @@ test("something that CLAIMS to be JSON and is not says so, with the request and 
 test("html from a redirect to a login page is returned, not thrown", async () => {
   // The everyday case behind "why is this failing": an unauthenticated request served a login page.
   globalThis.fetch = (async () =>
-    new Response("<html>sign in</html>", { status: 200, headers: { "content-type": "text/html" } })) as typeof fetch;
+    new Response("<html>sign in</html>", { status: 200, headers: { "content-type": "text/html" } }));
   match(String(await new HttpApi("http://api").get("/v1/me")), /sign in/);
 });

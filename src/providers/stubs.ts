@@ -4,6 +4,7 @@ import * as path from "node:path";
 
 import { fill } from "../config/index.ts";
 import type { Trace } from "../diagnostics/trace.ts";
+import { asText } from "../config/load.ts";
 import { Registry } from "./registry.ts";
 
 /**
@@ -145,7 +146,7 @@ const template = (value: unknown, values: Record<string, unknown>): unknown => {
     }
     return value.replace(/\{([\w.]+)\}/g, (_, path: string) => {
       const found = path.split(".").reduce<unknown>((cursor, key) => (cursor as never)?.[key], values);
-      return found === undefined ? `{${path}}` : String(found);
+      return found === undefined ? `{${path}}` : asText(found);
     });
   }
   if (Array.isArray(value)) return value.map(v => template(v, values));
@@ -159,7 +160,10 @@ export const stubProviders = new Registry<StubProvider>("stub").register("http",
   const state: Record<string, unknown> = structuredClone(config.state ?? {});
   const url = `http://localhost:${config.port}`;
   let seq = 0;
-  let stub: StubServer;
+  // Assigned once, below, after the server it needs exists — and read by the handler above that
+  // point, which is why it cannot be a `const`.
+  // eslint-disable-next-line prefer-const
+  let stub!: StubServer;
 
   const server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const requestPath = new URL(req.url ?? "/", url).pathname;

@@ -65,8 +65,8 @@ test("a provider field offers what is actually registered", () => {
   const providers = new Map([["client", ["rest", "graphql"]], ["video", ["ffmpeg"]]]);
   const out = render("export type Root = { client?: ClientConfig };\nexport type ClientConfig = { provider?: string };", { providers });
   match(out, /"provider": "…",?\s+\/\/ one of: rest, graphql/);
-  match(out, /\/\/   client\s+rest, graphql/);
-  match(out, /\/\/   video\s+ffmpeg/);
+  match(out, /\/\/ {3}client\s+rest, graphql/);
+  match(out, /\/\/ {3}video\s+ffmpeg/);
 });
 
 test("nesting past the limit stops rather than running away", () => {

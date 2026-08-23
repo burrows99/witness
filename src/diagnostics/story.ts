@@ -280,15 +280,15 @@ export class Story {
     return Story.TRAFFIC.includes(request.resourceType);
   }
 
-  private static isFailure(request: RequestRecord): boolean {
+  private static isFailure(this: void, request: RequestRecord): boolean {
     return !!request.failure || (request.status ?? 0) >= 400;
   }
 
-  private static isNoisy(message: ConsoleRecord): boolean {
+  private static isNoisy(this: void, message: ConsoleRecord): boolean {
     return message.type === "error" || message.type === "warning";
   }
 
-  private static detail(request: RequestRecord): string[] {
+  private static detail(this: void, request: RequestRecord): string[] {
     const lines = [
       `**${request.method} ${Story.shorten(request.url)}** → ${request.failure ?? request.status} ` +
         `(${Story.duration(request.ms ?? 0)}) during \`${request.step}\``,
@@ -301,7 +301,7 @@ export class Story {
     return lines;
   }
 
-  private static errorDetail(error: PageErrorRecord): string[] {
+  private static errorDetail(this: void, error: PageErrorRecord): string[] {
     return [`**${error.message}** during \`${error.step}\``, "", "```", Story.shorten(error.stack ?? "", 1200), "```", ""];
   }
 

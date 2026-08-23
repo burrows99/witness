@@ -15,7 +15,7 @@ const havePlaywright = await import("@playwright/test").then(
   () => true,
   () => false,
 );
-const { Actions } = havePlaywright ? await import("./engine.ts") : ({ Actions: null } as never);
+const { Actions } = havePlaywright ? await import("./engine.ts") : ({} as typeof import("./engine.ts"));
 const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 
 type Done = string[];
@@ -459,7 +459,7 @@ test("an action can leave the note a person re-walks it by", when, async () => {
           notes: ["they picked {slot}"],
         },
       },
-    } as never,
+    },
     url: () => "http://app/",
     evidence: () =>
       ({
@@ -490,7 +490,7 @@ test("an action with no verify writes no note", when, async () => {
     operations: { call: async () => ({}) } as unknown as Operations,
     queries: { query: () => "row" } as unknown as Queries,
     trace: new Trace(),
-    actions: { a: { steps: [{ press: "Enter" }] } } as never,
+    actions: { a: { steps: [{ press: "Enter" }] } },
     url: () => "http://app/",
     evidence: () => ({ actionFrame: async () => "f.png", manualVerification: () => ((wrote = true), "x") }) as unknown as Evidence,
   });
@@ -504,7 +504,7 @@ test("a step can use a declared secret without the caller typing one", when, asy
     operations: { call: async () => ({}) } as unknown as Operations,
     queries: { query: () => "row" } as unknown as Queries,
     trace: new Trace(),
-    actions: { signIn: { steps: [{ type: { on: { placeholder: "password" }, value: "{secret.adminPassword}" } }] } } as never,
+    actions: { signIn: { steps: [{ type: { on: { placeholder: "password" }, value: "{secret.adminPassword}" } }] } },
     url: () => "http://app/",
     evidence: () => ({ actionFrame: async () => "f.png" }) as unknown as Evidence,
     secret: (name: string) => (name === "adminPassword" ? "hunter2" : ""),
@@ -524,7 +524,7 @@ test("a secret is only read when a step actually asks for one", when, async () =
     operations: { call: async () => ({}) } as unknown as Operations,
     queries: { query: () => "row" } as unknown as Queries,
     trace: new Trace(),
-    actions: { a: { steps: [{ press: "Enter" }] } } as never,
+    actions: { a: { steps: [{ press: "Enter" }] } },
     url: () => "http://app/",
     evidence: () => ({ actionFrame: async () => "f.png" }) as unknown as Evidence,
     secret: (name: string) => (asked.push(name), "x"),
@@ -553,7 +553,7 @@ test("a note whose template names nothing stored is a warning, not a silence", w
         steps: [{ store: { from: { testId: "x" }, as: "repo" } }],
         verify: { title: "T", notes: ["made {repo}", "owned by {owner}"] },
       },
-    } as never,
+    },
     url: () => "http://app/",
     evidence: () =>
       ({
@@ -583,7 +583,7 @@ test("what `verify` says the run was about is available to its own notes", when,
     trace: new Trace(),
     actions: {
       a: { steps: [], verify: { title: "T", subject: { user: "ada" }, notes: ["signed in as {user}"] } },
-    } as never,
+    },
     url: () => "http://app/",
     evidence: () =>
       ({ actionFrame: async () => "f.png", manualVerification: (opts: { notes?: string[] }) => ((written = opts), "m.md") }) as unknown as Evidence,
@@ -605,7 +605,7 @@ test("a value a step stored beats one the subject named", when, async () => {
         steps: [{ store: { from: { testId: "who" }, as: "user" } }],
         verify: { title: "T", subject: { user: "whoever the config guessed" }, notes: ["it was {user}"] },
       },
-    } as never,
+    },
     url: () => "http://app/",
     evidence: () =>
       ({ actionFrame: async () => "f.png", manualVerification: (opts: { notes?: string[] }) => ((written = opts), "m.md") }) as unknown as Evidence,
@@ -625,7 +625,7 @@ test("a composed action's evidence lives inside the step that ran it", when, asy
     actions: {
       "app.signIn": { steps: [{ press: "Enter" }] },
       "app.tour": { steps: [{ press: "Escape" }, { run: "signIn" }] },
-    } as never,
+    },
     url: () => "http://app/",
     evidence: () =>
       ({
@@ -668,7 +668,7 @@ test("an api step can name which service answers", when, async () => {
           { check: { that: "{mail.messages_count}", equals: "2", because: "the mail catcher answered" } },
         ],
       },
-    } as never,
+    },
     url: () => "http://app/",
     evidence: () => ({ actionFrame: async () => "f.png" }) as unknown as Evidence,
   });

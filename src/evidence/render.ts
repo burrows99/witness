@@ -1,4 +1,3 @@
-import * as path from "node:path";
 
 import { loadConfig } from "../config/index.ts";
 import { videoProviders } from "../providers/video.ts";

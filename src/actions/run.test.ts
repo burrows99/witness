@@ -119,7 +119,7 @@ test("parallel gives each action its own lane, and the panes come out in the ord
       evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
       pinEvidence: () => undefined,
       renderVideos: () => [],
-    } as never,
+    },
     { names: ["one", "two", "three"], parallel: true, render: false },
     { launch: browser.launch },
   );
@@ -151,7 +151,7 @@ test("a retry is a fresh browser, and keeps the failed attempt's evidence", asyn
       evidence: () => ({ dir: "/tmp/witness-run-test/evidence", writeManifest: () => undefined, readme: () => undefined }),
       pinEvidence: () => undefined,
       renderVideos: () => [],
-    } as never,
+    },
     { names: ["flaky"], retries: 1, render: false },
     { launch: browser.launch },
   );

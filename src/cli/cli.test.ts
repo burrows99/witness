@@ -14,7 +14,7 @@ const run = async (cli: Cli, argv: string[]): Promise<string> => {
   process.stdout.write = ((text: string) => {
     written.push(text);
     return true;
-  }) as typeof process.stdout.write;
+  });
   try {
     await cli.run(argv);
   } finally {
@@ -197,7 +197,7 @@ test("a command that fails still reports what it sent and what came back", async
   process.stderr.write = ((text: string) => {
     said.push(text);
     return true;
-  }) as typeof process.stderr.write;
+  });
   try {
     await cli.run(["api", "get", "/v1/workspaces"]).catch((err: Error) => err);
   } finally {
@@ -226,7 +226,7 @@ test("--quiet keeps a failure quiet — the message is the whole output", async 
   process.stderr.write = ((text: string) => {
     said.push(text);
     return true;
-  }) as typeof process.stderr.write;
+  });
   try {
     await cli.run(["api", "get", "/x", "--quiet"]).catch(() => undefined);
   } finally {
