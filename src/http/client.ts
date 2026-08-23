@@ -30,11 +30,21 @@ export class HttpApi {
    *
    * An empty path is the base URL itself, and stays that way: it is what the GraphQL provider asks for,
    * where the operation lives in the document rather than in a route.
+   *
+   * The ends are walked by index rather than trimmed with `/\/+$/` and `/^\/+/`. The patterns read
+   * better and CodeQL is right to refuse them: an anchored `\/+` is polynomial against a string of
+   * many slashes, and both halves here arrive from a config file or a command line, which is the
+   * untrusted input that rule means. Two indices say everything the patterns did, in one pass.
    */
   url(path: string): string {
     if (path.startsWith("http")) return path;
-    const base = this.baseUrl.replace(/\/+$/, "");
-    return path ? `${base}/${path.replace(/^\/+/, "")}` : base;
+    let end = this.baseUrl.length;
+    while (end > 0 && this.baseUrl[end - 1] === "/") end -= 1;
+    const base = this.baseUrl.slice(0, end);
+    if (!path) return base;
+    let start = 0;
+    while (start < path.length && path[start] === "/") start += 1;
+    return `${base}/${path.slice(start)}`;
   }
 
   async request<T = unknown>(path: string, init: ApiInit = {}): Promise<T> {
