@@ -16,6 +16,7 @@ import { Queries } from "./database/queries.ts";
 import { SignIn } from "./browser/sign-in.ts";
 import { type StubServer, stubProviders } from "./providers/stubs.ts";
 import { renderVideos } from "./evidence/render.ts";
+import type { RenderOptions } from "./providers/video.ts";
 import { Drift, type Report } from "./diagnostics/drift.ts";
 import { Stack } from "./environment/stack.ts";
 import { Workspace } from "./environment/workspace.ts";
@@ -393,9 +394,9 @@ export class System {
   }
 
   /** Turn this run's recordings into MP4s. What the `video` command does, callable. */
-  renderVideos(): string[] {
+  renderVideos(opts: RenderOptions = {}): string[] {
     try {
-      return renderVideos(this.workspace);
+      return renderVideos(this.workspace, opts);
     } catch (err) {
       process.stderr.write(`[video] ${String(err).slice(0, 160)}\n`);
       return [];

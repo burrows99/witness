@@ -42,11 +42,24 @@ export type VideoConfig = {
   index?: boolean;
 };
 
+export type RenderOptions = {
+  /**
+   * Re-render everything, including videos already newer than the recordings they came from.
+   *
+   * Off for a run, which must touch only what it just recorded. On for `witness video`, whose whole
+   * job is the word in its summary — rebuild.
+   */
+  force?: boolean;
+};
+
 export type VideoProvider = {
   available: () => boolean;
   /** Returns the files it wrote. */
-  render: (config: VideoConfig, root: string) => string[];
+  render: (config: VideoConfig, root: string, opts?: RenderOptions) => string[];
 };
+
+/** When the most recent of these was written. */
+const newestOf = (files: string[]): number => Math.max(...files.map(file => fs.statSync(file).mtimeMs));
 
 const ffmpeg = (args: string[]): void => {
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", ...args], { encoding: "utf8" });
@@ -62,7 +75,7 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
     }
   },
 
-  render: (config, root) => {
+  render: (config, root, opts = {}) => {
     // Relative to the `.witness` directory, like every other path a config declares.
     const from = path.join(root, config.from ?? "artifacts/test-results");
     const out = path.join(root, config.out ?? "artifacts");
@@ -74,6 +87,7 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
                     "-preset", preset, "-movflags", "+faststart"];
 
     const written: string[] = [];
+    let upToDate = 0;
     for (const dir of fs.readdirSync(from)) {
       const at = path.join(from, dir);
       if (!fs.statSync(at).isDirectory()) continue;
@@ -97,6 +111,20 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
       const target = override?.name
         ? path.join(out, `${override.name}.mp4`)
         : path.join(groupDir, "video.mp4");
+
+      // Only what this run actually recorded. This swept EVERY directory still sitting under
+      // `test-results` and re-rendered all of them, so running one action rewrote another action's
+      // `before/video.mp4` and its still — moving the mtime, and sometimes the content, of a cut that
+      // is supposed to be a record of the code as it WAS. A `before` that can be regenerated after the
+      // change is the one thing the evidence model cannot allow, and nothing said it had happened; it
+      // also moved the capture time of frames the evidence hook then demanded be re-Read, which
+      // teaches a reader to treat the gate as noise. A raw recording older than the video made from it
+      // has nothing new to say.
+      if (!opts.force && fs.existsSync(target) && fs.statSync(target).mtimeMs >= newestOf(recordings)) {
+        upToDate += 1;
+        continue;
+      }
+
       fs.mkdirSync(path.dirname(target), { recursive: true });
       const layout = override?.layout ?? (recordings.length > 1 ? "side-by-side" : "single");
       const scale = override?.width ?? (layout === "side-by-side" ? 1920 : width);
@@ -126,7 +154,8 @@ export const videoProviders = new Registry<VideoProvider>("video").register("ffm
 
     // A run that records nothing must not look like a success: a spec opening its own context has to
     // pass `recordVideo` itself, and when it forgets, everything passes and no evidence exists.
-    if (!written.length && fs.readdirSync(from).length) {
+    // `upToDate` so a run whose videos were all still current is not accused of recording nothing.
+    if (!written.length && !upToDate && fs.readdirSync(from).length) {
       process.stderr.write(`[video] ${from} holds no .webm — the run recorded nothing\n`);
     }
     return written;

@@ -36,7 +36,7 @@ export class Cli {
   /** The generic half: where the stack is, and the escape hatches into it. */
   withDefaults(opts: {
     /** Rendering happens here, not in a subprocess. */
-    renderVideos?: () => string[];
+    renderVideos?: (opts?: { force?: boolean }) => string[];
     api?: (method: string, path: string, body?: unknown) => Promise<unknown>;
     /** `on` names one of the extra databases the description declares; omitted means the default. */
     sql?: (query: string, on?: string) => string;
@@ -113,7 +113,9 @@ export class Cli {
       this.command("video", {
         summary: "rebuild the MP4s from the last run's recordings",
         passthrough: () => {
-          const written = render();
+          // `force`, because the summary says rebuild: a run skips what is already current, and a
+          // command asked for by name must not silently do nothing.
+          const written = render({ force: true });
           process.stdout.write(`${written.length} video${written.length === 1 ? "" : "s"}\n`);
         },
       });
