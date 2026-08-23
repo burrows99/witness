@@ -26,7 +26,7 @@ owns the repository, and the unscoped name is taken on npmjs.com.
 - [Install](#install)
 - [Usage](#usage)
 - [Evidence](#evidence)
-- [A worked example: Grafana, from nothing](#a-worked-example-grafana-from-nothing)
+- [A worked example: a whole stack](#a-worked-example-a-whole-stack)
 - [Where a description comes from](#where-a-description-comes-from)
 - [The conventions worth keeping](#the-conventions-worth-keeping)
 - [API](#api)
@@ -255,44 +255,75 @@ This does not reimplement the tools: it is recorded through Playwright's own pag
 down beside the run. The story is what a *program* reads; Playwright's trace is what a *person* opens,
 and the story names it rather than replacing it.
 
-## A worked example: Grafana, from nothing
+## A worked example: a whole stack
 
-Real and reproducible — [`examples/grafana/`](examples/grafana). Grafana is somebody else's software,
-chosen because neither this tool nor its author has any say over it.
+Real and reproducible, and it is this repository — `docker-compose.yml` and `.witness/config.jsonc` at
+the root. Four services, because a typical stack is not one: **an app people use, the database it
+writes to, the mail it sends, and something watching all of it.**
+
+| service | what describing it needs |
+|---|---|
+| **gitea** — a git forge | a UI with routes and locators, *and* a REST API |
+| **postgres** — its database | named queries, and real rows to disagree with a screen |
+| **mailpit** — its mail catcher | a *second* UI and a *second* API on another service |
+| **grafana** — what watches it | somebody else's software, described the same way |
 
 ```bash
-cd examples/grafana && docker compose up -d
-npx witness action run grafana.theWholeProduct
+docker compose up -d
+npx witness stack status
+npx witness action run tour
 ```
 
-No arguments and no environment variables: the credentials are declared as `containerEnv` and read back
-out of the running container, which is where a real one would come from too.
+![The whole stack, walked once and narrated](docs/example/stack.gif)
 
-![Signing in to Grafana and walking the whole of it, narrated](docs/example/grafana.gif)
+*(the [MP4](docs/example/stack.mp4) is what the run produced; the GIF is it, for GitHub)*
 
-*(the [MP4](docs/example/grafana.mp4) is what the run produced; the GIF is it, for GitHub)*
-
-One action produced that — no test file, no page objects, no code. It composes seven smaller ones, each
-still runnable alone, and checks Grafana against its own API as it goes:
+One action produced that — 50 seconds, six smaller actions composed, narrated with slides, and every
+claim checked against the layer it is about:
 
 ```jsonc
-{ "run": "grafana.openDashboards" },
-{ "frame": "dashboards, empty" },
-{ "api": { "operation": "search", "as": "listed" } },
-{ "check": { "that": "{listed.length}", "equals": "{stats.dashboards}",
-             "because": "the API and the screen should agree about how many dashboards there are" } }
+{ "slide": { "title": "2 · The database", "lines": ["The screen says there is an account.", "Postgres is the layer that can disagree."] } },
+{ "query": { "name": "accounts", "as": "accounts" } },
+{ "check": { "that": "{accounts}", "contains": "1", "because": "the account the screen just made should be a row" } },
+
+{ "run": "gitea.createRepo" },
+{ "api": { "operation": "repo", "params": { "owner": "witness-admin", "repo": "witness-demo" }, "as": "repo" } },
+{ "check": { "that": "{repo.full_name}", "equals": "witness-admin/witness-demo", "because": "the screen and the API should agree that it exists" } },
+
+{ "run": "gitea.askForAReset" },
+{ "api": { "client": "mailpit", "operation": "messages", "as": "mail" } },
+{ "check": { "that": "{mail.messages_count}", "atLeast": 1, "because": "the app sends a message, and this is where it lands" } }
 ```
 
-The whole of it is [`config.jsonc`](examples/grafana/.witness/config.jsonc), and one run's output is in
-[`docs/example/`](docs/example): the [story](docs/example/debug.md) and the
-[note](docs/example/manual-verification.md), both generated.
+`client` names which service answers, because more than one does. What it left behind:
 
-The same description answers questions without a browser at all:
-
-```bash
-$ npx witness instance health --quiet
-{ "database": "ok", "version": "13.2.0", "commit": "f681b1359f6a0b8ecb9f2c49a88ac72b75bde73b" }
 ```
+tour  (21 frames)
+  03-register  (9 frames)
+  11-createrepo  (6 frames)
+  18-askforareset  (4 frames)
+  19-openinbox  (3 frames)
+  24-signin  (7 frames)
+  25-opendatasources  (3 frames)
+```
+
+and the [note](docs/example/manual-verification.md), filled with what this run actually saw:
+
+```md
+- Registered witness-admin through the web UI; Gitea made it an administrator.
+- Postgres held 1 account and 1 repository afterwards.
+- Gitea's own API agreed the repository exists: witness-admin/witness-demo.
+- The mail it sent was caught by Mailpit rather than delivered.
+- Nothing here was seeded by hand: every row was made through the product.
+```
+
+The whole description is [`.witness/config.jsonc`](.witness/config.jsonc); one run's output is in
+[`docs/example/`](docs/example) — the [story](docs/example/debug.md), the
+[note](docs/example/manual-verification.md), and the
+[layout](docs/example/artifacts-README.md) it wrote to explain itself.
+
+The tour expects a **fresh** stack: it registers the first account and counts the rows afterwards.
+`docker compose down -v && docker compose up -d` puts it back.
 
 ## Where a description comes from
 

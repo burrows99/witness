@@ -649,3 +649,37 @@ test("a composed action's evidence lives inside the step that ran it", when, asy
   // No frame for the `run` step itself: the action it ran ends with one of that same screen.
   ok(!wrote.some(file => file.includes("02-run.png")), `a run step should take no frame: ${wrote.join(", ")}`);
 });
+
+test("an api step can name which service answers", when, async () => {
+  // A stack has more than one service that answers, and a second service's declared operations were
+  // unreachable: the step could only ever ask the default client.
+  const asked: string[] = [];
+  const actions = new Actions({
+    operations: { call: async (name: string) => (asked.push(`default:${name}`), { from: "the app" }) } as unknown as Operations,
+    client: (which: string) =>
+      ({ call: async (name: string) => (asked.push(`${which}:${name}`), { messages_count: 2 }) }) as unknown as Operations,
+    queries: { query: () => "row" } as unknown as Queries,
+    trace: new Trace(),
+    actions: {
+      a: {
+        steps: [
+          { api: { operation: "version", as: "app" } },
+          { api: { client: "mailpit", operation: "messages", as: "mail" } },
+          { check: { that: "{mail.messages_count}", equals: "2", because: "the mail catcher answered" } },
+        ],
+      },
+    } as never,
+    url: () => "http://app/",
+    evidence: () => ({ actionFrame: async () => "f.png" }) as unknown as Evidence,
+  });
+  const result = await actions.run("a", fakePage().page);
+  ok(result.ok, result.error);
+  deepEqual(asked, ["default:version", "mailpit:messages"]);
+});
+
+test("a system with no other services says so rather than failing obscurely", when, async () => {
+  await rejects(
+    () => engine({ a: { steps: [{ api: { client: "mailpit", operation: "messages" } }] } }).run("a", fakePage().page),
+    /api step names client "mailpit", and this system was built without any/,
+  );
+});

@@ -1,5 +1,5 @@
 ---
-name: grafana
+name: stack
 description: >-
   Drive this project's running app and come back with evidence — the requests with their bodies, a
   frame per step, a video, and a written-up debug story. Use for "show me it works", "record a
@@ -24,7 +24,7 @@ npx witness skill > .witness/SKILL.md  # rewrite this file from what is true now
 
 In this project: `npx witness <command>` — which is how it was run to generate this file.
 
-Its own help calls it `grafana`; that is the usage line, not necessarily something you can
+Its own help calls it `stack`; that is the usage line, not necessarily something you can
 type. Every example below is written the way that works here.
 
 ## The shape of it
@@ -66,6 +66,7 @@ of a product is worth more than a suite about it.
 ```bash
 npx witness stack status                       # is it up, and is what is answering ours
 npx witness api get /v1/whatever               # read the real payload before theorising about it
+npx witness db sql "select …"                  # what was actually stored
 EVIDENCE=before npx witness action run <name>  # record the behaviour as it is now
 #   … make the change …
 EVIDENCE=after npx witness action run <name>   # record it again, filed beside the first
@@ -85,21 +86,14 @@ with more logging.
   - `api post` — POST <path> [json]
   - `api patch` — PATCH <path> [json]
   - `api delete` — DELETE <path> [json]
+- `npx witness db` — the stack's database
+  - `db sql` — run a query
 - `npx witness video` — rebuild the MP4s from the last run's recordings
-- `npx witness dashboards` — what this Grafana holds
-  - `dashboards list` — every dashboard and folder
-  - `dashboards folders` — the folders they can live in
-- `npx witness instance` — the instance itself
-  - `instance health` — up, and is its database reachable
-  - `instance stats` — what it holds, counted
-  - `instance org` — the organisation
-  - `instance settings` — what the caller is allowed to do
-- `npx witness users` — who can sign in
-  - `users list` — every account
-  - `users count` — how many
-- `npx witness connections` — what it can query
-  - `connections sources` — configured data sources
-  - `connections available` — data source plugins it ships with
+- `npx witness accounts` — who exists, according to the database
+  - `accounts count` — how many
+  - `accounts show` — <name> — one of them
+- `npx witness mail` — what the stack has sent
+  - `mail list` — every message caught
 - `npx witness check` — whether the description still matches what is running
   - `check drift` — [<action that signs in>] — visit every declared route and count every declared locator
 - `npx witness action` — run one of the declared actions in a browser, and report everything it did
@@ -112,20 +106,18 @@ asked for something that does not exist.
 
 ## This project
 
-- **apps**: `grafana` — routes open as `app.<name>.<route>.open(page)`
+- **apps**: `gitea`, `mailpit`, `grafana` — routes open as `app.<name>.<route>.open(page)`
 - **actions**:
-  - `grafana.signIn` — sign in the way a first-time admin does, and get past the password prompt
-  - `grafana.openDashboards` — the dashboards list — what a new install has, which is nothing
-  - `grafana.startADashboard` — open the blank dashboard editor, without saving anything
-  - `grafana.openExplore` — the ad-hoc query screen, which is empty until something is connected
-  - `grafana.openDataSources` — what this Grafana can query — nothing yet, on a fresh install
-  - `grafana.browseConnections` — the catalogue of things it could connect to, and how many there are
-  - `grafana.openUsers` — who can sign in — one account, on a fresh install
-  - `grafana.openProfile` — the signed-in account's own page
-  - `grafana.theWholeProduct` — the whole of a fresh Grafana, walked once, and checked against its own API as it goes
-- **operations**: `health`, `stats`, `org`, `org.users`, `users`, `users.count`, `search`, `folders`, `datasources`, `plugins`, `annotations`, `permissions`
-- **cast**: `admin` — `app.cast("name")`
-- **secrets it will ask for**: `grafana.adminUser`, `grafana.adminPassword` — `app.secret("name")`; the config says where each comes from
+  - `tour` — the whole stack, walked once: the app, the database it wrote to, the mail it sent, and what watches it
+  - `gitea.register` — the first account, made the way a person makes one
+  - `gitea.askForAReset` — the one thing a fresh install will actually send mail about
+  - `gitea.createRepo` — a repository, through the screen a person uses
+  - `mailpit.openInbox` — what the stack has actually sent, on the screen a person reads it on
+  - `grafana.signIn` — sign in, and get past the password prompt
+  - `grafana.openDataSources` — what it can query — nothing yet, which is what a fresh install looks like
+- **operations**: `version`, `repo`, `repos`
+- **queries**: `accounts`, `account.byName`, `repositories`
+- **secrets it will ask for**: `gitea.user`, `gitea.email`, `gitea.credential`, `grafana.adminUser`, `grafana.adminPassword` — `app.secret("name")`; the config says where each comes from
 
 `npx witness action show <name>` prints the steps of any of them, as declared.
 

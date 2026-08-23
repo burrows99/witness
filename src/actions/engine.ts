@@ -31,6 +31,8 @@ import { Trace, type TraceEntry } from "../diagnostics/trace.ts";
  */
 export class Actions {
   private readonly operations: Operations;
+  /** The other services that answer. A stack has more than one. */
+  private readonly client: (name: string) => Operations;
   private readonly queries: Queries;
   private readonly trace: Trace;
   private readonly config: Record<string, ActionConfig>;
@@ -42,6 +44,8 @@ export class Actions {
 
   constructor(opts: {
     operations: Operations;
+    /** Anything else that answers, by the name of the service that does. */
+    client?: (name: string) => Operations;
     queries: Queries;
     trace: Trace;
     actions: Record<string, ActionConfig>;
@@ -51,6 +55,9 @@ export class Actions {
     secret?: (name: string, scope?: string) => string;
   }) {
     this.operations = opts.operations;
+    this.client = opts.client ?? (name => {
+      throw new Error(`api step names client "${name}", and this system was built without any`);
+    });
     this.queries = opts.queries;
     this.trace = opts.trace;
     this.config = opts.actions;
@@ -319,7 +326,7 @@ export class Actions {
     if (step.api) {
       const params = { ...values, ...this.resolveParams(step.api.params, values) };
       const body = step.api.body ? (this.resolve(step.api.body, values) as Record<string, unknown>) : undefined;
-      const answer = await this.operations.call(step.api.operation, params, body);
+      const answer = await (step.api.client ? this.client(step.api.client) : this.operations).call(step.api.operation, params, body);
       if (step.api.as) values[step.api.as] = this.pick(answer, step.api.pick);
     }
     // Pick one item out of something a previous step fetched — "the module we just authored", by name.
@@ -707,8 +714,14 @@ export type StepConfig = {
   caption?: { text: string; sub?: string };
   /** A full-frame card spliced into the video: what this section of the recording is about. */
   slide?: { title: string; lines?: string[] };
-  /** Call one of the config's declared operations, mid-flow, and keep what it answered. */
-  api?: { operation: string; params?: Record<string, string>; body?: unknown; as?: string; pick?: string };
+  /**
+   * Call one of the config's declared operations, mid-flow, and keep what it answered.
+   *
+   * `client` names which service to ask, for a stack where more than one answers — the default is
+   * the first service that declares an `api`. Without it, describing a second service's API meant
+   * declaring operations nothing could reach.
+   */
+  api?: { operation: string; client?: string; params?: Record<string, string>; body?: unknown; as?: string; pick?: string };
   /** Run one of the config's named queries and keep the answer — what was STORED, mid-flow. */
   query?: { name: string; params?: Record<string, string>; as?: string };
   as?: string;

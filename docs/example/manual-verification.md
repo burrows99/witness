@@ -1,30 +1,30 @@
-# What a fresh Grafana is — manual verification (run)
+# The whole stack, walked once — manual verification (run)
 
-Run: `grafana-thewholeproduct` (cli)
+Run: `tour` (cli)
 
 Whether what this run made is still there depends on what it did — nothing here removes it. `KEEP=1` asks anything that cleans up to leave it alone.
 
 ## Who
 
-- instance: `http://localhost:3010`
-- dashboards: `0`
-- users: `1`
+- app: `http://localhost:3020`
+- mail: `http://localhost:8025`
+- watching: `http://localhost:3010`
+- account: `witness-admin`
 
 ## Sign in as them
 
 ```bash
-docker run -d --name witness-example-grafana -p 3010:3000 grafana/grafana
-open http://localhost:3010 — admin / admin
+docker compose up -d
+open http://localhost:3020 — witness-admin
 ```
 
 ## Where to look
 
-- Grafana: http://localhost:3010
-- sign in with the cast's admin account
 
 ## What the run saw
 
-- The API reported 0 dashboards, 0 data sources and 1 user.
-- Dashboards, Explore, Connections, Users and Profile were each opened and photographed.
-- The catalogue offered 8 matches for "prometheus" — see the frame.
-- Nothing was saved: the new dashboard was opened and abandoned.
+- Registered witness-admin through the web UI; Gitea made it an administrator.
+- Postgres held 1 account and 1 repository afterwards.
+- Gitea's own API agreed the repository exists: witness-admin/witness-demo.
+- The mail it sent was caught by Mailpit rather than delivered.
+- Nothing here was seeded by hand: every row was made through the product.
