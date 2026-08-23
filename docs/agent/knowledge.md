@@ -50,6 +50,15 @@ nothing else, and the copy on this machine had arrived some other way. Same fami
 cause from a screenshot: the state in front of you is a result, and more than one thing produces it. A
 scratch prefix costs a second and is the only thing that can answer a question about installing.
 
+**An injectable seam means the default is the one thing nothing runs.** `Compose.read(root, run =
+Compose.docker)` is injected by every test in its file, so `Compose.docker` — the only line of it that
+ever executes in production — was never called by one. Deleting `--no-interpolate` from it left 424
+tests passing and every generated config silently without its `portVar`, which is invisible until a
+second checkout runs its own ports. The seam that makes a parser testable is the same seam that hides
+the caller, and the fix is one size lower: inject the `execFile`, and assert the ARGV rather than the
+answer, the way `docker.test.ts` already does. Anywhere a default parameter exists so tests can avoid
+the real thing, ask what still covers the real thing.
+
 ---
 
 ## Changing this repository

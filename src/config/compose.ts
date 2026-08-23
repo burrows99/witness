@@ -241,10 +241,16 @@ export class Compose {
    *
    * Nothing rather than a throw: a description generated without the compose half is still a
    * description, and a machine with no docker is a normal machine.
+   *
+   * `exec` is here so a test can read the argv rather than the answer. Every other test in this file
+   * hands `read` a runner and never reaches this line, so the one flag the whole generator depends on
+   * had nothing checking it: dropping `--no-interpolate` left 424 tests passing and every generated
+   * config silently without its `portVar`, which only shows up on the second checkout — the exact case
+   * `portVar` exists for.
    */
-  private static docker(this: void, root: string): string | undefined {
+  static docker(this: void, root: string, exec: typeof execFileSync = execFileSync): string | undefined {
     try {
-      return execFileSync("docker", ["compose", "config", "--no-interpolate", "--format", "json"], {
+      return exec("docker", ["compose", "config", "--no-interpolate", "--format", "json"], {
         cwd: root,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "ignore"],

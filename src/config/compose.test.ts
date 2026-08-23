@@ -1,4 +1,5 @@
 import { deepEqual, equal, match, ok } from "node:assert/strict";
+import type { execFileSync } from "node:child_process";
 import { test } from "node:test";
 
 import { Compose } from "./compose.ts";
@@ -160,4 +161,29 @@ test("the generated config says what it left out and where to get it", () => {
   match(rendered, /the actions\s+yours to write/);
   // Shaped like the file it is replacing, so it can be edited rather than transcribed.
   ok(rendered.includes('"name": "acme"') && rendered.includes('"services"'));
+});
+
+test("the runner that actually ships asks docker for an UNinterpolated config", () => {
+  // The only line in this file that runs in production, and the only one no test reached: every other
+  // test hands `read` its own runner. Dropping `--no-interpolate` leaves the whole suite green and
+  // every generated config without its `portVar` — `${GITEA_PORT:-3020}` arrives as `3020` and the
+  // VARIABLE NAME, which is the knob, is gone. Nothing notices until a second checkout runs its own
+  // ports. So this asserts the argv, not the answer.
+  const calls: [string, readonly string[]][] = [];
+  const exec = ((file: string, args: string[]) => {
+    calls.push([file, args]);
+    return "{}";
+  }) as typeof execFileSync;
+
+  Compose.docker(process.cwd(), exec);
+
+  deepEqual(calls, [["docker", ["compose", "config", "--no-interpolate", "--format", "json"]]]);
+});
+
+test("a docker that is not there is not an answer", () => {
+  // Nothing rather than a throw: a machine with no docker is a normal machine.
+  const exec = (() => {
+    throw new Error("docker: command not found");
+  }) as typeof execFileSync;
+  equal(Compose.docker(process.cwd(), exec), undefined);
 });
