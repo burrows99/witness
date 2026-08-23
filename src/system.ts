@@ -16,7 +16,7 @@ import { Queries } from "./database/queries.ts";
 import { SignIn } from "./browser/sign-in.ts";
 import { type StubServer, stubProviders } from "./providers/stubs.ts";
 import { renderVideos } from "./evidence/render.ts";
-import type { RenderOptions } from "./providers/video.ts";
+import { videoProviders, type RenderOptions } from "./providers/video.ts";
 import { Drift, type Report } from "./diagnostics/drift.ts";
 import { Stack } from "./environment/stack.ts";
 import { Workspace } from "./environment/workspace.ts";
@@ -64,6 +64,8 @@ export class System {
   private configFile?: string;
   /** Set while something outside a test is driving: the frames belong with ITS recording, not `cli/adhoc`. */
   private pinned?: EvidenceContext;
+  /** Whether the video provider is installed, once it has been asked. See `canRenderVideo`. */
+  private videoAvailable?: boolean;
   private readonly clients = new Map<string, Operations>();
   private readonly databases = new Map<string, Queries>();
   private readonly running = new Map<string, StubServer>();
@@ -138,6 +140,9 @@ export class System {
       // alone until this reached it, so an app answering 200 with the failure in the payload — most
       // Python and PHP APIs, every polled job, and GraphQL by specification — read as healthy.
       failureWhen: [this.api, ...this.clients.values()].flatMap(client => client.failureWhen ?? []),
+      // Whether a run's recordings will become an MP4 at all — asked of the same provider the render
+      // goes through, so the story only tells somebody to pace a video that is going to be written.
+      watchable: () => this.canRenderVideo(),
     });
 
     this.apps = {};
@@ -431,6 +436,24 @@ export class System {
   async checkDrift(as?: string): Promise<Report & { rendered: string }> {
     const report = await Drift.sweep(this, as);
     return { ...report, rendered: Drift.render(report) };
+  }
+
+  /**
+   * Whether this description's video provider is installed, and so whether a run leaves anything to play.
+   *
+   * Asked once and kept: answering it runs `ffmpeg -version`, and the engine asks per action. An
+   * unregistered provider name is a config error the render itself reports — here it is simply not
+   * something that is going to produce a video.
+   */
+  private canRenderVideo(): boolean {
+    if (this.videoAvailable === undefined) {
+      try {
+        this.videoAvailable = videoProviders.get(this.config.video?.provider ?? "ffmpeg").available();
+      } catch {
+        this.videoAvailable = false;
+      }
+    }
+    return this.videoAvailable;
   }
 
   /** Turn this run's recordings into MP4s. What the `video` command does, callable. */

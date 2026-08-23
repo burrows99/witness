@@ -99,6 +99,11 @@ Every value is a template filled from what the run gathered, written whether the
   the frame the story names.
 - **`expect` passing is not the same as evidence.** A `css` match can succeed on a node that is
   off-screen: the run goes green and the picture shows nothing.
+- **Neither is a run that finishes.** Fourteen steps against a fast local app are over in two
+  seconds, which is a tenth of a second on screen each: the frames genuinely differ, and what plays
+  is a blank screen and then the end state. `debug.md` says so under `## What it got away with`
+  whenever a run's steps average less than a third of a second of recording each, and `slide`,
+  `caption` and `wait` are what it is telling you to reach for.
 - **`waitForUrl` takes a route, not a URL** — `{ "waitForUrl": { "route": "home" } }`. A literal
   `localhost:3020` disconnects `portVar`. Somewhere that is not this app at all — the identity
   provider a sign-in hands the browser to — is `{ "waitForUrl": { "service": "keycloak" } }`, the
