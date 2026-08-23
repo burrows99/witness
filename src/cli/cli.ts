@@ -123,11 +123,9 @@ export class Cli {
     if (!handler) {
       // A noun with no verb is a question, not a mistake: answer it. `unknown: chat` for a command the
       // tool's own help documents is the least useful thing it could say.
-      const verbs = Object.entries(spec.verbs ?? {});
-      if (!verb && verbs.length) {
-        process.stdout.write(
-          [`${noun} — ${spec.summary}`, "", ...verbs.map(([name, h]) => `  ${name.padEnd(14)} ${h.summary}`), ""].join("\n"),
-        );
+      const listed = Cli.listVerbs(noun, spec, verb);
+      if (listed) {
+        process.stdout.write(listed);
         return;
       }
       return Cli.die(`unknown: ${noun} ${verb ?? ""}`.trim(), 2);
@@ -186,6 +184,19 @@ export class Cli {
   }
 
   /** The verbs already registered under a noun, so a caller can add to them rather than replace them. */
+  /**
+   * A noun with no verb is a question, not a mistake: answer it.
+   *
+   * Static, and returning the text rather than printing it, because the entry point answers `config`
+   * itself before a description is loaded — and when it had its own copy of this branch it did not
+   * have this one, so `witness config` said `unknown: config` about a noun its own help documents.
+   */
+  static listVerbs(noun: string, spec: Noun, verb?: string): string | undefined {
+    const verbs = Object.entries(spec.verbs ?? {});
+    if (verb || !verbs.length) return undefined;
+    return [`${noun} — ${spec.summary}`, "", ...verbs.map(([name, h]) => `  ${name.padEnd(14)} ${h.summary}`), ""].join("\n");
+  }
+
   verbs(noun: string): Record<string, Verb> | undefined {
     return this.nouns.get(noun)?.verbs;
   }

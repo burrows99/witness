@@ -23,6 +23,7 @@ progress, warnings and the "what broke" pointer go to **stderr**, so `… | jq` 
 | `video render` | rebuild the MP4s from the last run's recordings |
 | `action list` / `action show <a>` / `action run <a…>` | any action is declared |
 | `stub list` / `stub show <s>` | any `stubs` are declared |
+| `config explore [<service>] [--pages N] [--depth N]` | always — walks the app and prints the description it implies |
 | *your own nouns* | each entry in the `cli` block |
 
 ## `action run`
@@ -38,6 +39,17 @@ npx witness action run <action…> [key=value…] [--parallel] [--retries=N]
 - `HEADED=1` shows the browser
 
 Exit code is 1 if any action failed.
+
+## `config explore`
+
+```
+npx witness config explore [<service>] [--pages=12] [--depth=2]
+```
+
+Crawls same-origin from the routes already declared (or `/`), carrying the config's identity cookies,
+and prints a JSONC fragment: `routes` and `locators` from each page's aria snapshot, `forms` from the
+placeholder attributes, `api.operations` from the XHR the app made while being walked. It never
+writes the config. What the caps left out is printed, not dropped silently.
 
 ## Your own nouns
 

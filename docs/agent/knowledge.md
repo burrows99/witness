@@ -81,6 +81,10 @@ cold-agent runs produced about ten pull requests.
 **A path in the skill is a promise.** When the artifact layout dropped its `actions/` segment, the
 skill kept sending readers to it. Nothing type-checks a string in a document.
 
+**A demo that waits too little proves nothing.** The first `after` recording caught the frame before
+a 10-second crawl printed anything, so a green run produced a video of a command with no output. The
+recording is the deliverable; its timing is part of the work, not an afterthought.
+
 **Progress on stdout breaks the consumer.** Results are stdout, progress and warnings are stderr, or
 `| jq` fails for reasons nobody can see.
 
@@ -97,6 +101,24 @@ is worse than no gate.
 
 **Exempt the same paths both ways.** Whatever a gate excuses from *triggering* a requirement must
 also be excused from *invalidating* it, or the two halves disagree and the gate blocks its own author.
+
+---
+
+## Generating things
+
+**Read the first output, not the exit code.** The first fragment `config explore` produced was green
+and contained routes called `0` and `02` (a star-count link), a locator truncated mid-word to
+`aPainlessSelfHostedGit`, and three identical lines about `/user/login` in its skipped list. All
+three are invisible to a test that only asks whether it ran.
+
+**A generated identifier has to be one.** Start-with-a-letter, and cut at a word rather than a
+character. Both rules came from that first fragment.
+
+**Never write over the file.** A generated name is worse than the one a person would choose, so
+`explore` prints a fragment. A tool that overwrites hand-tuned names gets run once.
+
+**Say what you left out.** A fragment that stopped at a cap looks exactly like one that found
+everything.
 
 ---
 

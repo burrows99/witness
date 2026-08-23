@@ -2,6 +2,7 @@
 import * as path from "node:path";
 
 import { Cli, System, Workspace } from "../src/index.ts";
+import { Explore } from "../src/config/explore.ts";
 import { Skill } from "../src/skill/skill.ts";
 import { Template } from "../src/config/template.ts";
 
@@ -37,6 +38,21 @@ const config: Parameters<Cli["command"]>[1] = {
       summary: "print a config file with every field witness understands, and its documentation",
       raw: true,
       run: () => Template.forWitness().render(),
+    },
+    explore: {
+      summary: "[<service>] [--pages N] [--depth N] — walk the running app and print the description it implies",
+      // The fragment IS the answer, so it is not wrapped in a record of a request nobody made.
+      raw: true,
+      // Unlike its siblings this one needs the description loaded — an origin to walk, the identities
+      // to carry, the routes it already declares. It is listed before that happens and only ever RUN
+      // after, which is why the variable is enough and a second registration was not.
+      run: async (args: string[], flags: string[] = []) => {
+        const service = args[0] ?? Explore.likelyApp(system.config);
+        const number = (flag: string, fallback: number): number =>
+          Number(flags.find(f => f.startsWith(`--${flag}`))?.split("=")[1] ?? fallback);
+        const found = await Explore.of(system, service, { maxPages: number("pages", 12), maxDepth: number("depth", 2) });
+        return Explore.render(found, service);
+      },
     },
     where: {
       summary: "which description is in force here, and why",
@@ -124,12 +140,28 @@ if (rest[0] === "skill") {
 
 // `config template` describes a product before there is a description to load, and `config where` has
 // to answer when what it would load is missing or broken — which is when it is asked.
+//
+// Only those two. `config explore` needs the description (an origin, the identities, the routes it
+// already declares), so it falls through to the system-backed command line below rather than being
+// refused here — which is what this branch used to do to every verb it did not personally own,
+// including the empty one: `witness config` answered `unknown: config` about a noun its own help
+// documents.
 if (rest[0] === "config" && !configFile) {
-  const verb = config.verbs![rest[1] ?? ""];
-  if (!verb) Cli.die(`unknown: config ${rest[1] ?? ""}`.trim(), 2);
-  const answer = verb.run(rest.slice(2));
-  process.stdout.write(typeof answer === "string" ? `${answer}\n` : `${JSON.stringify(answer, null, 2)}\n`);
-  process.exit(0);
+  const listed = Cli.listVerbs("config", config, rest[1]);
+  if (listed) {
+    process.stdout.write(listed);
+    process.exit(0);
+  }
+  const name = rest[1] ?? "";
+  // A verb that does not exist is still a clean 2 here. Falling through for ANYTHING unrecognised
+  // sent `config nonsense` on to load a description it never needed, and the reader got "no
+  // .witness/ directory" instead of being told the verb was the problem.
+  if (!config.verbs![name]) Cli.die(`unknown: config ${name}`.trim(), 2);
+  if (name === "template" || name === "where") {
+    const answer = config.verbs![name].run(rest.slice(2));
+    process.stdout.write(typeof answer === "string" ? `${answer}\n` : `${JSON.stringify(answer, null, 2)}\n`);
+    process.exit(0);
+  }
 }
 
 let system: System;
