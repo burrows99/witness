@@ -159,6 +159,14 @@ export class Stack {
 export type ServiceSpec = {
   /** Default published port. Overridden by `portVar` in the compose `.env`. */
   port?: number;
+  /**
+   * The variable in the compose `.env` that SETS the port, when there is one.
+   *
+   * The load-bearing half of the pair: a second checkout runs the same stack on its own ports by
+   * setting the variable compose already reads, so it needs no wrapper script — and a literal `port`
+   * typed where this belongs is that knob quietly disconnected. `port` is the fallback for when the
+   * variable is unset, which is what `${PORT:-3020}` says in the compose file.
+   */
   portVar?: string;
   /** A fixed URL instead of localhost:port (a remote environment, say). */
   url?: string;
@@ -166,6 +174,7 @@ export type ServiceSpec = {
   urlVar?: string;
   /** Container name WITHOUT the worktree suffix. Omit for a service that runs on the host. */
   container?: string;
+  /** Environment variable that overrides the container name outright, suffix and all. */
   containerVar?: string;
   /**
    * How `status` decides it is up.

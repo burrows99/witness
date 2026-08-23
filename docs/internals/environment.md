@@ -4,7 +4,7 @@
 
 | file | |
 |---|---|
-| `stack.ts` (190) | service → URL, port, container, and whether it is up |
+| `stack.ts` (215) | service → URL, port, container, and whether it is up |
 | `docker.ts` (71) | the containers, over the docker CLI |
 | `workspace.ts` (130) | `.witness/` — the one directory this tool reads and writes |
 

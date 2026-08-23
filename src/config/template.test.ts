@@ -2,6 +2,7 @@ import { deepEqual, equal, match, ok } from "node:assert/strict";
 import { test } from "node:test";
 
 import { Registry } from "../providers/registry.ts";
+import { Compose } from "./compose.ts";
 import { Template } from "./template.ts";
 import { TypeSource } from "./types.ts";
 import { withoutComments } from "./load.ts";
@@ -90,6 +91,28 @@ test("witness's own template covers every field of SystemConfig, and parses", ()
   const rendered = Template.forWitness().render();
   const parsed = parse(rendered);
   deepEqual(Object.keys(parsed), schema.fields.map(f => f.name));
+});
+
+test("witness's own template covers every field of a service, the ones `init` writes included", () => {
+  // Counted against two things that are NOT the template: the type that declares where a service runs,
+  // and the config `init` really generates from a compose file. Counting a service's keys against
+  // `ServiceConfig` would have proved nothing — the reader dropped `ServiceSpec` from the declaration
+  // and from the template alike, so the two agreed perfectly on a shape neither of them had.
+  const types = TypeSource.fromDirectory(new URL("..", import.meta.url).pathname);
+  const spec = types.declaration("ServiceSpec");
+  ok(spec.kind === "object");
+
+  const services = parse(Template.forWitness().render()).services as Record<string, Record<string, unknown>>;
+  const service = Object.keys(services["<name>"]);
+  for (const field of spec.fields) ok(service.includes(field.name), `a service's "${field.name}" is missing from the template`);
+
+  // And the four that sent someone here in the first place: `init` writes them into the file directly
+  // above the comment pointing at `config template` for everything it left out.
+  const written = Compose.translate({ web: { build: { context: "." }, container_name: "acme-web${WT:-}", ports: ["${WEB_PORT:-3000}:3000"] } }, "acme");
+  deepEqual(Object.keys(written.services.web), ["kind", "port", "portVar", "container"]);
+  for (const field of Object.keys(written.services.web)) {
+    ok(service.includes(field), `\`init\` writes "${field}" into a service, and the template does not have it`);
+  }
 });
 
 test("witness's own template names every registered provider", () => {

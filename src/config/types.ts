@@ -59,6 +59,11 @@ export class TypeSource {
    * Unions and intersections first, because they are the outermost thing; then the shapes; then the
    * leaves. An intersection of objects becomes one object — `Record<string, unknown> & { … }` is how a
    * type says "these fields, and anything else", and the fields are the half worth showing.
+   *
+   * Each half is {@link resolve}d before its fields are taken, because a NAMED half is a reference and
+   * a reference has no fields: `ServiceConfig = ServiceSpec & { … }` kept only the anonymous half, so
+   * every field of `ServiceSpec` — `port`, `portVar`, `container`, `kind` and the rest of where a
+   * service runs — was absent from the template that calls itself every field witness understands.
    */
   parse(text: string): TypeModel {
     const source = text.trim().replace(/;$/, "").trim();
@@ -68,7 +73,7 @@ export class TypeSource {
 
     const intersection = TypeSource.split(source, "&");
     if (intersection.length > 1) {
-      const parts = intersection.map(part => this.parse(part));
+      const parts = intersection.map(part => this.resolve(this.parse(part)));
       const fields = parts.flatMap(part => (part.kind === "object" ? part.fields : []));
       return fields.length ? { kind: "object", fields } : parts[0];
     }
@@ -102,7 +107,7 @@ export class TypeSource {
           .map(part => part.trim().replace(/^["']|["']$/g, ""))
           .filter(Boolean),
       );
-      const resolved = inner.kind === "ref" ? this.declaration(inner.name) : inner;
+      const resolved = this.resolve(inner);
       if (resolved.kind === "object") return { kind: "object", fields: resolved.fields.filter(field => !dropped.has(field.name)) };
       return resolved;
     }
@@ -120,6 +125,25 @@ export class TypeSource {
     // A function type, a `keyof`, an imported generic: real TypeScript this reader does not model. Kept
     // verbatim so the template says what the type says rather than inventing a shape for it.
     return { kind: "opaque", text: source.replace(/\s+/g, " ") };
+  }
+
+  /**
+   * A reference followed to the declaration it names, through however many aliases stand in between.
+   *
+   * Only for the two constructs that have to look INSIDE a type rather than point at it: an
+   * intersection taking a half's fields, an `Omit` taking all but some. Everywhere else a reference
+   * stays a reference — that is what lets the template spell a type out once and point at it after
+   * that. `Omit<ApiConfig, "service">` needs the whole chain: `ApiConfig` is an alias for
+   * `ClientConfig`, and stopping at the first declaration left a service's `api` holding nothing.
+   */
+  private resolve(model: TypeModel): TypeModel {
+    const seen = new Set<string>();
+    let resolved = model;
+    while (resolved.kind === "ref" && !seen.has(resolved.name)) {
+      seen.add(resolved.name);
+      resolved = this.declaration(resolved.name);
+    }
+    return resolved;
   }
 
   /** The members of an object type body, with the doc comment that precedes each. */
