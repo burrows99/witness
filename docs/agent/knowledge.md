@@ -36,6 +36,13 @@ stayed green throughout. Same family as the entry above: when the fixture and th
 shape, neither of them is checking it. Build the fixture through the loader, or assert against what
 the loader returns.
 
+**A service in the stack that nothing uses proves nothing.** The compose file has shipped an identity
+provider since the day the third-party services went in — "a sign-in that LEAVES the app, on a second
+origin, on purpose" — and not one service was pointed at it. So the single case the crawler most needed
+to get right could not happen here, and arrived instead as a bug report from somebody else's app, where
+it had already described Microsoft's login screen as that product's own. Wiring Grafana to it was five
+environment variables. A stack that cannot produce the shape cannot catch the bug.
+
 ---
 
 ## Changing this repository
@@ -164,6 +171,16 @@ invisible until something loaded the file:
 
 Both are lazily-resolve-it bugs, and both only exist for configs a person would not have hand-written.
 Generating input is also generating new *shapes* of input.
+
+**A same-origin check on the href is not a same-origin check.** `config explore` asked where a link
+POINTED and then walked it, so `/api/auth/idp/microsoft/start` — a path on the app's own origin —
+took the crawl to login.microsoftonline.com, and the description of a git forge offered "Email, phone,
+or Skype". Where a navigation LANDS is the only version of the question that can be answered, and it
+cannot be asked until after the navigation. Same family as checking a URL by substring: the string is
+not the request. And the check that arrives too late is not the whole fix — an OAuth start endpoint is
+a same-origin link on the login page of a very large number of applications, so the shapes that begin
+a handoff are skipped before anything is sent. A tool that walks a stack on request must reach nobody
+the person did not point it at.
 
 ---
 
