@@ -252,6 +252,23 @@ exactly like a wrong one. Generate where the stack was brought up, or name the d
 project. The same fact is why nine services in a nineteen-service stack had no `container` at all: the
 name is only ever in the compose file when somebody typed it there, and most of the time nobody did.
 
+**A generated description has to be the same twice, and no per-function test can tell you it is not.**
+Twenty-two tests asked twenty-two questions of `explore` and every one passed while three separate
+defects made two runs of the same command against an unchanged app disagree — an id in a route, a spam
+score in a locator's name, a page recorded where it was asked for rather than where it landed. Each is
+invisible to a test that hands one function one input, because each needs two runs and a diff to have
+a shape at all. The fix is one test: render a whole crawl twice with the app's live values moved on,
+and compare the strings. Anything committed and later regenerated needs that test, or the churn in the
+diff is the first anyone hears about it.
+
+**A rule that only half its callers got is worse than one nobody wrote.** `operations` has collapsed
+`/repos/7/issues` and `/repos/12/issues` into `{id}` since the day it was written; `routes` never
+learned to, so one fragment folded eleven observed API calls back into the single operation they came
+from and, four lines above, wrote down a route to one email that would be deleted that week. Nothing
+looked wrong: the half that was right made the file read as if the rule were being applied. When a
+rule turns out to be needed twice, move it and take both callers — a copy of the reasoning in a
+comment is not the same as a call.
+
 ---
 
 ## Judgement calls that keep coming back
