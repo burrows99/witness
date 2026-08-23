@@ -1,5 +1,5 @@
 import { deepEqual, equal, match, ok } from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { tmpdir } from "node:os";
@@ -16,6 +16,19 @@ const havePlaywright = await import("@playwright/test").then(
 );
 const when = { skip: havePlaywright ? false : "needs @playwright/test" };
 
+/**
+ * And a browser, for the half that drives one.
+ *
+ * The package is not the browser: `npm i @playwright/test` downloads none, so a test that RUNS an
+ * action needs `npx playwright install chromium`, which is why CI installs it. Skipped rather than
+ * failed on a checkout that has not — the same guard `drift.test.ts` uses, for the same reason — and
+ * CI is the one place nothing may skip.
+ */
+const executable = havePlaywright ? await import("@playwright/test").then(pw => pw.chromium.executablePath()).catch(() => "") : "";
+const withABrowser = {
+  skip: !havePlaywright ? "needs @playwright/test" : existsSync(executable) ? false : "needs a browser — npx playwright install chromium",
+};
+
 /** A checkout with a marker file and a config in it, and the CLI run from inside it. */
 const checkout = (config: Record<string, unknown>): string => {
   const dir = mkdtempSync(path.join(tmpdir(), "witness-cli-"));
@@ -26,7 +39,13 @@ const checkout = (config: Record<string, unknown>): string => {
 };
 
 const witness = (args: string[], cwd = tmpdir()): { status: number; out: string; err: string } => {
-  const run = spawnSync(process.execPath, ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", binary, ...args], { cwd, encoding: "utf8" });
+  // A ceiling, so a command that never exits fails this suite rather than hanging it forever — and a
+  // status nothing can be when it hits, because a command with no exit code is the same failure these
+  // tests are about, one step further along. `spawnSync` hands back the code the process would have
+  // used alongside the ETIMEDOUT, so a run that printed everything and then held the process open
+  // would otherwise read here as one that answered.
+  const run = spawnSync(process.execPath, ["--disable-warning=MODULE_TYPELESS_PACKAGE_JSON", binary, ...args], { cwd, encoding: "utf8", timeout: 120_000 });
+  if (run.error) return { status: -1, out: run.stdout, err: `${run.stderr}${run.error.message}\n` };
   return { status: run.status ?? -1, out: run.stdout, err: run.stderr };
 };
 
@@ -115,6 +134,67 @@ test("a flag written with a space says so instead of being ignored", when, () =>
   const { status, err } = witness(["--config", "acme.config.json", "config", "explore", "--as", "signIn"], dir);
   equal(status, 2);
   match(err, /--as takes its value with an =/);
+});
+
+/**
+ * Two actions that need nothing running: a claim that holds, and one that does not.
+ *
+ * A `check` step is settled in the process — no navigation, no timeout, no service to stand up — so a
+ * run that fails here fails for the reason under test and takes about a second. It is still a real
+ * action driven by the real command line in a real browser, which is the point: what these assert is
+ * the code a shell would actually be handed.
+ */
+const withActions = {
+  ...config,
+  actions: {
+    holds: { summary: "a claim that still holds", steps: [{ check: { that: "one", equals: "one" } }] },
+    broken: { summary: "a claim that no longer holds", steps: [{ check: { that: "one", equals: "two" } }] },
+  },
+};
+
+test("an action that ran and failed exits 1, and still hands over the evidence", withABrowser, () => {
+  // The command that drives the product was the one place the repository's headline rule did not hold:
+  // `"ok": false` and `0 ok · 1 failed` printed over a shell told everything went fine. It was caught
+  // filming, with the error and `exit=0` in the same frame (#127).
+  const dir = checkout(withActions);
+  const { status, out } = witness(["--config", "acme.config.json", "action", "run", "broken"], dir);
+  equal(status, 1);
+  // Set rather than exited, the way `check drift` does it: a non-zero exit must not cost the reader
+  // the JSON, the video or the debug story, which are the whole reason to run this rather than a test.
+  match(out, /"ok": false/);
+  match(out, /failed at step 1/);
+  ok(existsSync(path.join(dir, "artifacts", "cli", "broken", "run")), "the failed run still filed its evidence");
+});
+
+test("…and an action that worked still exits 0", withABrowser, () => {
+  const dir = checkout(withActions);
+  const { status, out } = witness(["--config", "acme.config.json", "action", "run", "holds"], dir);
+  equal(status, 0);
+  match(out, /"ok": true/);
+});
+
+test("a chain is as failed as the action in it that failed", withABrowser, () => {
+  // One lane, several actions, in order: `holds` working first does not make the run a success.
+  const dir = checkout(withActions);
+  equal(witness(["--config", "acme.config.json", "action", "run", "holds", "broken"], dir).status, 1);
+});
+
+test("and so is a parallel run with one failed lane", withABrowser, () => {
+  // Lanes settle on their own and the run collects them, so this is where a failure is easiest to
+  // lose. It is also where there was no code to lose it from: a browser was opened per lane and only
+  // the last one closed, so the command printed its whole result and then never exited at all.
+  const dir = checkout(withActions);
+  equal(witness(["--config", "acme.config.json", "action", "run", "holds", "broken", "--parallel"], dir).status, 1);
+});
+
+test("a name that names nothing is a 1 too, and still opens nothing", when, () => {
+  // The other way out of this verb, and not to be regressed by the ones above: the name is answered
+  // for before a browser or a directory exists (#141), so there is nothing on disk to read as a run.
+  const dir = checkout(withActions);
+  const { status, err } = witness(["--config", "acme.config.json", "action", "run", "nope"], dir);
+  equal(status, 1);
+  match(err, /no such action "nope" — declared: holds, broken/);
+  ok(!existsSync(path.join(dir, "artifacts")), "nothing was written for a run that never happened");
 });
 
 test("a config file may carry the comments that explain it", when, () => {

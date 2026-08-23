@@ -175,14 +175,19 @@ went into planning a demo of the callback before anyone asked the provider a que
 fixture before building on it: `wired` is a statement about one file, `works` is a statement about
 two processes.
 
-**`action run` exits 0 on an action that failed.** `runActions` catches a failing action so its
-evidence still gets rendered, and the command line prints that result and returns — so
-`./bin/witness action run x; echo "exit=$?"` prints `exit=0` directly underneath `"ok": false`, and
-`witness help` says `0 ok · 1 failed` three lines further down. It was caught filming: a terminal
-recording of a run of an action that does not exist showed the error and `exit=0` in the same frame,
-which is evidence contradicting itself in the one place this repository can least afford it. Same
-family as `gh pr checks` — a green from a command that was never asked the question. Until it is
-fixed, do not put `echo "exit=$?"` after `action run` in anything anybody will watch.
+**`action run` exited 0 on an action that failed.** *(Fixed in #127. Kept because the rule it broke is
+this file's first entry.)* `runActions` catches a failing action so its evidence still gets rendered,
+and the command line printed that result and returned — so `./bin/witness action run x; echo
+"exit=$?"` printed `exit=0` directly underneath `"ok": false`, with `witness help` saying
+`0 ok · 1 failed` three lines further down. It was caught filming: a terminal recording of a run of an
+action that does not exist showed the error and `exit=0` in the same frame, which is evidence
+contradicting itself in the one place this repository can least afford it. Same family as `gh pr
+checks` — a green from a command that was never asked the question. The fix is the line `check drift`
+has had all along (`process.exitCode = 1`, set rather than exited, so the JSON, the video and the
+debug story still land) and a test that drives a deliberately failing action through the real binary,
+because what let it live this long was that nothing ran the verb. **A `before` cut of a bug now exits
+`1`, and that is the run working**: read the frames, not the code, when the failure is the thing being
+recorded. The rule a repository opens its documentation with is the one to grep its own code for.
 
 **A fixture cannot test the step that decides what goes IN a fixture.** Twenty-two tests asked
 `Explore.forms` questions and every one passed while the crawler could not see a labelled input,
@@ -248,6 +253,15 @@ a `(tried "<resolved>" too)` clause that could never print: resolution returned 
 when it was declared, so wherever the message was built the two were equal by construction. It looked
 like the command line had a fallback for bare names. It did not — and the generated skill told its
 readers to write one, which is how #141 was found. Grep for what a message CLAIMS before believing it.
+
+**`x ??= await f()` is not a memo, and under `--parallel` it opened a browser per lane.** The check
+happens, the `await` suspends, and only then is the variable assigned — so every lane that asked while
+the first launch was in flight found nothing there and started one of its own. The last one to settle
+was the one closed; the rest stayed up holding the event loop, and the command printed its whole
+result and then never exited: no exit code at all, which is worse than the wrong one #127 was about
+and hid behind it. Memoise the PROMISE (`opening ??= launch()`), and await it once at the end to close
+what it opened. Found by running `action run a b --parallel` while checking that a failed lane reports
+a failure — the case the fix was about was fine and the command it was in could not answer at all.
 
 ---
 

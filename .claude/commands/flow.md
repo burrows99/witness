@@ -41,6 +41,9 @@ Before touching anything, because afterwards there is nothing left to record.
 EVIDENCE=before ./bin/witness action run <action>
 ```
 
+- A before cut of a bug **exits 1**, and that is the run working (#127): the action ran and failed,
+  which is the thing being recorded. The result and the evidence are written either way — read the
+  frames, not the code, in this one phase.
 - No action shows the behaviour? Write one. `docs/how-to/write-an-action.md`. It outlives the ticket.
 - The change is in terminal output rather than a screen? The service records with
   `"records": "terminal"` — `docs/how-to/record-a-terminal.md`. This is a terminal tool; most of its

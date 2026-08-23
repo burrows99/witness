@@ -107,7 +107,7 @@ export function commandsFor(system: System): Cli {
           run: async (args: string[], flags: string[] = []) => {
             const { names, inputs } = parseRunArgs(args);
             if (!names.length) Cli.die("missing <action> — `action list` says which", 2);
-            return runActions(system, {
+            const result = await runActions(system, {
               names,
               inputs,
               headed: process.env.HEADED === "1",
@@ -122,6 +122,14 @@ export function commandsFor(system: System): Cli {
               retries: Number(flags.find(flag => flag.startsWith("--retries"))?.split("=")[1] ?? 0),
               cookies: identityCookies(system.config.identities),
             });
+            // The gate `check drift` sets above, on the command that drives the product. `runActions`
+            // catches a failing action so its evidence still gets written, and the exit code was left
+            // at 0 behind it: `"ok": false` and `0 ok · 1 failed` printed over a shell told everything
+            // went fine, in a repository whose headline rule is to read the exit code and never the
+            // output. Set rather than exited, for the reason drift is: the JSON, the video and the
+            // debug story are the point, and a red must not cost the reader the evidence for it.
+            if (!result.ok) process.exitCode = 1;
+            return result;
           },
         },
       },

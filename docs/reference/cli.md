@@ -68,7 +68,10 @@ npx witness action run <action…> [key=value…] [--parallel] [--retries=N]
   only one service declares that name, bare; anything else is refused before a browser is opened, and
   leaves no evidence directory behind
 
-Exit code is 1 if any action failed.
+Exit code is 1 if any action failed — a chain where only one of them broke, a `--parallel` run where
+only one lane did. The result is still printed and the evidence still written: the code is set on the
+way out, not exited on, because a red that costs the reader the frames is worse than the green it
+replaces. So a `before` cut of a bug is *meant* to be a 1, and the frames are what to read next.
 
 ## `config explore`
 
