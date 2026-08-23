@@ -79,3 +79,23 @@ test("every statement reaches the trace, with what it answered", () => {
   equal(entry.statement, "select status from orders");
   equal(entry.rows, "cancelled");
 });
+
+test("the credential is asked for when a query runs, not when the system is built", () => {
+  // `containerEnv` reads a RUNNING container. Resolving it eagerly meant building a system shelled
+  // into docker — so `witness help` failed whenever the stack was down, which is most of the time
+  // somebody types it.
+  let asked = 0;
+  const db = new Postgres({
+    docker: { exec: () => "ok" } as unknown as Docker,
+    container: "acme-db",
+    user: "acme",
+    database: "acme",
+    password: () => {
+      asked += 1;
+      return "from-the-container";
+    },
+  });
+  equal(asked, 0);
+  db.sql("select 1");
+  equal(asked, 1);
+});

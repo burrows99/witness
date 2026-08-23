@@ -53,6 +53,16 @@ test("run where there is no .witness, it says how to make one", when, () => {
   match(err, /Run `witness init` to make one, or pass --config <file>/);
 });
 
+test("a noun on its own lists its verbs, including the ones that need a description", when, () => {
+  // `config` answered `unknown: config` about a noun its own help documents, because the entry point
+  // handled the noun itself and had its own, worse, copy of this branch.
+  const { status, out } = witness(["config"]);
+  equal(status, 0);
+  match(out, /config — the description this tool reads/);
+  match(out, /template\s+print a config file/);
+  match(out, /explore\s+/);
+});
+
 test("an unknown config verb is a 2, not a stack trace", when, () => {
   const { status, err } = witness(["config", "nonsense"]);
   equal(status, 2);

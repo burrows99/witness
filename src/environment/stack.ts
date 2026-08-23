@@ -38,8 +38,10 @@ export class Stack {
     this.endpoints = Object.fromEntries(
       Object.entries(spec.services).map(([name, s]) => [
         name,
-        process.env[s.urlVar ?? ""] ??
-          (s.url ? s.url : `http://localhost:${s.portVar ? (compose[s.portVar] ?? s.port) : s.port}`),
+        // A service can publish no port at all — a queue worker, a migration container. It has no
+        // URL, and inventing `http://localhost:undefined` for it made every command that asks the
+        // stack anything throw `Invalid URL`.
+        Stack.endpoint(s, compose),
       ]),
     );
 
@@ -76,7 +78,8 @@ export class Stack {
         let reachable: boolean;
         let answering: string | undefined;
 
-        if (probe === "container") {
+        // No URL to ask, so docker is the only thing that can answer — whether or not anyone said so.
+        if (probe === "container" || !url) {
           reachable = containerUp ?? false;
         } else {
           const spec = typeof probe === "object" ? probe : {};
@@ -98,7 +101,7 @@ export class Stack {
 
         // A declared container that is NOT the one publishing the port means somebody else's software
         // is answering. Neither up nor down — and the most expensive thing to discover later.
-        const port = Number(new URL(url).port);
+        const port = url ? Number(new URL(url).port) : 0;
         if (container && port) {
           const publisher = this.docker.publisher(port);
           if (publisher && publisher !== container) answering = `${publisher} publishes this port, not ${container}`;
@@ -107,6 +110,15 @@ export class Stack {
         return { name, url, reachable, container, containerUp, answering };
       }),
     );
+  }
+
+  /** Where a service answers, or `""` when it publishes nothing to answer on. */
+  static endpoint(service: ServiceSpec, compose: Record<string, string>): string {
+    const override = process.env[service.urlVar ?? ""];
+    if (override) return override;
+    if (service.url) return service.url;
+    const port = service.portVar ? (compose[service.portVar] ?? service.port) : service.port;
+    return port ? `http://localhost:${port}` : "";
   }
 
   /** A `KEY=value` file as an object. A missing file is not an error — it means "all defaults". */
