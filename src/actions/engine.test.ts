@@ -1,8 +1,10 @@
 import { deepEqual, equal, match, ok, rejects } from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
+
+import type { Browser, Page } from "@playwright/test";
 
 import type { Evidence } from "../evidence/evidence.ts";
 import type { Operations } from "../http/operations.ts";
@@ -21,6 +23,33 @@ const havePlaywright = await import("@playwright/test").then(
 );
 const { Actions } = havePlaywright ? await import("./engine.ts") : ({} as typeof import("./engine.ts"));
 const when = { skip: havePlaywright ? false : "needs @playwright/test" };
+
+/**
+ * …and the half that cannot be driven with a fake at all.
+ *
+ * What a step reads off an element is decided BY the element, so a page that answers the same thing
+ * whatever was asked cannot catch it getting the decision wrong: every assertion available without
+ * leaving the process passes against a `store` that reads an `<input>` as empty. The package is not
+ * the browser either — `npm i @playwright/test` downloads none — so this needs `npx playwright install
+ * chromium`, which CI runs, and CI is the one place nothing may skip.
+ */
+const executable = havePlaywright ? await import("@playwright/test").then(pw => pw.chromium.executablePath()).catch(() => "") : "";
+const withABrowser = {
+  skip: !havePlaywright ? "needs @playwright/test" : existsSync(executable) ? false : "needs a browser — npx playwright install chromium",
+};
+
+/** One browser for the file, opened by the first test that needs one and closed after the last. */
+let browser: Browser | undefined;
+const showing = async (html: string): Promise<Page> => {
+  const { chromium } = await import("@playwright/test");
+  browser ??= await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.setContent(html);
+  return page;
+};
+after(async () => {
+  await browser?.close();
+});
 
 type Done = string[];
 
@@ -45,8 +74,12 @@ const fakePage = (
     click: async () => void did.push(`click ${what}`),
     fill: async (value: string) => void did.push(`fill ${what} ${JSON.stringify(value)}`),
     pressSequentially: async (value: string) => void did.push(`type ${what} ${JSON.stringify(value)}`),
-    textContent: async () => opts.text ?? "  on screen  ",
-    allTextContents: async () => opts.all ?? [opts.text ?? "  on screen  "],
+    // What the engine asks an element for now. A fake can answer the READING and not the rule that
+    // produced it: the rule branches on what kind of element it is, and a fake that says the same
+    // thing for an `<input>` as for a `<div>` is the one thing that cannot be asked. The tests at the
+    // end of this file open a browser for exactly that reason.
+    evaluate: async () => [{ said: opts.text ?? "  on screen  ", control: false }],
+    evaluateAll: async () => (opts.all ?? [opts.text ?? "  on screen  "]).map(said => ({ said, control: false })),
     count: async () => (opts.absent && what.includes(opts.absent) ? 0 : 1),
     filter: () => locator(what),
     nth: (n: number) => locator(`${what}#${n}`),
@@ -430,7 +463,6 @@ test("every step is named by what it does, and says what it is about", when, asy
   ).run("a", {
     ...(fakePage().page as unknown as Record<string, unknown>),
     waitForURL: async () => undefined,
-    textContent: async () => "Tuesday",
   } as never);
 
   deepEqual(
@@ -575,8 +607,8 @@ test("store reads one thing, or every one of them", when, async () => {
   const withOptions = {
     ...(page as unknown as Record<string, unknown>),
     getByRole: () => ({
-      textContent: async () => "What to expect",
-      allTextContents: async () => [...options, "  "],
+      evaluate: async () => [{ said: "What to expect", control: false }],
+      evaluateAll: async () => [...options, "  "].map(said => ({ said, control: false })),
     }),
   } as never;
 
@@ -993,5 +1025,178 @@ test("a system with nowhere to keep fixtures says so rather than guessing at the
   await rejects(
     () => engine({ a: { steps: [{ upload: "seed.pdf", to: "#drop" }] } }).run("a", fakePage().page),
     /an `upload` step names a file, and this system was built without a `\.witness\/` directory to find one in/,
+  );
+});
+
+/**
+ * A settings dialog of the shape that found this: picking a provider prefills its endpoint, and the
+ * claim worth making is that the box now holds Google's URL rather than the last provider's.
+ */
+const SETTINGS = `
+  <h1>Provider settings</h1>
+  <label for="provider">Provider</label>
+  <select id="provider">
+    <option value="oa">OpenAI</option>
+    <option value="gm" selected>Gemini</option>
+  </select>
+  <label for="provider-base-url">Base URL</label>
+  <input id="provider-base-url" value="https://generativelanguage.googleapis.com/v1beta/openai/">
+  <label for="system-prompt">System prompt</label>
+  <textarea id="system-prompt">the prompt this page shipped with</textarea>
+  <label for="api-key">API key</label>
+  <!-- Empty on purpose: no value attribute here, and none anywhere near a masked input. A hardcoded
+       one is a hardcoded credential to a secret scanner reading this repository, and the scanner
+       reads the SHAPE, so a fixture whose content SAYS it is not a key fails in the same place. The
+       run types into it instead, which is what puts a credential in a password field anywhere
+       outside a fixture, and leaves nothing in the history for a scanner to find. -->
+  <input id="api-key" type="password">
+  <input id="organisation" value="">
+  <input id="stream" type="checkbox" checked>
+  <input id="verbose" type="checkbox">
+`;
+
+/**
+ * What a `type` step puts behind the dots.
+ *
+ * A sentence rather than anything key-shaped, and a name rather than a literal at the step: the point
+ * of the test below is that this string is unreadable off the screen and absent from the result, which
+ * is a claim about the reading and not about what was typed.
+ */
+const BEHIND_THE_DOTS = "the value behind the dots";
+
+test("a field that was prefilled is a claim an action can make", withABrowser, async () => {
+  // The issue, verbatim. `store` read text content, an input has none, and the value was on the
+  // screen, in the frame beside the step, and unassertable: the check failed as `"{baseUrl}" is ""`.
+  const page = await showing(SETTINGS);
+  const result = await engine({
+    a: {
+      steps: [
+        { store: { from: { css: "#provider-base-url" }, as: "baseUrl" } },
+        { check: { that: "{baseUrl}", contains: "generativelanguage.googleapis.com", because: "picking Gemini must prefill its endpoint" } },
+        // Named the way a person names it, which is the form the reference advertises and the reason
+        // the step author cannot be asked which tag their locator lands on.
+        { store: { from: { label: "Base URL" }, as: "byLabel" } },
+        // And the reading everything else already had is untouched: a heading is still its text.
+        { store: { from: "h1", as: "heading" } },
+      ],
+    },
+  }).run("a", page);
+
+  equal(result.values.baseUrl, "https://generativelanguage.googleapis.com/v1beta/openai/");
+  equal(result.values.byLabel, result.values.baseUrl);
+  equal(result.values.heading, "Provider settings");
+});
+
+test("a picker reads as the option chosen, not as every option it offers", withABrowser, async () => {
+  // The loud half of this bug is an empty string. The quiet half is a `<select>`, whose text content
+  // is every option concatenated — `"OpenAIGemini"` — so a claim about the chosen provider went GREEN
+  // against the one nobody chose, which is worse than the failure the issue was filed about.
+  const page = await showing(SETTINGS);
+  const result = await engine({ a: { steps: [{ store: { from: { css: "#provider" }, as: "provider" } }] } }).run("a", page);
+  equal(result.values.provider, "Gemini");
+
+  await rejects(
+    () =>
+      engine({
+        a: { steps: [{ store: { from: { css: "#provider" }, as: "provider" } }, { check: { that: "{provider}", contains: "OpenAI" } }] },
+      }).run("a", page),
+    /"\{provider\}" is "Gemini", which does not contain "OpenAI"/,
+  );
+});
+
+test("a textarea reads as what was typed into it, not as what the markup said", withABrowser, async () => {
+  // The third direction, and the one with no symptom at all: a textarea's text content is what the
+  // page SHIPPED with, so a store after a type step read a plausible, stale, wrong value.
+  const page = await showing(SETTINGS);
+  const result = await engine({
+    a: {
+      steps: [
+        { store: { from: { css: "#system-prompt" }, as: "before" } },
+        { type: { on: { css: "#system-prompt" }, value: "answer in one sentence", delay: 0 } },
+        { store: { from: { css: "#system-prompt" }, as: "after" } },
+      ],
+    },
+  }).run("a", page);
+
+  equal(result.values.before, "the prompt this page shipped with");
+  equal(result.values.after, "answer in one sentence");
+});
+
+test("a checkbox reads as whether it is ticked, which is the question it is asked", withABrowser, async () => {
+  // A checkbox has a value AND a checked state and they are different questions. `.value` is `"on"`
+  // unless somebody set it, it is nowhere on the screen, and it does not move when the box does.
+  const page = await showing(SETTINGS);
+  const result = await engine({
+    a: {
+      steps: [
+        { store: { from: { css: "#stream" }, as: "stream" } },
+        { store: { from: { css: "#verbose" }, as: "verbose" } },
+        { check: { that: "{stream}", equals: "true", because: "streaming is on by default" } },
+        { click: { css: "#verbose" } },
+        { store: { from: { css: "#verbose" }, as: "afterClicking" } },
+      ],
+    },
+  }).run("a", page);
+
+  equal(result.values.stream, "true");
+  equal(result.values.verbose, "false");
+  equal(result.values.afterClicking, "true");
+});
+
+test("a password field reads as the dots it draws, and what was typed never reaches the result", withABrowser, async () => {
+  // `values` is returned to the caller, printed as JSON by the command line and pasted into pull
+  // requests, and this engine's one rule about credentials is that they must not become stored
+  // values — which a reading that took `.value` would have broken from the other end. A password
+  // field draws dots on purpose; enough of them to say a field is filled is the whole of what is on
+  // the screen. Typed by the run rather than sitting in the fixture, which is both the real shape and
+  // the only one that does not put a hardcoded credential in this repository.
+  const page = await showing(SETTINGS);
+  const result = await engine({
+    a: {
+      steps: [
+        { type: { on: { label: "API key" }, value: BEHIND_THE_DOTS, delay: 0 } },
+        { store: { from: { label: "API key" }, as: "apiKey" } },
+        { check: { that: "{apiKey}", not: "", because: "a filled field must still have something to read" } },
+      ],
+    },
+  }).run("a", page);
+
+  equal(result.values.apiKey, "•".repeat(BEHIND_THE_DOTS.length));
+  ok(!JSON.stringify(result).includes(BEHIND_THE_DOTS), "what was typed into a masked field must not survive into the result");
+});
+
+test("store all reads every field's value, and keeps the one that is empty", withABrowser, async () => {
+  // A blank match is whitespace between tags and not an option, which is why the list form drops
+  // them. An empty FIELD is a fact about the form, and losing it is the silent version of this bug.
+  const page = await showing(SETTINGS);
+  const result = await engine({
+    a: { steps: [{ store: { from: { css: "input:not([type=checkbox]):not([type=password])" }, as: "fields", all: true } }] },
+  }).run("a", page);
+
+  deepEqual(result.values.fields, ["https://generativelanguage.googleapis.com/v1beta/openai/", ""]);
+});
+
+test("expect reads a form control the same way store does", withABrowser, async () => {
+  // Same blindness, one verb along: Playwright's text matcher is `textContent` with a nicer message,
+  // so `text` on an input could never pass however right the claim, and `text` on a select matched
+  // every option the picker offers rather than the chosen one.
+  const page = await showing(SETTINGS);
+  const result = await engine({
+    a: {
+      steps: [
+        { expect: { on: { css: "#provider-base-url" }, text: "generativelanguage.googleapis.com", because: "picking Gemini must prefill its endpoint" } },
+        { expect: { on: { css: "#provider" }, text: "Gemini" } },
+        // Anything that is not a control is left to Playwright's matcher, which normalises the
+        // whitespace markup wraps a sentence in and says more about a locator than a predicate can.
+        { expect: { on: "h1", text: "Provider settings" } },
+      ],
+    },
+  }).run("a", page);
+  ok(result.ok, result.error);
+
+  await rejects(
+    () => engine({ a: { steps: [{ expect: { on: { css: "#provider" }, text: "OpenAI", timeout: 1_000 } }] } }).run("a", page),
+    /Gemini/,
+    "the option nobody chose must not satisfy a claim about the picker",
   );
 });

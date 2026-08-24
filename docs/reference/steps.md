@@ -49,7 +49,8 @@ is the right name one element off.
 | `expect` | `{ on, state?, text?, count?, timeout?, because? }` | about the **screen** |
 | `check` | `{ that, equals?, not?, contains?, matches?, atLeast?, atMost?, because? }` | about the **values gathered** — `matches` is a regex |
 
-`because` becomes the failure message. Write it for the person reading the failure.
+`because` becomes the failure message. Write it for the person reading the failure. `expect` with
+`text` reads a form control by its value, the same way [`store`](#gathering) does.
 
 ## A sign-in that leaves the app
 
@@ -97,6 +98,26 @@ difference, and it is the reason this is a step rather than something a crawler 
 
 Everything stored is available to later steps as `{name}`, dotted for depth (`{order.status}`,
 `{rows.length}`).
+
+A **form control** is read by its value and everything else by its text, decided from the element
+rather than declared in the step — you named a thing on the screen, and what it says is what you get.
+It matters because the wrong reading is quiet rather than loud: an `<input>` has no text at all, a
+`<textarea>`'s text is what the markup shipped with rather than what was typed into it, and a
+`<select>`'s text is every option it offers concatenated, so `"contains": "OpenAI"` would pass on a
+picker with Gemini chosen. So *this field was prefilled correctly* is a claim an action can make:
+
+```jsonc
+{ "store": { "from": { "label": "Base URL" }, "as": "baseUrl" } },
+{ "check": { "that": "{baseUrl}", "contains": "generativelanguage.googleapis.com",
+             "because": "picking Gemini must prefill its endpoint" } }
+```
+
+Three controls where the value is not what is on the screen either, and the screen wins. A `<select>`
+reads as the **label** of the chosen option — its value is an identifier its author picked, which may
+appear nowhere on the page. A checkbox or a radio reads as `"true"` or `"false"`: its value is `"on"`
+and never drawn, while whether it is ticked is the question anybody has of it. And a password field
+reads as the dots it draws, which is enough to say a field was prefilled without putting a credential
+into evidence that gets published.
 
 A **doubled** brace is not a placeholder — `{{…}}` is left exactly as it stands, which is how
 `docker ps --format '{{.Names}}'` gets into a step. Not every string here was written as a template,
