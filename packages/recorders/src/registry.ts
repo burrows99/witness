@@ -61,6 +61,9 @@ export function createRecorder(name: RecorderName, deps: RecorderDeps): Recorder
         source: deps.terminal,
         store: deps.store,
         workDir: join(deps.runDir, 'raw-terminal'),
+        renderStill: deps.renderCard,
+        ...(deps.width !== undefined ? { width: deps.width } : {}),
+        ...(deps.height !== undefined ? { height: deps.height } : {}),
       })
     }
     default: {

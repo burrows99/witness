@@ -40,6 +40,29 @@ swe-verify verify --plan <plan-id> --record --json
 One command: instruments every changed line, brings the fixture up, drives the plan, evaluates
 the gate. `--record` adds a captioned MP4 to `story.artifacts`.
 
+**`--record` needs the plan to say what to film.** Steps with `"driver": "web"` film themselves —
+the page is the evidence. A change with no screen has to name the commands worth watching, in a
+`record` block:
+
+```json
+"record": {
+  "terminal": {
+    "steps": [
+      { "caption": "BEFORE — the test fails on a cancelled context",
+        "command": "go test ./pkg/... -run TestThing", "waitMs": 30000 },
+      { "caption": "the one-line fix", "command": "git diff -U1" }
+    ]
+  }
+}
+```
+
+Each beat becomes its own clip with its caption rendered as a **card spliced in front of it** —
+never typed into the shell, where a `# comment` would be indistinguishable from the program's
+own output. Each beat is a fresh shell, so beats must be independent commands.
+
+A plan that declares nothing filmable exits `3`: recording was asked for and there was nothing to
+record, and a green verdict with no film is what recording exists to prevent.
+
 | Exit | Meaning | Next move |
 |---|---|---|
 | `0` | allow | go to step 3 |
@@ -171,5 +194,6 @@ Each one comes from a recording that misled somebody.
 - `fixture.kind: "compose"` exits 3. Only `process` and `none` work, so an app needing container
   provisioning has to be driven by a script rather than a plan.
 - Attaching video to a PR (step 6) has no CLI path.
+- Each filmed beat is a fresh shell, so a beat cannot depend on state a previous one set up.
 - No adapter for **ts**, **java**: changed lines there are
   reported as ungated (`SV016`) rather than silently passed.

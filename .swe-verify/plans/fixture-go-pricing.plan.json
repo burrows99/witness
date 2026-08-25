@@ -3,8 +3,34 @@
   "id": "fixture-go-pricing",
   "intent": "the Go tiered discount fixture returns a discounted total for a tier-2 customer",
   "domain": "fullstack",
-  "scope": { "include": ["fixtures/l1/go/**"] },
-  "fixture": { "kind": "process", "language": "go", "program": "main.go", "file": "fixtures/l1/go/main.go", "awaitExit": true },
+  "scope": {
+    "include": [
+      "fixtures/l1/go/**"
+    ]
+  },
+  "fixture": {
+    "kind": "process",
+    "language": "go",
+    "program": "main.go",
+    "file": "fixtures/l1/go/main.go",
+    "awaitExit": true
+  },
   "steps": [],
-  "assertions": []
+  "assertions": [],
+  "record": {
+    "terminal": {
+      "steps": [
+        {
+          "caption": "the Go fixture prices a tier-2 customer",
+          "command": "go run ./fixtures/l1/go/main.go",
+          "waitMs": 15000
+        },
+        {
+          "caption": "the discount table it reads",
+          "command": "sed -n '1,20p' fixtures/l1/go/main.go",
+          "waitMs": 6000
+        }
+      ]
+    }
+  }
 }

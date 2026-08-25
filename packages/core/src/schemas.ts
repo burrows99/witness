@@ -76,6 +76,32 @@ export const planSchema = {
         },
       },
     },
+    record: {
+      type: 'object',
+      properties: {
+        terminal: {
+          type: 'object',
+          required: ['steps'],
+          properties: {
+            steps: {
+              type: 'array',
+              minItems: 1,
+              items: {
+                type: 'object',
+                required: ['command'],
+                properties: {
+                  caption: { type: 'string' },
+                  command: { type: 'string', minLength: 1 },
+                  waitMs: { type: 'integer', minimum: 0 },
+                },
+              },
+            },
+            cwd: { type: 'string' },
+            env: { type: 'object', additionalProperties: { type: 'string' } },
+          },
+        },
+      },
+    },
     assertions: {
       type: 'array',
       items: {

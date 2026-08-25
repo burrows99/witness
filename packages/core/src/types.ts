@@ -79,6 +79,36 @@ export interface Plan {
   steps: PlanStep[]
   assertions: PlanAssertion[]
   coverage?: PlanCoverage
+  /** What to film. A plan that declares nothing filmable cannot be recorded. */
+  record?: PlanRecord
+}
+
+/**
+ * A plan declares what a recording should show, because the runner cannot
+ * infer it. Browser steps film themselves — the page is the evidence — but a
+ * change with no screen has to say which commands are worth watching.
+ */
+export interface PlanRecord {
+  terminal?: PlanTerminalRecording
+}
+
+export interface PlanTerminalRecording {
+  steps: PlanTerminalStep[]
+  /** Where the commands run; defaults to the repository root. */
+  cwd?: string
+  env?: Record<string, string>
+}
+
+export interface PlanTerminalStep {
+  /**
+   * Narration for this beat. Rendered as a card spliced before the command,
+   * never typed into the shell — a caption written as a `# comment` pollutes
+   * the only frame that is meant to be evidence.
+   */
+  caption?: string
+  command: string
+  /** How long the command may run before the recording moves on. */
+  waitMs?: number
 }
 
 /** What the gate needs to know about a committed plan. */

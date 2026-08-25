@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { validateStory, validatePlan, validateConfig, resolveConfig } from '../../src/schema.js'
+import type { PlanTerminalStep } from '../../src/types.js'
 import { minimalStory, minimalPlan } from '../helpers/fixtures.js'
 
 describe('validateStory — story@1', () => {
@@ -61,6 +62,39 @@ describe('validateStory — story@1', () => {
 })
 
 describe('validatePlan — plan@1', () => {
+  /**
+   * A plan has to be able to say what a recording should show. The runner
+   * cannot infer it: browser steps film themselves because the page is the
+   * evidence, but a change with no screen has to name the commands worth
+   * watching, or `--record` has nothing to record and the run is green with
+   * no film — the exact outcome recording exists to prevent.
+   */
+  it('accepts a plan that declares commands to film', () => {
+    const p = minimalPlan()
+    p.record = {
+      terminal: {
+        steps: [
+          { caption: 'the test fails on a cancelled context', command: 'go test ./...', waitMs: 26_000 },
+          { command: 'git diff --stat' },
+        ],
+      },
+    }
+    expect(validatePlan(p).ok).toBe(true)
+  })
+
+  it('rejects a filmed beat with no command, which would record a blank clip', () => {
+    const p = minimalPlan()
+    // Deliberately invalid: the type forbids it, the schema must too.
+    p.record = { terminal: { steps: [{ caption: 'narration with nothing to show' } as PlanTerminalStep] } }
+    expect(validatePlan(p).ok).toBe(false)
+  })
+
+  it('rejects a terminal recording with no beats at all', () => {
+    const p = minimalPlan()
+    p.record = { terminal: { steps: [] } }
+    expect(validatePlan(p).ok).toBe(false)
+  })
+
   it('accepts the worked-example plan', () => {
     expect(validatePlan(minimalPlan()).ok).toBe(true)
   })

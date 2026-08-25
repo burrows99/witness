@@ -185,14 +185,23 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
               },
             }
           : {}),
-        ...(options.record.terminal ? { terminal: options.record.terminal } : {}),
+        ...(options.record.terminal ?? options.plan.record?.terminal
+          ? { terminal: options.record.terminal ?? options.plan.record!.terminal! }
+          : {}),
         card: options.record.slide,
         renderCard: renderSlidePng,
         width: 1280,
         height: 720,
       }))
+      // "A run that records nothing fails." Recording was asked for, and a
+      // green verdict with no film is exactly the outcome recording exists to
+      // prevent — so this is a usage error the plan can fix, not a warning to
+      // scroll past.
       if (recorders.length === 0) {
-        log('recording: nothing in this run can be recorded — no browser context and no commands to film')
+        throw new UsageError(
+          `plan "${options.plan.id}" declares nothing that can be filmed, but --record was requested`,
+          'Add steps with "driver": "web" to film the browser, or a "record": { "terminal": { "steps": [...] } } block to film commands.',
+        )
       }
     }
     for (const recorder of recorders) await recorder.start(ctx)
@@ -273,6 +282,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     // arrives after sealing is not in the artefact list, which is the same as
     // not existing as far as every consumer is concerned.
     let videoPath: string | undefined
+    const empty: string[] = []
     for (const recorder of recorders) {
       const produced = await recorder.stop()
       // The same check the conformance suite applies, applied to the real
@@ -287,6 +297,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       // per step by the driver. SV030 owns that question in the gate, where
       // every artefact is in view — asking it of one recorder in isolation
       // would fail a perfectly well-behaved video recorder.
+      if (produced.length === 0) empty.push(recorder.name)
       const violations = validateRecording(recorder, produced)
       if (violations.length > 0) {
         throw new HarnessError(
@@ -300,6 +311,17 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
         videoPath = join(dir, video.path)
         log(`recording: ${video.path} (${video.bytes} bytes, readable by ${video.readableBy.join(', ')})`)
       }
+    }
+
+    // Recorders were applicable and every one came back empty: the tool that
+    // does the capturing is missing or failed. That is the harness's fault
+    // rather than the plan's, so it reports as one — but it still fails,
+    // because a green verdict with no film is what recording exists to stop.
+    if (recorders.length > 0 && empty.length === recorders.length) {
+      throw new HarnessError(
+        `recording was requested but ${empty.join(' and ')} captured nothing`,
+        'Run `swe-verify doctor`; the recording tool (ffmpeg, vhs, or a browser) is missing or failed. The harness log says which.',
+      )
     }
 
     const assertions = await evaluateAssertions(options.plan, drivers, stepResults, events, artifacts)

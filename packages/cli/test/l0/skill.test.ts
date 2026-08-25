@@ -129,6 +129,18 @@ describe('the playbook — numbered steps, each one a command', () => {
     expect(skill).toMatch(/readyState/)
   })
 
+  it('says how a plan declares what to film, or --record has nothing to record', () => {
+    // The gap a fresh agent hit: it ran `verify --record`, got exit 0 and no
+    // video, because no plan in the project declared anything filmable.
+    expect(skill).toMatch(/"record"/)
+    expect(skill).toMatch(/terminal/)
+    expect(skill).toMatch(/caption/)
+  })
+
+  it('says a caption becomes a card rather than a line in the shell', () => {
+    expect(skill.toLowerCase()).toMatch(/card spliced in front|never typed into the shell/)
+  })
+
   it('lists where a run leaves its artefacts', () => {
     expect(skill).toMatch(/story\.json/)
     expect(skill).toMatch(/artifacts\/video/)

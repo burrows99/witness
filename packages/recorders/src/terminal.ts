@@ -146,3 +146,43 @@ export async function recordTerminal(options: RecordTerminalOptions): Promise<vo
     maxBuffer: 32 * 1024 * 1024,
   })
 }
+
+
+/**
+ * `script` captures the terminal verbatim: colour codes, cursor moves, title
+ * sequences, and the shell redrawing its prompt after every keystroke. A
+ * human watching the video never sees any of that, but an agent reading the
+ * transcript sees nothing else — which makes the one artefact it *can* read
+ * the least readable thing in the run.
+ */
+export function stripTerminalControl(raw: string): string {
+  // Control characters in a regex are usually a mistake; here they are the
+  // entire subject. This function exists to remove them.
+  /* eslint-disable no-control-regex */
+  const text = raw
+    // OSC — window titles, editor file markers. Terminated by BEL or ST.
+    .replace(/\u001b\][^\u001b\u0007]*(?:\u0007|\u001b\\)/g, '')
+    // CSI — colour, cursor movement, erase.
+    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, '')
+    // Two-character escapes: keypad mode, charset selection.
+    .replace(/\u001b[=>()][0-9A-Za-z]?/g, '')
+    // Stray BEL, backspace, and the shift-out/shift-in pair.
+    .replace(/[\u0007\u0008\u000e\u000f]/g, '')
+    // `script` writes CRLF. Normalising first matters: a bare carriage
+    // return means "overwrite this line", and treating the CR of a CRLF as
+    // one discards every line's content and leaves an empty transcript.
+    .replace(/\r\n/g, '\n')
+  /* eslint-enable no-control-regex */
+
+  // A carriage return without a newline is the shell overwriting the line it
+  // just drew; only the final state of that line is worth keeping.
+  return text
+    .split('\n')
+    .map((line) => {
+      const parts = line.split('\r')
+      return (parts[parts.length - 1] ?? '').replace(/\s+$/, '')
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
