@@ -260,9 +260,19 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     if (session && options.plan.fixture?.awaitExit) {
       const exited = await session.waitForExit(options.config.budgets.runMs)
       if (!exited) {
+        // Say what was actually costing the time. "Raise the budget" is the
+        // right advice for a slow server and the wrong advice for a plan
+        // whose instrumentation is amplified by the test it drives — and
+        // those look identical without the hit count.
+        const hits = session.totalHits()
+        const probes = session.probes.length
+        const seconds = Math.round(options.config.budgets.runMs / 1000)
+        const amplification = probes > 0 ? Math.round(hits / probes) : 0
         throw new HarnessError(
-          `fixture did not exit within the ${Math.round(options.config.budgets.runMs / 1000)}s run budget`,
-          'Raise budgets.runMs, or drop fixture.awaitExit if the process is a long-running server.',
+          `fixture did not exit within the ${seconds}s run budget (${probes} probe(s) fired ${hits} time(s))`,
+          amplification >= 10
+            ? `Each probe fired about ${amplification} times, so instrumentation — not the code — is the cost here: a table-driven test re-runs every instrumented line per case. Narrow fixture.args to fewer test cases, or raise budgets.runMs.`
+            : 'Raise budgets.runMs, or drop fixture.awaitExit if the process is a long-running server.',
         )
       }
     }

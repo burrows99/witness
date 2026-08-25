@@ -235,3 +235,34 @@ describe('a launch that has to compile first', () => {
     await expect(s.launch({})).rejects.toThrow(/timed out/)
   })
 })
+
+describe('totalHits — the number that explains a slow run', () => {
+  /**
+   * A real run died on a ten-minute budget with a remedy suggesting the
+   * budget was too small. What was actually happening: 97 probes on a
+   * table-driven test with ~55 cases, so every instrumented line re-ran once
+   * per case — thousands of DAP round-trips at roughly 60ms each.
+   * `budgets.probeLines` caps how many lines are instrumented and says
+   * nothing about how often they run, so the amplification was invisible and
+   * the remedy pointed at the wrong lever.
+   */
+  it('is zero before anything fires', async () => {
+    const adapter = new FakeAdapter()
+    const s = await session(adapter)
+    await s.install([target()])
+    expect(s.totalHits()).toBe(0)
+    await s.uninstall()
+  })
+
+  it('counts every firing, not every probe', async () => {
+    const adapter = new FakeAdapter()
+    const s = await session(adapter)
+    await s.install([target({ id: 'p001' }), target({ id: 'p002', line: 42 })])
+    adapter.fire('p001', {})
+    adapter.fire('p001', {})
+    adapter.fire('p002', {})
+    await new Promise((r) => setTimeout(r, 20))
+    expect(s.totalHits()).toBe(3)
+    await s.uninstall()
+  })
+})

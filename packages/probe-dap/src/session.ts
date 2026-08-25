@@ -210,6 +210,22 @@ export class DapSession {
     return this.hitCounts.get(probeId) ?? 0
   }
 
+  /**
+   * Every logpoint firing so far, across all probes.
+   *
+   * The number that explains a slow run. `budgets.probeLines` caps how many
+   * lines are instrumented, but the cost is lines × executions: 97 probes on
+   * a table-driven test with 55 cases is thousands of DAP round-trips, and
+   * nothing counted them. A run died on a ten-minute budget with a remedy
+   * suggesting the budget was too small, when what was actually happening
+   * was a ninety-fold amplification nobody could see.
+   */
+  totalHits(): number {
+    let total = 0
+    for (const count of this.hitCounts.values()) total += count
+    return total
+  }
+
   get probes(): readonly InstalledProbe[] {
     return this.installed
   }
