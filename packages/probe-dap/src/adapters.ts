@@ -62,6 +62,13 @@ export interface AdapterSpec {
   configureArgs(params: ConfigureParams): Record<string, unknown>
   detect(root?: string, env?: AdapterEnv): AdapterAvailability
   /**
+   * The adapter runs the program on a *second* connection, announced by a
+   * `startDebugging` reverse request. js-debug does this: the connection you
+   * launch on never runs your code, so probes set there hit nothing and no
+   * `terminated` event ever arrives.
+   */
+  multiSession?: boolean
+  /**
    * How to start the program with no debugger attached.
    *
    * Not having an adapter means this language cannot be *gated*; it does not
@@ -208,34 +215,64 @@ const delveAdapter: AdapterSpec = {
  * unavailable rather than falling back to log-scraping: a gate that degrades
  * is flaky, and flaky gates get bypassed (D3).
  */
+/**
+ * Where a js-debug DAP server may be found, in the order worth trying.
+ *
+ * It is not on npm — Microsoft ships it only as a release asset — so there is
+ * no `npm i` that produces one, and VS Code bundles it in-process rather than
+ * as `dapDebugServer.js`. A cached copy under the user's home is therefore
+ * the normal case, not a fallback.
+ */
+export function jsDebugCandidates(root?: string, env: AdapterEnv = process.env): string[] {
+  const home = env.HOME ?? env.USERPROFILE ?? ''
+  return [
+    env.SWE_VERIFY_JS_DEBUG ?? '',
+    ...(root ? [join(root, 'node_modules', '@vscode', 'js-debug', 'src', 'dapDebugServer.js')] : []),
+    ...(home ? [join(home, '.swe-verify', 'adapters', 'js-debug', 'src', 'dapDebugServer.js')] : []),
+  ].filter(Boolean)
+}
+
+function findJsDebug(root?: string, env?: AdapterEnv): string | null {
+  return jsDebugCandidates(root, env).find((path) => existsSync(path)) ?? null
+}
+
 const jsDebugAdapter: AdapterSpec = {
   language: 'ts',
   name: 'js-debug',
-  configure: 'attach',
-  debuggee: ({ program, port }) => ({
-    command: 'node',
-    // Loopback by default, and therefore invisible from outside a container:
-    // the 0.0.0.0 host is mandatory, not a nicety (TDD §14.2).
-    args: [`--inspect=0.0.0.0:${port}`, program],
-    env: {},
-  }),
-  configureArgs: ({ port, pathMapping }) => ({
+  // `launch`, like delve, not `attach`. Node's --inspect speaks CDP; js-debug
+  // is the thing that translates CDP to DAP, so it has to be the process we
+  // connect to, and it starts the program itself. Attaching to --inspect
+  // directly was never going to work: it is a different protocol.
+  configure: 'launch',
+  multiSession: true,
+  debuggee: ({ port, repoRoot, env }) => {
+    const server = findJsDebug(repoRoot, env ?? process.env)
+    return {
+      command: 'node',
+      // The server takes the port and host positionally, in that order.
+      args: [server ?? 'dapDebugServer.js', String(port), '127.0.0.1'],
+      env: {},
+    }
+  },
+  configureArgs: ({ program, cwd, args, pathMapping }) => ({
     type: 'pwa-node',
-    request: 'attach',
-    port,
+    request: 'launch',
+    program,
+    cwd,
+    // Without this the debuggee's stdout goes to a terminal nobody is
+    // reading, and a transcript assertion has nothing to match on.
+    console: 'internalConsole',
+    ...(args?.length ? { args: [...args] } : {}),
     ...(pathMapping ? { localRoot: pathMapping.localRoot, remoteRoot: pathMapping.remoteRoot } : {}),
   }),
   plain: ({ program, args }) => ({ command: 'node', args: [program, ...args], env: {} }),
   detect: (root, env) => {
-    const bundled = (env ?? process.env).SWE_VERIFY_JS_DEBUG
-      ?? (root ? join(root, 'node_modules', '@vscode', 'js-debug', 'src', 'dapDebugServer.js') : '')
-    if (bundled && existsSync(bundled)) {
-      return { available: true, detail: `js-debug at ${bundled}` }
-    }
+    const found = findJsDebug(root, env)
+    if (found) return { available: true, detail: `js-debug at ${found}` }
     return {
       available: false,
-      detail: 'js-debug (the DAP server for Node/TypeScript) is not vendored in this build',
-      remedy: 'Point SWE_VERIFY_JS_DEBUG at a dapDebugServer.js. Node\'s own --inspect speaks CDP, not DAP, so it cannot be used directly.',
+      detail: 'js-debug (the DAP server for Node/TypeScript) was not found',
+      remedy: `Install it once: gh release download --repo microsoft/vscode-js-debug --pattern 'js-debug-dap-*.tar.gz' -O - | tar xz -C ~/.swe-verify/adapters. It is not published to npm, and Node's own --inspect speaks CDP rather than DAP, so it cannot be used directly.`,
     }
   },
 }

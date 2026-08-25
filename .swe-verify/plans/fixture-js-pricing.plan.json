@@ -1,0 +1,19 @@
+{
+  "schema": "swe-verify/plan@1",
+  "id": "fixture-js-pricing",
+  "intent": "the JavaScript tiered discount fixture returns a discounted total for a tier-2 customer",
+  "domain": "fullstack",
+  "scope": { "include": ["fixtures/l1/js/**"] },
+  "fixture": { "kind": "process", "language": "ts", "program": "fixtures/l1/js/main.js", "awaitExit": true },
+  "steps": [],
+  "assertions": [
+    { "id": "prices-tier-2", "kind": "terminal-match", "afterStep": 0, "expect": { "contains": "result 90" } }
+  ],
+  "record": {
+    "terminal": {
+      "steps": [
+        { "caption": "the JavaScript fixture prices a tier-2 customer", "command": "node fixtures/l1/js/main.js", "waitMs": 10000 }
+      ]
+    }
+  }
+}

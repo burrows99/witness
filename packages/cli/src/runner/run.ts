@@ -501,6 +501,7 @@ async function attachProbes(params: {
   const adapter = fixture.adapter!
 
   const session = await DapSession.connectTcp(debug.host, debug.port, {
+    ...(adapter.multiSession ? { followChildAt: { host: debug.host, port: debug.port } } : {}),
     repoRoot: cwd,
     log,
     connectTimeoutMs: 30_000,

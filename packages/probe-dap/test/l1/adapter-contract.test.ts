@@ -250,3 +250,48 @@ describe.each(Object.values(ADAPTERS))('plain start: $language', (adapter) => {
     )
   })
 })
+
+describe('js-debug is multi-session, which the adapter has to declare', () => {
+  /**
+   * js-debug does not run your program on the connection you launch on. It
+   * sends a `startDebugging` reverse request naming a target, and the process
+   * only exists on a *second* connection to the same server. Probes set
+   * before following land on a session that runs nothing, and `terminated`
+   * never arrives — the run hangs until its budget expires.
+   */
+  const jsDebug = adapterFor('ts')
+
+  it('declares itself multi-session', () => {
+    expect(jsDebug.multiSession).toBe(true)
+  })
+
+  it('launches rather than attaches, because --inspect is CDP not DAP', () => {
+    // Node's own --inspect speaks the Chrome DevTools Protocol. js-debug is
+    // the thing that translates it, so it must be what we connect to.
+    expect(jsDebug.configure).toBe('launch')
+  })
+
+  it('starts the DAP server, not the program, with port before host', () => {
+    const command = jsDebug.debuggee({
+      program: 'app/main.js', cwd: '/repo', repoRoot: '/repo', port: 5599, pathMapping: null, env: {},
+    })
+    expect(command.command).toBe('node')
+    expect(command.args.slice(-2)).toEqual(['5599', '127.0.0.1'])
+    expect(command.args[0]).toMatch(/dapDebugServer\.js$/)
+  })
+
+  it('asks the program to run with its output captured', () => {
+    // Without internalConsole the debuggee's stdout goes to a terminal
+    // nobody reads, and a transcript assertion has nothing to match on.
+    const args = jsDebug.configureArgs({
+      program: 'app/main.js', cwd: '/repo', repoRoot: '/repo', port: 1, pathMapping: null, env: {},
+    })
+    expect(args).toMatchObject({ type: 'pwa-node', request: 'launch', console: 'internalConsole' })
+  })
+
+  it('is the only adapter here that needs following', () => {
+    for (const language of ['py', 'go'] as const) {
+      expect(adapterFor(language).multiSession, language).not.toBe(true)
+    }
+  })
+})

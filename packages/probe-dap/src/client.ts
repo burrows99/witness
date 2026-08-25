@@ -25,6 +25,16 @@ export interface DapClientOptions {
   timeoutMs?: number
   onEvent?: (event: DapEvent) => void
   log?: (line: string) => void
+  /**
+   * Answer a reverse request from the adapter. Return true when handled, so
+   * the client acknowledges it; false leaves the existing refusal in place.
+   *
+   * js-debug needs this. It is multi-session: the connection you launch on
+   * never runs your code, it sends `startDebugging` asking the client to open
+   * a *second* connection for the actual process. Refusing that is why
+   * breakpoints hit nothing and `terminated` never arrives.
+   */
+  onReverseRequest?: (command: string, args: Record<string, unknown>) => boolean
 }
 
 interface Pending {
@@ -131,13 +141,17 @@ export class DapClient {
     // A reverse request (`runInTerminal`) is answered with a refusal rather
     // than ignored: an adapter that waits forever for a reply hangs the run.
     if (message.type === 'request') {
+      const command = typeof message.command === 'string' ? message.command : ''
+      const args = (message.arguments ?? {}) as Record<string, unknown>
+      this.options.log?.(`dap ← request ${command}`)
+      const handled = this.options.onReverseRequest?.(command, args) === true
       this.stream.write(encodeMessage({
         seq: this.seq++,
         type: 'response',
         request_seq: message.seq,
-        success: false,
-        command: typeof message.command === 'string' ? message.command : '',
-        message: 'swe-verify runs headless and cannot host a terminal',
+        success: handled,
+        command,
+        ...(handled ? {} : { message: 'swe-verify runs headless and cannot host a terminal' }),
       }))
     }
   }

@@ -266,3 +266,37 @@ describe('totalHits — the number that explains a slow run', () => {
     await s.uninstall()
   })
 })
+
+describe('late breakpoint verification', () => {
+  /**
+   * An adapter may accept a breakpoint before it can verify one. js-debug
+   * answers `setBreakpoints` before the script has loaded — everything comes
+   * back unverified — and only reports the truth later, as a `breakpoint`
+   * event. Ignoring that event made every JavaScript line report SV011,
+   * "accepted but never verified", on runs whose logpoints demonstrably
+   * fired.
+   */
+  it('marks a probe verified when the adapter says so afterwards', async () => {
+    const adapter = new FakeAdapter({ verify: false, breakpointIds: true })
+    const s = await session(adapter)
+    const installed = await s.install([target({ id: 'p001' })])
+    expect(installed[0]!.verified).toBe(false)
+
+    adapter.verifyBreakpoint(installed[0]!.adapterId!, 41)
+    await new Promise((r) => setTimeout(r, 20))
+
+    expect(s.probes[0]!.verified).toBe(true)
+    expect(s.probes[0]!.adapterLine).toBe(41)
+    await s.uninstall()
+  })
+
+  it('ignores an update for a breakpoint it never installed', async () => {
+    const adapter = new FakeAdapter({ breakpointIds: true })
+    const s = await session(adapter)
+    await s.install([target({ id: 'p001' })])
+    adapter.verifyBreakpoint(9999, 1)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(s.probes).toHaveLength(1)
+    await s.uninstall()
+  })
+})

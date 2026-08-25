@@ -21,6 +21,11 @@ export interface FakeAdapterOptions {
   deferAttachResponse?: boolean
   /** Delay `initialized`, as an adapter that compiles during launch does. */
   initializedDelayMs?: number
+  /**
+   * Return an id per breakpoint, as js-debug does, so a later `breakpoint`
+   * event can be matched back to the probe it verifies.
+   */
+  breakpointIds?: boolean
 }
 
 interface RecordedBreakpoint {
@@ -36,6 +41,7 @@ export class FakeAdapter {
 
   private readonly sources = new Map<string, RecordedBreakpoint[]>()
   private seq = 1
+  private nextBreakpointId = 1
   private deferredAttach: number | null = null
 
   constructor(private readonly options: FakeAdapterOptions = {}) {
@@ -54,6 +60,16 @@ export class FakeAdapter {
   }
 
   /** Emit the output a logpoint would produce, with values already resolved. */
+  /** Verify a breakpoint after the fact, as an adapter does once a script loads. */
+  verifyBreakpoint(id: number, line: number): void {
+    this.send({
+      seq: this.seq++,
+      type: 'event',
+      event: 'breakpoint',
+      body: { reason: 'changed', breakpoint: { id, verified: true, line } },
+    })
+  }
+
   fire(probeId: string, vars: Record<string, string>): void {
     const parts = [LOGPOINT_MAGIC, probeId]
     for (const [name, value] of Object.entries(vars)) parts.push(name, value)
@@ -107,6 +123,7 @@ export class FakeAdapter {
         this.sources.set(path, requested)
         this.respond(message, {
           breakpoints: requested.map((b) => ({
+            ...(this.options.breakpointIds ? { id: this.nextBreakpointId++ } : {}),
             verified: this.options.verify !== false,
             line: this.options.slideTo ?? b.line,
             ...(this.options.verifyMessage ? { message: this.options.verifyMessage } : {}),

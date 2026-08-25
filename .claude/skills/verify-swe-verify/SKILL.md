@@ -1,9 +1,9 @@
 ---
 name: verify-swe-verify
-description: "Verify a change in swe-verify by proving the changed code actually ran. Use whenever you edit code here, before saying a change is done, or when a swe-verify gate reports a finding (SV001, SV003, SV010, SV011, SV020) and you need to know what to do about it. Covers fixture-go-pricing, fixture-pricing."
+description: "Verify a change in swe-verify by proving the changed code actually ran. Use whenever you edit code here, before saying a change is done, or when a swe-verify gate reports a finding (SV001, SV003, SV010, SV011, SV020) and you need to know what to do about it. Covers fixture-go-pricing, fixture-js-pricing, fixture-pricing."
 license: Apache-2.0
 metadata:
-  swe-verify-fingerprint: sha256:eab614ea102491c802ef52e09af0c63185e878a302323bf1d646af4b31732964
+  swe-verify-fingerprint: sha256:5a3277daed2bd08f0b7c0cb4e5da501cfe4b43dcf4141406286a8251e0cefcd5
   swe-verify-project: swe-verify
 ---
 
@@ -20,6 +20,8 @@ Pass the id of the plan whose scope covers the files you changed:
 
 - **`fixture-go-pricing`** — the Go tiered discount fixture returns a discounted total for a tier-2 customer
   - covers `fixtures/l1/go/**` — 1 assertion(s)
+- **`fixture-js-pricing`** — the JavaScript tiered discount fixture returns a discounted total for a tier-2 customer
+  - covers `fixtures/l1/js/**` — 1 assertion(s)
 - **`fixture-pricing`** — the tiered discount fixture computes a discounted total for a tier-2 customer
   - covers `fixtures/l1/py/**` — **no assertions**: it proves the code ran, not that it behaved. Add one before relying on it.
 
@@ -232,10 +234,9 @@ placeholders in it.
 
 ## What this project can gate
 
-Instrumentable here: **py** (debugpy), **go** (delve).
+Instrumentable here: **py** (debugpy), **go** (delve), **ts** (js-debug).
 
 Not instrumentable here — changes in these languages are reported as ungated (`SV016`) rather than silently passed:
-- **ts** (js-debug): js-debug (the DAP server for Node/TypeScript) is not vendored in this build → Point SWE_VERIFY_JS_DEBUG at a dapDebugServer.js. Node's own --inspect speaks CDP, not DAP, so it cannot be used directly.
 - **java** (java-debug): java-debug (com.microsoft.java.debug.plugin) is not vendored in this build → Point SWE_VERIFY_JAVA_DEBUG at a java-debug plugin jar.
 
 Drivers: `api` (HTTP), `web` (Playwright is installed).
@@ -289,5 +290,5 @@ Each one comes from a recording that misled somebody.
 - `docker compose down` has no `--rmi`, so a `build: true` fixture leaves one image per run.
 - Attaching video to a PR (step 6) has no CLI path.
 - Each filmed beat is a fresh shell, so a beat cannot depend on state a previous one set up.
-- No adapter for **ts**, **java**: changed lines there are
+- No adapter for **java**: changed lines there are
   reported as ungated (`SV016`) rather than silently passed.

@@ -21,6 +21,13 @@ export interface InstalledProbe {
    * test asserts it is true, not merely that `setBreakpoints` returned OK.
    */
   verified: boolean
+  /**
+   * The adapter's own id for this breakpoint. Needed because verification can
+   * arrive after acceptance: js-debug answers `setBreakpoints` before the
+   * script has loaded, then sends a `breakpoint` event once it has, and the
+   * id is the only way to match that back to a probe.
+   */
+  adapterId?: number
   /** Where the adapter actually bound it, when it slid to the next statement. */
   adapterLine?: number
   message?: string
@@ -49,11 +56,33 @@ export interface SessionOptions extends DapClientOptions {
    * seconds an ordinary request needs.
    */
   launchTimeoutMs?: number
+  /**
+   * Where to reconnect for a child session, when the adapter is
+   * multi-session. js-debug launches nothing on the connection you speak to:
+   * it sends a `startDebugging` reverse request naming a target, and the
+   * process only exists on a second connection to the same server. Probes set
+   * before that follow-through land on a session that runs no code.
+   */
+  followChildAt?: { host: string; port: number }
   /** Repo root, used to record files repo-relative in the story. */
   repoRoot: string
   pathMapping?: PathMapping | null
   /** Extra text the adapter printed, kept for `harness.log`. */
   onOutput?: (text: string) => void
+}
+
+/** The same handshake for a parent connection and for any child it spawns. */
+const INITIALIZE_ARGS: Record<string, unknown> = {
+  clientID: 'swe-verify',
+  clientName: 'swe-verify',
+  adapterID: 'swe-verify',
+  pathFormat: 'path',
+  linesStartAt1: true,
+  columnsStartAt1: true,
+  supportsVariableType: true,
+  supportsRunInTerminalRequest: false,
+  supportsStartDebuggingRequest: true,
+  locale: 'en',
 }
 
 /** Generous by default: a cold Go build of a large package is minutes. */
@@ -72,11 +101,17 @@ export class DapSession {
    * the spec produces.
    */
   private pendingConfigure: Promise<unknown> | null = null
+  /** The child session an adapter asked us to open, once it has asked. */
+  private pendingChild: { request: string; configuration: Record<string, unknown> } | null = null
+  private childArrived: (() => void) | null = null
+  /** Kept open deliberately: closing the parent tears the child down with it. */
+  private parentClient: DapClient | null = null
+  private childSocket: Duplex | null = null
   private readonly targetsById = new Map<string, ProbeTarget>()
   private readonly diagnosticList: ProbeDiagnostic[] = []
 
   private constructor(
-    readonly client: DapClient,
+    private client: DapClient,
     private readonly options: SessionOptions,
     private readonly socket: Duplex | null,
   ) {}
@@ -89,8 +124,12 @@ export class DapSession {
    */
   static async connectTcp(host: string, port: number, options: SessionOptions & { connectTimeoutMs?: number }): Promise<DapSession> {
     const socket = await openSocket(host, port, options.connectTimeoutMs ?? 15_000)
-    const session = new DapSession(
-      new DapClient(socket, { ...options, onEvent: (event) => session.onEvent(event) }),
+    const session: DapSession = new DapSession(
+      new DapClient(socket, {
+        ...options,
+        onEvent: (event) => session.onEvent(event),
+        onReverseRequest: (command, args): boolean => session.onReverseRequest(command, args),
+      }),
       options,
       socket,
     )
@@ -113,17 +152,7 @@ export class DapSession {
    * than racing for it.
    */
   async initialize(clientName = 'swe-verify'): Promise<Record<string, unknown>> {
-    const response = await this.client.request('initialize', {
-      clientID: 'swe-verify',
-      clientName,
-      adapterID: 'swe-verify',
-      pathFormat: 'path',
-      linesStartAt1: true,
-      columnsStartAt1: true,
-      supportsVariableType: true,
-      supportsRunInTerminalRequest: false,
-      locale: 'en',
-    })
+    const response = await this.client.request('initialize', { ...INITIALIZE_ARGS, clientName })
     return (response.body ?? {}) as Record<string, unknown>
   }
 
@@ -135,6 +164,67 @@ export class DapSession {
     await this.configure('launch', args)
   }
 
+  /**
+   * A `startDebugging` request means the real process lives on another
+   * connection. Capturing the configuration here — and acknowledging it, so
+   * the adapter does not sit waiting — is what lets `configure` follow it.
+   */
+  private onReverseRequest(command: string, args: Record<string, unknown>): boolean {
+    if (command !== 'startDebugging') return false
+    const configuration = (args.configuration ?? {}) as Record<string, unknown>
+    // Typed, not stringified: `args` is whatever the adapter sent, and
+    // String() on an object yields "[object Object]" as a request command.
+    const request = typeof args.request === 'string' ? args.request : 'launch'
+    this.pendingChild = { request, configuration }
+    this.childArrived?.()
+    return true
+  }
+
+  /**
+   * Move this session onto the child the adapter just announced.
+   *
+   * The parent connection stays open: closing it tears the child down with
+   * it. Everything after this — probes, hits, `terminated` — belongs to the
+   * child, which is the only session where the program actually runs.
+   */
+  private async followChild(at: { host: string; port: number }): Promise<void> {
+    if (!this.pendingChild) {
+      await new Promise<void>((resolve) => {
+        if (this.pendingChild) return resolve()
+        this.childArrived = resolve
+        setTimeout(resolve, 15_000)
+      })
+    }
+    const child = this.pendingChild
+    if (!child) {
+      this.options.log?.('dap: adapter never announced a child session; probes would land on a session that runs nothing')
+      return
+    }
+
+    const socket = await openSocket(at.host, at.port, 15_000)
+    this.parentClient = this.client
+    this.client = new DapClient(socket, {
+      ...this.options,
+      onEvent: (event) => this.onEvent(event),
+      onReverseRequest: (command, args) => this.onReverseRequest(command, args),
+    })
+    this.childSocket = socket
+    await this.client.request('initialize', INITIALIZE_ARGS, this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
+    const started = this.client.waitFor('initialized', this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
+    // Left pending on purpose. The child withholds its launch response until
+    // its own configurationDone, just as the parent did — awaiting it here
+    // would deadlock before a single probe was installed. The caller's
+    // configurationDone() is what releases it.
+    this.pendingConfigure = this.client.request(
+      child.request,
+      child.configuration,
+      this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS,
+    )
+    this.pendingConfigure.catch(() => {})
+    await started
+    this.options.log?.('dap: following the adapter to its child session')
+  }
+
   private async configure(command: 'attach' | 'launch', args: Record<string, unknown>): Promise<void> {
     const initialized = this.client.waitFor('initialized', this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
     this.pendingConfigure = this.client.request(command, args, this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
@@ -142,6 +232,23 @@ export class DapSession {
     // stops Node treating it as an unhandled rejection in the meantime.
     this.pendingConfigure.catch(() => {})
     await initialized
+
+    // A multi-session adapter has not started the program yet, and it will
+    // not until the parent handshake finishes: js-debug withholds the launch
+    // response until `configurationDone`, exactly as debugpy withholds
+    // `attach`. So the parent's handshake is completed here rather than by
+    // the caller — by the time this returns, `client` is the child, and the
+    // caller's install() and configurationDone() land on the session that
+    // actually runs the program.
+    if (this.options.followChildAt) {
+      try {
+        await this.client.request('configurationDone')
+      } catch (error) {
+        this.options.log?.(`dap: parent configurationDone refused (${(error as Error).message})`)
+      }
+      await this.pendingConfigure
+      await this.followChild(this.options.followChildAt)
+    }
   }
 
   /**
@@ -163,7 +270,7 @@ export class DapSession {
         lines: sorted.map((t) => t.line),
       })
 
-      const body = (response.body ?? {}) as { breakpoints?: Array<{ verified?: boolean; line?: number; message?: string }> }
+      const body = (response.body ?? {}) as { breakpoints?: Array<{ id?: number; verified?: boolean; line?: number; message?: string }> }
       const results = body.breakpoints ?? []
       sorted.forEach((target, index) => {
         const result = results[index]
@@ -173,6 +280,9 @@ export class DapSession {
           file,
           line: target.line,
           verified: result?.verified === true,
+          // The adapter's own id for this breakpoint, so a later `breakpoint`
+          // event can be matched back to the probe it verifies.
+          ...(result?.id !== undefined ? { adapterId: result.id } : {}),
           // Adapters routinely slide a breakpoint to the next executable
           // statement. Recording both lines is what stops the requested line
           // reporting unfired forever (contracts §7).
@@ -276,6 +386,25 @@ export class DapSession {
       this.terminated = true
       return
     }
+
+    // An adapter may verify a breakpoint later than it accepts one. js-debug
+    // answers `setBreakpoints` before the script has loaded, so every probe
+    // comes back unverified and only becomes real when the file arrives —
+    // reported as a `breakpoint` event. Without this every JavaScript line
+    // reports SV011, "accepted but never verified", on a run whose logpoints
+    // demonstrably fired.
+    if (event.event === 'breakpoint') {
+      const body = (event.body ?? {}) as { breakpoint?: { id?: number; verified?: boolean; line?: number; message?: string } }
+      const update = body.breakpoint
+      if (update?.id === undefined) return
+      const probe = this.installed.find((p) => p.adapterId === update.id)
+      if (!probe) return
+      if (update.verified === true) probe.verified = true
+      if (update.line !== undefined) probe.adapterLine = update.line
+      if (update.message) probe.message = update.message
+      return
+    }
+
     if (event.event !== 'output') return
 
     const body = (event.body ?? {}) as { output?: string; category?: string }
