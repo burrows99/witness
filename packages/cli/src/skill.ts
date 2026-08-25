@@ -208,13 +208,23 @@ this. A body referencing a local path renders nothing.
 gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -F body=@body.md
 \`\`\`
 
-## 7. Verify the evidence rendered
+## 7. Verify the evidence is really there
 
-\`\`\`js
-[...document.querySelectorAll('video')].map(v => ({ readyState: v.readyState, duration: v.duration }))
+Not in a browser. \`video.readyState\` reports \`0\` on perfectly good attachments whenever the
+page is busy — two agents chased that false failure and nearly reported working evidence as
+broken. Ask whether the URL resolves to media bytes instead:
+
+\`\`\`bash
+for id in $(gh pr view <n> --repo <owner>/<repo> --json body -q .body \\
+    | grep -o 'user-attachments/assets/[0-9a-f-]*' | cut -d/ -f3 | sort -u); do
+  loc=$(curl -sI -H "Authorization: token $(gh auth token)" \\
+        "https://github.com/user-attachments/assets/$id" | tr -d '\\r' | sed -n 's/^[Ll]ocation: //p')
+  curl -sI "$loc" | grep -iE '^(HTTP|content-type|content-length)'
+done
 \`\`\`
 
-\`readyState === 4\` and a non-zero duration. A dead link is not evidence.
+\`video/mp4\` and a plausible size is evidence. \`text/html\` means the link resolves to a page,
+not a file. No output at all means the body still has its placeholders in it.
 
 ## Findings you will meet
 

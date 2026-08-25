@@ -135,8 +135,18 @@ describe('the playbook — numbered steps, each one a command', () => {
     expect(skill.toLowerCase()).toMatch(/cannot reach|no cli path/)
   })
 
-  it('tells the agent to check the video actually rendered', () => {
-    expect(skill).toMatch(/readyState/)
+  it('checks the attachment without a browser, which reports false failures', () => {
+    // Two agents independently read `readyState: 0` on attachments that were
+    // fine — under contention the video element's own fetch never fires — and
+    // both nearly reported working evidence as broken.
+    expect(skill).toMatch(/user-attachments\/assets/)
+    expect(skill).toMatch(/content-type/i)
+    expect(skill).not.toMatch(/readyState === 4/)
+  })
+
+  it('says what a wrong content type means, rather than only what right looks like', () => {
+    expect(skill).toMatch(/text\/html/)
+    expect(skill.toLowerCase()).toMatch(/placeholder/)
   })
 
   it('says how a plan declares what to film, or --record has nothing to record', () => {
