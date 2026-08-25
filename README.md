@@ -36,6 +36,32 @@ exit 2
 
 ---
 
+## Install
+
+The packages live on this repository's own npm registry, so npm needs to be told
+where the scope comes from once:
+
+```
+@macquery-labs:registry=https://npm.pkg.github.com
+```
+
+in your `.npmrc`, then:
+
+```bash
+npm install -g @macquery-labs/cli
+witness doctor
+```
+
+`doctor` reports which languages this machine can instrument. Python and Go need
+no setup beyond `debugpy` and `dlv`; JavaScript and TypeScript need js-debug,
+which Microsoft ships only as a release asset:
+
+```bash
+mkdir -p ~/.witness/adapters
+gh release download --repo microsoft/vscode-js-debug \
+  --pattern 'js-debug-dap-*.tar.gz' -O - | tar xz -C ~/.witness/adapters
+```
+
 ## How it works
 
 Four moving parts, in the order they run:
