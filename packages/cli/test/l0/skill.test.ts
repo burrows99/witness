@@ -231,6 +231,22 @@ describe('what is derived from this project', () => {
     expect(skill).toMatch(/\| `SV014` \| policy \|/)
   })
 
+  it('shows what a waiver looks like, not only that a cap exists', () => {
+    // An agent hit three genuinely unreachable guards, reasoned correctly
+    // that a waiver was the designed answer, and then had to guess the
+    // schema: the skill named waivers three times — twice in the findings
+    // table, once in the cap — and never showed one. It guessed a top-level
+    // array with `line`; the real shape is `coverage.waivers` with `lines`.
+    expect(skill).toMatch(/"coverage"[\s\S]{0,200}"waivers"/)
+    expect(skill).toMatch(/"lines"/)
+    expect(skill).toMatch(/"expires"/)
+  })
+
+  it('says what a waiver is for, so it is not read as an escape hatch', () => {
+    expect(skill.toLowerCase()).toMatch(/cannot run|genuinely/)
+    expect(skill.toLowerCase()).toMatch(/hard to test/)
+  })
+
   it('states the policies that decide a verdict here', () => {
     expect(skill).toMatch(/defensive.*warn/i)
     expect(skill).toMatch(/10%/)

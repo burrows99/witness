@@ -262,6 +262,25 @@ ${renderAdapters(facts)}
 
 - Defensive lines (catch blocks, guards, throws): **${facts.policy.defensive}**${facts.policy.defensive === 'warn' ? ' — unexercised ones warn, they do not block' : ''}.
 - Waivers may cover at most **${facts.policy.waiverCapPct}%** of a diff before the gate refuses them.
+  A waiver is for a line that genuinely *cannot* run — a guard behind a check that already
+  rejected the input, a branch reachable only on a platform this suite does not run on. It is not
+  for a line that is merely awkward to reach; write the test instead. Both the reason and the
+  expiry are required, because a waiver with neither is a permanent hole:
+
+  \`\`\`json
+  "coverage": {
+    "policy": "all-executable",
+    "waivers": [
+      { "file": "src/parser.go", "lines": "296",
+        "reason": "unreachable: the parser rejects malformed input before this fallback runs",
+        "expires": "<YYYY-MM-DD>" }
+    ]
+  }
+  \`\`\`
+
+  \`lines\` is one number or a range (\`"296"\`, \`"296-298"\`); \`expires\` is a real ISO date you
+  choose, and the gate warns as it approaches. Make the reason the argument for why the line
+  cannot run — "hard to test" is not one, and a reviewer will read it as an excuse.
 - A bypass needs a reason and is published: apply the \`${facts.policy.bypassLabel}\` label and put
   \`${facts.policy.bypassLabel}: <reason>\` in the change description, or pass \`--bypass "<reason>"\` locally.
 - A run has ${Math.round(facts.policy.runMs / 60_000)} minute(s) and at most ${facts.policy.probeLines} probes.
