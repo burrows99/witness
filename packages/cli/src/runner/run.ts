@@ -352,6 +352,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
         target,
         verified: probe?.verified ?? false,
         ...(probe?.adapterLine !== undefined ? { adapterLine: probe.adapterLine } : {}),
+        ...(probe?.message ? { reason: probe.message } : {}),
         hits: session?.hitsFor(target.id) ?? 0,
       }
     })

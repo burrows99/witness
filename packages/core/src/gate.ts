@@ -97,7 +97,13 @@ export function evaluate(input: GateInput): GateResult {
   // the remedy differs.
   const ungated = (file: (typeof diff.files)[number]): string | null => {
     if (file.unsupportedLanguage) return file.unsupportedLanguage
-    if (input.instrumentable && file.language && !input.instrumentable.includes(file.language)) return file.language
+    if (!file.language) return null
+    // Two honest reasons not to gate a language: this build has no adapter
+    // for it, or the project said not to. `scope.languages` was read only by
+    // the skill generator before this — it printed a table describing a
+    // filter that did not exist.
+    if (input.instrumentable && !input.instrumentable.includes(file.language)) return file.language
+    if (!policy.scope.languages.includes(file.language)) return file.language
     return null
   }
 
@@ -247,9 +253,17 @@ export function evaluate(input: GateInput): GateResult {
       // opposite remedy, so it is a separate code (D9, R2).
       if (entry?.verified === false) {
         metrics.unverified += 1
+        // The adapter usually said why. Repeating its sentence beats guessing:
+        // "could not find statement at x.go:137" is a plan pointing at a
+        // struct field, which has nothing to do with path mapping.
+        const said = entry.reason?.trim()
         add('SV011', 'error',
-          `probe on ${file.path}:${line.line} was accepted but never verified — the line was never actually watched`,
-          'Run `swe-verify doctor`: this is almost always a path-mapping problem between the container and the repo, or a build without source information.',
+          said
+            ? `probe on ${file.path}:${line.line} was accepted but never verified — the adapter said: ${said}`
+            : `probe on ${file.path}:${line.line} was accepted but never verified — the line was never actually watched`,
+          said && /statement|no code|not a line|no executable/i.test(said)
+            ? 'The plan probes a line the adapter cannot break on — a declaration, a brace, a blank. Point the scope at executable lines, or exclude the file if it holds none.'
+            : 'Run `swe-verify doctor`: this is almost always a path-mapping problem between the container and the repo, or a build without source information.',
           locus)
         continue
       }

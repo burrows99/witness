@@ -26,6 +26,14 @@ export interface ProbeOutcome {
   verified: boolean
   adapterLine?: number
   hits: number
+  /**
+   * What the adapter said when it refused to bind. Delve answers "could not
+   * find statement at x.go:137" for a struct field or a bare `} else {`, and
+   * that sentence is the whole diagnosis — without it SV011 can only guess,
+   * and it guessed "path-mapping problem" at two people who then went looking
+   * for one that was not there.
+   */
+  reason?: string
 }
 
 export interface AssembleParams {
@@ -70,6 +78,7 @@ export function assembleCoverage(diff: NormalisedDiff, probes: readonly ProbeOut
       class: probe && !probe.verified ? 'unbound' : changed.class,
       ...(probe ? { probe_id: probe.target.id, verified: probe.verified, hits: probe.hits } : { hits: 0 }),
       ...(probe?.adapterLine !== undefined ? { adapter_line: probe.adapterLine } : {}),
+      ...(probe?.reason ? { reason: probe.reason } : {}),
     })
   }
 

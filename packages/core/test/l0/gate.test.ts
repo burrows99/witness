@@ -533,3 +533,60 @@ describe('a language with no installed adapter is ungated, not blocked', () => {
     expect(r.verdict).toBe('block')
   })
 })
+
+describe('SV011 repeats what the adapter said, instead of guessing', () => {
+  /**
+   * Two agents independently hit this. Delve refuses a breakpoint on a struct
+   * field or a bare `} else {` and answers "could not find statement at
+   * si_test.go:137, please use a line with a statement" — but the finding said
+   * "almost always a path-mapping problem", so both went hunting for a path
+   * mapping that was fine. The sentence they needed was already in the
+   * harness log; it just never reached the finding.
+   */
+  const unverified = (reason?: string) => {
+    const diff = diffOf()
+    const lines = coverageFor(diff).map((l, i) =>
+      i === 0 ? { ...l, verified: false, class: 'unbound' as const, ...(reason ? { reason } : {}) } : l)
+    return evaluate(input({ diff, story: storyFor(diff, {}, lines) }))
+  }
+
+  it('quotes the adapter when it explained itself', () => {
+    const r = unverified('could not find statement at src/pricing/discount.ts:41')
+    const finding = r.findings.find((f) => f.code === 'SV011')!
+    expect(finding.message).toMatch(/could not find statement/)
+  })
+
+  it('sends a non-statement probe to the plan, not to doctor', () => {
+    const finding = unverified('could not find statement at x:41').findings.find((f) => f.code === 'SV011')!
+    expect(finding.remedy).toMatch(/executable lines|declaration/)
+    expect(finding.remedy).not.toMatch(/path-mapping/)
+  })
+
+  it('still suggests doctor when the adapter said nothing', () => {
+    const finding = unverified().findings.find((f) => f.code === 'SV011')!
+    expect(finding.remedy).toMatch(/doctor/)
+    expect(finding.message).toMatch(/never actually watched/)
+  })
+})
+
+describe('scope.languages actually filters, rather than only describing', () => {
+  /**
+   * It was read in exactly one place — the skill generator, to print a table
+   * of what this project gates. The gate never consulted it, so the table
+   * described a filter that did not exist and a project could not opt a
+   * language out however it configured itself.
+   */
+  it('leaves out a language the project excluded', () => {
+    const diff = diffOf('src/app.ts', ['const bonus = 1', 'return bonus'])
+    const policy = policyOf({ scope: { include: ['**'], exclude: [], languages: ['py', 'go'] } })
+    const r = evaluate(input({ diff, story: null, policy }))
+    expect(codes(r)).toContain('SV016')
+    expect(r.verdict).toBe('allow')
+  })
+
+  it('gates a language the project kept', () => {
+    const diff = diffOf('src/app.ts', ['const bonus = 1', 'return bonus'])
+    const policy = policyOf({ scope: { include: ['**'], exclude: [], languages: ['ts'] } })
+    expect(evaluate(input({ diff, story: null, policy })).verdict).toBe('block')
+  })
+})

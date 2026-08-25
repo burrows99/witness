@@ -205,8 +205,7 @@ Each one comes from a recording that misled somebody.
 
 ## What the tooling cannot do here
 
-- `fixture.kind: "compose"` exits 3. Only `process` and `none` work, so an app needing container
-  provisioning has to be driven by a script rather than a plan.
+- `docker compose down` has no `--rmi`, so a `build: true` fixture leaves one image per run.
 - Attaching video to a PR (step 6) has no CLI path.
 - Each filmed beat is a fresh shell, so a beat cannot depend on state a previous one set up.
 - No adapter for **ts**, **java**: changed lines there are
