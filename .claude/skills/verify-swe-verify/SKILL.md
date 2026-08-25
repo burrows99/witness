@@ -3,7 +3,7 @@ name: verify-swe-verify
 description: "Verify a change in swe-verify by proving the changed code actually ran. Use whenever you edit code here, before saying a change is done, or when a swe-verify gate reports a finding (SV001, SV003, SV010, SV011, SV020) and you need to know what to do about it. Covers fixture-go-pricing, fixture-pricing."
 license: Apache-2.0
 metadata:
-  swe-verify-fingerprint: sha256:9e973e740e8ab5d11789663d4adcd563165ae3faa242d8dfa0f00f074c6eee1c
+  swe-verify-fingerprint: sha256:eab614ea102491c802ef52e09af0c63185e878a302323bf1d646af4b31732964
   swe-verify-project: swe-verify
 ---
 
@@ -70,6 +70,40 @@ record, and a green verdict with no film is what recording exists to prevent.
 | `3` | usage or config error | fix the plan or config |
 | `4` | **harness failure** | swe-verify could not observe. Not your change's fault; run `swe-verify doctor` and report it |
 | `5` | bypassed | recorded and amber, never green |
+
+### Make it prove behaviour, not just execution
+
+Without an assertion a green run says only that the code ran — that is `SV021`. Which kind fits
+depends on what the fixture is:
+
+- `terminal-match` — a process or test fixture — reads the transcript the recording produced
+
+  ```json
+  { "id": "a1", "kind": "terminal-match", "afterStep": 0,
+    "expect": { "contains": "--- PASS: TestThing", "absent": "FAIL" } }
+  ```
+- `http-status` — an API step
+
+  ```json
+  { "id": "a1", "kind": "http-status", "afterStep": 1, "expect": { "status": 400 } }
+  ```
+- `http-json` — a field in an API response
+
+  ```json
+  { "id": "a2", "kind": "http-json", "afterStep": 3,
+    "expect": { "path": "body.todos.0.text", "equals": "buy milk" } }
+  ```
+- `ui-text` — what the page showed — evaluated from the story, so it works while recording
+
+  ```json
+  { "id": "a3", "kind": "ui-text", "afterStep": 5, "expect": { "visible": "Order confirmed" } }
+  ```
+
+`terminal-match` reads the same transcript a reviewer watches in the video, so a green assertion
+and a green recording are one claim rather than two that happen to share a pull request.
+
+An assertion anchors to a step with `afterStep`. A process fixture drives itself and has no
+steps, so use `afterStep: 0` — it anchors to the run.
 
 ## 3. Film the reproduction too
 

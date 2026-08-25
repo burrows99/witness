@@ -50,6 +50,8 @@ export interface SkillFacts {
   adapters: SkillAdapterFact[]
   browser: boolean
   scope: { include: string[]; exclude: string[]; languages: string[] }
+  /** Assertion kinds this build ships, so the skill cannot describe one it lacks. */
+  assertionKinds: string[]
   policy: { defensive: string; waiverCapPct: number; bypassLabel: string; runMs: number; probeLines: number }
 }
 
@@ -135,6 +137,16 @@ record, and a green verdict with no film is what recording exists to prevent.
 | \`3\` | usage or config error | fix the plan or config |
 | \`4\` | **harness failure** | swe-verify could not observe. Not your change's fault; run \`swe-verify doctor\` and report it |
 | \`5\` | bypassed | recorded and amber, never green |
+
+### Make it prove behaviour, not just execution
+
+Without an assertion a green run says only that the code ran — that is \`SV021\`. Which kind fits
+depends on what the fixture is:
+
+${renderAssertionKinds(facts)}
+
+An assertion anchors to a step with \`afterStep\`. A process fixture drives itself and has no
+steps, so use \`afterStep: 0\` — it anchors to the run.
 
 ## 3. Film the reproduction too
 
@@ -303,6 +315,51 @@ swe-verify plan --intent "<what this change proves>" --scope "<glob>" --json
 \`\`\``
 }
 
+/**
+ * The assertion kinds this build actually ships.
+ *
+ * An agent hit SV021 on a process fixture and had to read `packages/core` to
+ * discover `terminal-match` existed: the skill named no assertion kind at
+ * all, and the only example anywhere came from the `plan` skeleton, which
+ * emits `http-status` — useless to a fixture that serves no HTTP. Without
+ * this there is no documented way out of SV021 for a test or job fixture,
+ * which is most backend work.
+ */
+function renderAssertionKinds(facts: SkillFacts): string {
+  const shapes: Record<string, { when: string; example: string }> = {
+    'terminal-match': {
+      when: 'a process or test fixture — reads the transcript the recording produced',
+      example: '{ "id": "a1", "kind": "terminal-match", "afterStep": 0,\n  "expect": { "contains": "--- PASS: TestThing", "absent": "FAIL" } }',
+    },
+    'http-status': {
+      when: 'an API step',
+      example: '{ "id": "a1", "kind": "http-status", "afterStep": 1, "expect": { "status": 400 } }',
+    },
+    'http-json': {
+      when: 'a field in an API response',
+      example: '{ "id": "a2", "kind": "http-json", "afterStep": 3,\n  "expect": { "path": "body.todos.0.text", "equals": "buy milk" } }',
+    },
+    'ui-text': {
+      when: 'what the page showed — evaluated from the story, so it works while recording',
+      example: '{ "id": "a3", "kind": "ui-text", "afterStep": 5, "expect": { "visible": "Order confirmed" } }',
+    },
+  }
+
+  const known = facts.assertionKinds.filter((k) => shapes[k])
+  const unknown = facts.assertionKinds.filter((k) => !shapes[k])
+  const blocks = known.map((kind) => {
+    const shape = shapes[kind]!
+    return `- \`${kind}\` — ${shape.when}\n\n  \`\`\`json\n  ${shape.example.replace(/\n/g, '\n  ')}\n  \`\`\``
+  })
+  if (unknown.length > 0) blocks.push(`- also available: ${unknown.map((k) => `\`${k}\``).join(', ')}`)
+  if (blocks.length === 0) return 'This build ships no assertion kinds, so no plan here can prove behaviour.'
+
+  return `${blocks.join('\n')}
+
+\`terminal-match\` reads the same transcript a reviewer watches in the video, so a green assertion
+and a green recording are one claim rather than two that happen to share a pull request.`
+}
+
 /** What the tooling cannot do here — derived, not a static disclaimer. */
 function renderLimits(facts: SkillFacts): string {
   const lines = [
@@ -377,6 +434,7 @@ function fingerprintOf(facts: SkillFacts): string {
       .sort((a, b) => a.language.localeCompare(b.language))
       .map((a) => ({ language: a.language, name: a.name, available: a.available, detail: a.detail, remedy: a.remedy ?? '' })),
     browser: facts.browser,
+    assertionKinds: [...facts.assertionKinds].sort(),
     scope: { include: [...facts.scope.include].sort(), exclude: [...facts.scope.exclude].sort(), languages: [...facts.scope.languages].sort() },
     policy: facts.policy,
   }))

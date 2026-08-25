@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { adapterReport } from '@swe-verify/probe-dap'
+import { builtinAssertionKinds } from '@swe-verify/core'
+import { assertionKinds } from '@swe-verify/driver-api'
 import { EXIT, UsageError } from '../errors.js'
 import { loadFullPlans } from '../workspace.js'
 import { renderSkill, skillName, type SkillFacts } from '../skill.js'
@@ -103,6 +105,13 @@ async function gatherFacts(ctx: CommandContext): Promise<SkillFacts> {
       ...(adapter.remedy ? { remedy: adapter.remedy } : {}),
     })),
     browser,
+    // What this build ships, not what the design lists — the skill must not
+    // name an assertion kind the runner cannot evaluate.
+    assertionKinds: [
+      ...builtinAssertionKinds().map((k) => k.kind),
+      ...assertionKinds().map((k) => k.kind),
+      ...(browser ? ['ui-text'] : []),
+    ],
     scope: ctx.config.scope,
     policy: {
       defensive: ctx.config.coverage.defensive,

@@ -24,6 +24,7 @@ const facts = (over: Partial<SkillFacts> = {}): SkillFacts => ({
   ],
   browser: true,
   scope: { include: ['**'], exclude: ['**/*.md'], languages: ['ts', 'py'] },
+  assertionKinds: ['terminal-match', 'http-status', 'http-json', 'ui-text'],
   policy: { defensive: 'warn', waiverCapPct: 10, bypassLabel: 'swe-verify:bypass', runMs: 600_000, probeLines: 500 },
   ...over,
 })
@@ -157,6 +158,22 @@ describe('the playbook — numbered steps, each one a command', () => {
   it('says what a wrong content type means, rather than only what right looks like', () => {
     expect(skill).toMatch(/text\/html/)
     expect(skill.toLowerCase()).toMatch(/placeholder/)
+  })
+
+  it('names an assertion kind that fits a fixture with no HTTP and no page', () => {
+    // An agent hit SV021 on a process fixture and had to read the tool's own
+    // source to discover `terminal-match` existed. The skill named no
+    // assertion kind at all, and the only example anywhere came from the
+    // `plan` skeleton, which emits `http-status` — useless to a test binary.
+    expect(skill).toMatch(/terminal-match/)
+    expect(skill).toMatch(/"contains"/)
+    expect(skill).toMatch(/afterStep": 0|afterStep: 0/)
+  })
+
+  it('only names assertion kinds this build actually ships', () => {
+    const withoutBrowser = renderSkill(facts({ assertionKinds: ['terminal-match'] }))
+    expect(withoutBrowser).toMatch(/terminal-match/)
+    expect(withoutBrowser).not.toMatch(/`ui-text`/)
   })
 
   it('says how a plan declares what to film, or --record has nothing to record', () => {
