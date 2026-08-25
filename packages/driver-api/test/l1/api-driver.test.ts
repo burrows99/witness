@@ -3,9 +3,9 @@ import { createServer, type Server } from 'node:http'
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { PlanStep, RunContext } from '@swe-verify/core'
-import { compileRedactionPolicy, DEFAULT_CONFIG } from '@swe-verify/core'
-import { ArtifactStore } from '@swe-verify/recorders'
+import type { PlanStep, RunContext } from '@witness/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG } from '@witness/core'
+import { ArtifactStore } from '@witness/recorders'
 import { ApiDriver } from '../../src/driver.js'
 import { httpStatus, httpJson, assertionKinds } from '../../src/assertions.js'
 import { parseTraceparent } from '../../src/trace.js'
@@ -41,7 +41,7 @@ beforeAll(async () => {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   baseUrl = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`
-  runDir = mkdtempSync(join(tmpdir(), 'swe-verify-api-'))
+  runDir = mkdtempSync(join(tmpdir(), 'witness-api-'))
 })
 
 afterAll(async () => {

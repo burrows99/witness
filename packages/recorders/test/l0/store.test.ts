@@ -3,10 +3,10 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ArtifactStore } from '../../src/store.js'
-import { compileRedactionPolicy, DEFAULT_CONFIG } from '@swe-verify/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG } from '@witness/core'
 
 let dir: string
-beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'swe-verify-store-')) })
+beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'witness-store-')) })
 afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
 const store = (over = {}) => new ArtifactStore({

@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { verifySeal, type GateResult, type Story } from '@swe-verify/core'
-import { adapterFor } from '@swe-verify/probe-dap'
+import { verifySeal, type GateResult, type Story } from '@witness/core'
+import { adapterFor } from '@witness/probe-dap'
 import { TestRepo, cli, planFor } from '../helpers/repo.js'
 
 /**
@@ -10,7 +10,7 @@ import { TestRepo, cli, planFor } from '../helpers/repo.js'
  * the interpreter is pointed at explicitly — the same override a project
  * whose venv lives somewhere unusual would use.
  */
-const PY_ENV = { SWE_VERIFY_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') }
+const PY_ENV = { WITNESS_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') }
 
 /**
  * L2 — `verify` end to end against a real Python application, with real
@@ -74,7 +74,7 @@ let base: string
 beforeEach(() => {
   repo = new TestRepo()
   repo.write('app/pricing.py', BASE_APP)
-  repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'local' }))
+  repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'local' }))
   repo.writePlan(planFor('pricing', ['app/**'], {
     fixture: { kind: 'process', language: 'py', program: 'app/pricing.py', awaitExit: true },
     steps: [],
@@ -85,7 +85,7 @@ beforeEach(() => {
 afterEach(() => repo.dispose())
 
 const storyOf = (): Story => {
-  const runs = join(repo.dir, '.swe-verify', 'runs')
+  const runs = join(repo.dir, '.witness', 'runs')
   const id = readdirSync(runs).sort().at(-1)!
   return JSON.parse(readFileSync(join(runs, id, 'story.json'), 'utf8')) as Story
 }
@@ -129,7 +129,7 @@ suite('verify — a backend-only change, gated on real line coverage (M1)', () =
   it('lets the application run to completion — logpoints never suspend it', async () => {
     repo.write('app/pricing.py', EXERCISED_CHANGE)
     await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
-    const log = readFileSync(join(repo.dir, '.swe-verify', 'runs', storyOf().run_id, 'logs', 'harness.log'), 'utf8')
+    const log = readFileSync(join(repo.dir, '.witness', 'runs', storyOf().run_id, 'logs', 'harness.log'), 'utf8')
     expect(log).toMatch(/result 90/)
   })
 
@@ -150,7 +150,7 @@ suite('verify — a backend-only change, gated on real line coverage (M1)', () =
   it('writes a harness log that says what the probes did (M5)', async () => {
     repo.write('app/pricing.py', EXERCISED_CHANGE)
     await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
-    const log = readFileSync(join(repo.dir, '.swe-verify', 'runs', storyOf().run_id, 'logs', 'harness.log'), 'utf8')
+    const log = readFileSync(join(repo.dir, '.witness', 'runs', storyOf().run_id, 'logs', 'harness.log'), 'utf8')
     expect(log).toMatch(/probes: \d+ installed, \d+ verified/)
     expect(log).toMatch(/sealed story/)
   })
@@ -262,7 +262,7 @@ describe('verify — refusing rather than degrading (NFR-12)', () => {
   })
 
   it('still reads what the old name wrote, so a rename orphans nothing', async () => {
-    // The one thing a rename must never do. `swe-verify/plan@1` is written
+    // The one thing a rename must never do. `witness/plan@1` is written
     // into every committed plan and sealed story, so the brand is ignored on
     // read and only the kind and major are checked.
     repo.write('app/pricing.py', EXERCISED_CHANGE)

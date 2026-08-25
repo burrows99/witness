@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
-import { adapterReport } from '@swe-verify/probe-dap'
-import { builtinAssertionKinds } from '@swe-verify/core'
-import { assertionKinds } from '@swe-verify/driver-api'
+import { adapterReport } from '@witness/probe-dap'
+import { builtinAssertionKinds } from '@witness/core'
+import { assertionKinds } from '@witness/driver-api'
 import { EXIT, UsageError } from '../errors.js'
 import { loadFullPlans } from '../workspace.js'
 import { renderSkill, skillName, type SkillFacts } from '../skill.js'
@@ -59,7 +59,7 @@ export async function skillCommand(ctx: CommandContext): Promise<CommandResult> 
     return {
       exitCode: EXIT.USAGE,
       text: [],
-      stderrText: [`swe-verify: ${reason}`, '  → Run `swe-verify skill` and commit the result.'],
+      stderrText: [`witness: ${reason}`, '  → Run `witness skill` and commit the result.'],
       json: { command: 'skill', path: target, name, stale: true, reason, plans: facts.plans.length },
     }
   }
@@ -75,7 +75,7 @@ export async function skillCommand(ctx: CommandContext): Promise<CommandResult> 
       facts.plans.length === 0
         ? 'no plans yet — the skill tells the agent to write the first one'
         : `describes ${facts.plans.length} plan(s): ${facts.plans.map((p) => p.id).join(', ')}`,
-      'regenerate whenever the project changes; `swe-verify skill --check` fails in CI when it is stale',
+      'regenerate whenever the project changes; `witness skill --check` fails in CI when it is stale',
     ],
     json: { command: 'skill', path: target, name, stale: false, plans: facts.plans.length },
   }
@@ -83,7 +83,7 @@ export async function skillCommand(ctx: CommandContext): Promise<CommandResult> 
 
 async function gatherFacts(ctx: CommandContext): Promise<SkillFacts> {
   const plans = loadFullPlans(ctx.cwd)
-  const browser = await import('@swe-verify/driver-web')
+  const browser = await import('@witness/driver-web')
     .then((web) => web.isPlaywrightAvailable())
     .catch(() => false)
 

@@ -1,4 +1,4 @@
-import { adapterReport, type AdapterEnv } from '@swe-verify/probe-dap'
+import { adapterReport, type AdapterEnv } from '@witness/probe-dap'
 
 /**
  * Which languages this machine can actually instrument.

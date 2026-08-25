@@ -53,10 +53,10 @@ afterAll(async () => {
 const mirrored = async <T>(attribute: string): Promise<T> =>
   JSON.parse((await page.locator(`#${CHROME_ID}`).getAttribute(attribute)) ?? '[]') as T
 
-const overlayText = async (): Promise<string> => (await mirrored<string[]>('data-swe-verify-rendered')).join(' ')
+const overlayText = async (): Promise<string> => (await mirrored<string[]>('data-witness-rendered')).join(' ')
 
 const overlayBoxes = async (): Promise<Array<{ top: number; bottom: number; height: number }>> =>
-  await mirrored('data-swe-verify-boxes')
+  await mirrored('data-witness-boxes')
 
 suite('caption — what the frame is rendering', () => {
   it('draws the caption over the page', async () => {

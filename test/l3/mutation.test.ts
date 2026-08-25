@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { GateResult, Plan } from '@swe-verify/core'
-import { adapterFor } from '@swe-verify/probe-dap'
+import type { GateResult, Plan } from '@witness/core'
+import { adapterFor } from '@witness/probe-dap'
 import { TestRepo, cli } from '../helpers/repo.js'
 
 /**
@@ -19,7 +19,7 @@ import { TestRepo, cli } from '../helpers/repo.js'
  * rate alone is maximised by blocking everything.
  */
 
-const PY_ENV = { SWE_VERIFY_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') }
+const PY_ENV = { WITNESS_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') }
 const SERVICE = readFileSync(join(import.meta.dirname, 'fixtures', 'service.py'), 'utf8')
 const available = adapterFor('py').detect(process.cwd(), process.env).available
 
@@ -151,7 +151,7 @@ const NULL_MUTATIONS: Mutation[] = [
 
 function planFor(): Plan {
   return {
-    schema: 'swe-verify/plan@1',
+    schema: 'witness/plan@1',
     id: 'pricing',
     intent: 'the cart totals and paginates correctly for a tier-2 customer',
     domain: 'fullstack',
@@ -191,7 +191,7 @@ async function runMutation(mutation: Mutation): Promise<Outcome> {
   const repo = new TestRepo()
   try {
     repo.write('app/service.py', SERVICE)
-    repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'local' }))
+    repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'local' }))
     repo.writePlan(planFor())
     const base = repo.commit('base')
 
@@ -249,7 +249,7 @@ afterAll(() => {
   // Published every release, as a pair, per PRD §6.
   console.log([
     '',
-    'swe-verify L3 mutation results',
+    'witness L3 mutation results',
     `  M1 catch rate        ${m1.toFixed(1)}%  (${caught}/${bad.length} injected bugs blocked; target ≥ 95%)`,
     `  M2 false-block rate  ${m2.toFixed(1)}%  (${falseBlocks}/${harmless.length} harmless diffs blocked; target ≤ 2%)`,
     '',

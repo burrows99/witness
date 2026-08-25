@@ -1,5 +1,5 @@
 /**
- * @swe-verify/probe-dap — non-suspending observation via DAP logpoints.
+ * @witness/probe-dap — non-suspending observation via DAP logpoints.
  *
  * The spec is explicit that when `logMessage` is set the adapter must log
  * rather than break. That is what makes "observe state over the lifetime of

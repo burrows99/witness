@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { configSource, loadConfig, loadPlans, planSha, scaffold, runDir, writeStory, readStory } from '../../src/workspace.js'
-import type { Story } from '@swe-verify/core'
+import type { Story } from '@witness/core'
 import { UsageError } from '../../src/errors.js'
 import { withReversedKeys } from '../../../../test/helpers/objects.js'
 import { diffAgainst, gitHeadSha, isGitRepo, mergeBase } from '../../src/git.js'
@@ -13,7 +13,7 @@ let dir: string
 const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' })
 
 beforeEach(() => {
-  dir = mkdtempSync(join(tmpdir(), 'swe-verify-ws-'))
+  dir = mkdtempSync(join(tmpdir(), 'witness-ws-'))
   git('init', '-q', '-b', 'main')
   git('config', 'user.email', 'test@example.com')
   git('config', 'user.name', 'test')
@@ -33,7 +33,7 @@ describe('scaffold + loadConfig', () => {
 
   it('is idempotent — running init twice does not clobber edits', () => {
     scaffold(dir)
-    const path = join(dir, '.swe-verify', 'config.json')
+    const path = join(dir, '.witness', 'config.json')
     const edited = { ...JSON.parse(readFileSync(path, 'utf8')), domain: 'data-engineering' }
     writeFileSync(path, JSON.stringify(edited))
     scaffold(dir)
@@ -45,23 +45,23 @@ describe('scaffold + loadConfig', () => {
   })
 
   it('rejects an invalid config with a usage error, not a crash', () => {
-    mkdirSync(join(dir, '.swe-verify'), { recursive: true })
-    writeFileSync(join(dir, '.swe-verify', 'config.json'), '{"schema":"swe-verify/config@1","runner":"cloud"}')
+    mkdirSync(join(dir, '.witness'), { recursive: true })
+    writeFileSync(join(dir, '.witness', 'config.json'), '{"schema":"witness/config@1","runner":"cloud"}')
     expect(() => loadConfig(dir)).toThrow(UsageError)
   })
 
   it('rejects unparseable JSON with a usage error naming the file', () => {
-    mkdirSync(join(dir, '.swe-verify'), { recursive: true })
-    writeFileSync(join(dir, '.swe-verify', 'config.json'), '{oops')
+    mkdirSync(join(dir, '.witness'), { recursive: true })
+    writeFileSync(join(dir, '.witness', 'config.json'), '{oops')
     expect(() => loadConfig(dir)).toThrow(/config\.json/)
   })
 })
 
 describe('loadPlans', () => {
   const writePlan = (name: string, over: Record<string, unknown> = {}) => {
-    mkdirSync(join(dir, '.swe-verify', 'plans'), { recursive: true })
+    mkdirSync(join(dir, '.witness', 'plans'), { recursive: true })
     const plan = {
-      schema: 'swe-verify/plan@1',
+      schema: 'witness/plan@1',
       id: name,
       intent: 'prove it',
       scope: { include: ['src/**'] },
@@ -69,7 +69,7 @@ describe('loadPlans', () => {
       assertions: [{ id: 'a1', kind: 'http-status', afterStep: 1, expect: { status: 200 } }],
       ...over,
     }
-    writeFileSync(join(dir, '.swe-verify', 'plans', `${name}.plan.json`), JSON.stringify(plan, null, 2))
+    writeFileSync(join(dir, '.witness', 'plans', `${name}.plan.json`), JSON.stringify(plan, null, 2))
     return plan
   }
 
@@ -86,8 +86,8 @@ describe('loadPlans', () => {
   })
 
   it('rejects an invalid plan with a usage error naming the file', () => {
-    mkdirSync(join(dir, '.swe-verify', 'plans'), { recursive: true })
-    writeFileSync(join(dir, '.swe-verify', 'plans', 'bad.plan.json'), '{"schema":"swe-verify/plan@1"}')
+    mkdirSync(join(dir, '.witness', 'plans'), { recursive: true })
+    writeFileSync(join(dir, '.witness', 'plans', 'bad.plan.json'), '{"schema":"witness/plan@1"}')
     expect(() => loadPlans(dir)).toThrow(/bad\.plan\.json/)
   })
 
@@ -165,17 +165,17 @@ describe('git integration', () => {
 })
 
 describe('run directory', () => {
-  it('writes and reads back a story under .swe-verify/runs/<id>', () => {
+  it('writes and reads back a story under .witness/runs/<id>', () => {
     const story = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'story.json'), 'utf8')) as Story
     const path = writeStory(dir, story.run_id, story)
-    expect(path).toContain(join('.swe-verify', 'runs', story.run_id))
+    expect(path).toContain(join('.witness', 'runs', story.run_id))
     expect(readStory(path).run_id).toBe(story.run_id)
   })
 
   it('rejects a story that fails schema validation on read', () => {
     const path = join(runDir(dir, '01JB7QK3M9X2VYD8N4T6ZQWERT'), 'story.json')
-    mkdirSync(join(dir, '.swe-verify', 'runs', '01JB7QK3M9X2VYD8N4T6ZQWERT'), { recursive: true })
-    writeFileSync(path, '{"schema":"swe-verify/story@1"}')
+    mkdirSync(join(dir, '.witness', 'runs', '01JB7QK3M9X2VYD8N4T6ZQWERT'), { recursive: true })
+    writeFileSync(path, '{"schema":"witness/story@1"}')
     expect(() => readStory(path)).toThrow(/invalid story .*required property 'run_id'/s)
   })
 })
@@ -183,7 +183,7 @@ describe('run directory', () => {
 describe('doctor says where the config came from', () => {
   /**
    * An agent branched from a commit that predated the gate config, so git
-   * correctly removed the tracked `.swe-verify/config.json` from the working
+   * correctly removed the tracked `.witness/config.json` from the working
    * tree — and every run on that branch quietly used built-in budgets. It ran
    * forty minutes against a ten-minute default before anyone noticed, because
    * `doctor` reported what the config *said* and never whether a file existed
@@ -191,13 +191,13 @@ describe('doctor says where the config came from', () => {
    * what it is?".
    */
   it('names the file when there is one', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'swe-verify-cfg-'))
-    mkdirSync(join(dir, '.swe-verify'), { recursive: true })
-    writeFileSync(join(dir, '.swe-verify', 'config.json'), JSON.stringify({ schema: 'swe-verify/config@1' }))
-    expect(configSource(dir)).toBe(join(dir, '.swe-verify', 'config.json'))
+    const dir = mkdtempSync(join(tmpdir(), 'witness-cfg-'))
+    mkdirSync(join(dir, '.witness'), { recursive: true })
+    writeFileSync(join(dir, '.witness', 'config.json'), JSON.stringify({ schema: 'witness/config@1' }))
+    expect(configSource(dir)).toBe(join(dir, '.witness', 'config.json'))
   })
 
   it('reports nothing to load, rather than an empty string', () => {
-    expect(configSource(mkdtempSync(join(tmpdir(), 'swe-verify-cfg-')))).toBeNull()
+    expect(configSource(mkdtempSync(join(tmpdir(), 'witness-cfg-')))).toBeNull()
   })
 })

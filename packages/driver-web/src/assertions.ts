@@ -1,4 +1,4 @@
-import { has, readString, type AssertionKind, type AssertionResult, type StoryView } from '@swe-verify/core'
+import { has, readString, type AssertionKind, type AssertionResult, type StoryView } from '@witness/core'
 import type { WebDriver } from './driver.js'
 
 /**

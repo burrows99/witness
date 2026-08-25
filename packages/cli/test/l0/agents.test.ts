@@ -10,7 +10,7 @@ import { AGENTS_BEGIN, AGENTS_END, renderAgentsBlock, upsertAgentsBlock, renderP
 
 describe('renderAgentsBlock', () => {
   it('tells the agent the one command it needs', () => {
-    expect(renderAgentsBlock()).toMatch(/swe-verify verify --plan/)
+    expect(renderAgentsBlock()).toMatch(/witness verify --plan/)
   })
 
   it('says what the gate blocks on, in the agent\'s terms', () => {
@@ -62,7 +62,7 @@ describe('vendor hooks — a latency optimisation, never the gate', () => {
   })
 
   it('every hook invokes the same binary CI does', () => {
-    for (const hook of VENDOR_HOOKS) expect(hook.render()).toMatch(/swe-verify/)
+    for (const hook of VENDOR_HOOKS) expect(hook.render()).toMatch(/witness/)
   })
 
   it('the git hook fails the commit on a blocking verdict', () => {

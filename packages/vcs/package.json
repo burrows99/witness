@@ -1,5 +1,5 @@
 {
-  "name": "@swe-verify/vcs",
+  "name": "@witness/vcs",
   "version": "0.1.0",
   "description": "VcsProvider: read a bypass signal, publish a result, describe the change. local, github, gitlab, bitbucket.",
   "license": "Apache-2.0",
@@ -22,7 +22,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@swe-verify/core": "workspace:*"
+    "@witness/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

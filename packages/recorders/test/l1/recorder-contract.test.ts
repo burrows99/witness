@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { compileRedactionPolicy, DEFAULT_CONFIG, validateRecording, type RunContext } from '@swe-verify/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG, validateRecording, type RunContext } from '@witness/core'
 import { ArtifactStore } from '../../src/store.js'
 import { RECORDERS, createRecorder, type RecorderDeps } from '../../src/registry.js'
 
@@ -33,7 +33,7 @@ function ctx(runDir: string): RunContext {
 
 /** Deps with nothing wired up: no browser context, no commands to run. */
 function bareDeps(): RecorderDeps {
-  const runDir = mkdtempSync(join(tmpdir(), 'swe-verify-contract-'))
+  const runDir = mkdtempSync(join(tmpdir(), 'witness-contract-'))
   return {
     runDir,
     store: new ArtifactStore({
@@ -128,7 +128,7 @@ describe.each(RECORDERS)('Recorder contract: %s', (name) => {
 function stubInputs(): Partial<RecorderDeps> {
   return {
     browser: {
-      videoDir: () => mkdtempSync(join(tmpdir(), 'swe-verify-vid-')),
+      videoDir: () => mkdtempSync(join(tmpdir(), 'witness-vid-')),
       recordedVideo: () => null,
       finish: async () => {},
     },

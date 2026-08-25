@@ -42,11 +42,11 @@ function fail(message: string, remedy: string): { ok: false; findings: Finding[]
  */
 function checkSchemaField(value: unknown, kind: 'plan' | 'story' | 'config', major: number) {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return fail(`${kind} is not a JSON object`, `Regenerate the ${kind} with the swe-verify CLI.`)
+    return fail(`${kind} is not a JSON object`, `Regenerate the ${kind} with the witness CLI.`)
   }
   const schema = (value as Record<string, unknown>).schema
   if (typeof schema !== 'string') {
-    return fail(`${kind} is missing the mandatory "schema" field`, `Add "schema": "<name>/${kind}@${major}", e.g. "swe-verify/${kind}@${major}".`)
+    return fail(`${kind} is missing the mandatory "schema" field`, `Add "schema": "<name>/${kind}@${major}", e.g. "witness/${kind}@${major}".`)
   }
   const m = SCHEMA_RE.exec(schema)
   if (!m) return fail(`unrecognised schema identifier "${schema}"`, `Expected something of the form "<name>/${kind}@${major}".`)
@@ -54,7 +54,7 @@ function checkSchemaField(value: unknown, kind: 'plan' | 'story' | 'config', maj
   if (Number(m[2]) !== major) {
     return fail(
       `unsupported schema major: "${schema}" (this CLI understands major ${major})`,
-      'Upgrade swe-verify to a version that understands this schema, or regenerate the artefact with this CLI.',
+      'Upgrade witness to a version that understands this schema, or regenerate the artefact with this CLI.',
     )
   }
   return null
@@ -114,7 +114,7 @@ export function validatePlan(input: unknown): ValidationResult<Plan> {
     ok: true,
     value: plan,
     warnings: unknownTopLevelFields(plan, planSchema as never).map(
-      (k) => `plan contains unknown field "${k}"; ignoring (written by a newer swe-verify?)`,
+      (k) => `plan contains unknown field "${k}"; ignoring (written by a newer witness?)`,
     ),
   }
 }
@@ -128,7 +128,7 @@ export function validateStory(input: unknown): ValidationResult<Story> {
     ok: true,
     value: story,
     warnings: unknownTopLevelFields(story, storySchema as never).map(
-      (k) => `story contains unknown field "${k}"; ignoring (written by a newer swe-verify?)`,
+      (k) => `story contains unknown field "${k}"; ignoring (written by a newer witness?)`,
     ),
   }
 }
@@ -149,7 +149,7 @@ export function validateConfig(input: unknown): ValidationResult<Config> {
 
 /** The free tier, spelled out: local runner, filesystem store, no telemetry. */
 export const DEFAULT_CONFIG: ResolvedConfig = {
-  schema: 'swe-verify/config@1',
+  schema: 'witness/config@1',
   domain: 'fullstack',
   vcs: 'auto',
   runner: 'local',

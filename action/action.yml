@@ -1,6 +1,6 @@
-name: swe-verify
+name: witness
 description: Block a merge when the changed code was never executed.
-author: swe-verify
+author: witness
 branding:
   icon: check-circle
   color: purple
@@ -48,7 +48,7 @@ runs:
       env:
         # The bypass label lives in the event payload, so no token and no API
         # call are needed for the free path (NFR-4).
-        SWE_VERIFY_EVENT: ${{ toJSON(github.event) }}
+        WITNESS_EVENT: ${{ toJSON(github.event) }}
       run: |
         set +e
         args=("${{ inputs.command }}" --json)
@@ -60,7 +60,7 @@ runs:
           args+=(--base "${{ github.event.pull_request.base.sha }}")
         fi
 
-        output=$(swe-verify "${args[@]}")
+        output=$(witness "${args[@]}")
         code=$?
         echo "$output"
 
@@ -68,19 +68,19 @@ runs:
         {
           echo "exit-code=$code"
           echo "verdict=$verdict"
-          echo "findings<<SWEVEOF"
+          echo "findings<<WTNSEOF"
           echo "$output"
-          echo "SWEVEOF"
+          echo "WTNSEOF"
         } >> "$GITHUB_OUTPUT"
 
         # Exit 4 is a harness failure — our bug, not the developer's. It still
         # fails the job, but it is reported as ours (FR-8, M5).
         if [ "$code" = "4" ]; then
-          echo "::error title=swe-verify harness failure::The harness could not observe this run (exit 4). This is a swe-verify problem, not a problem with your change."
+          echo "::error title=witness harness failure::The harness could not observe this run (exit 4). This is a witness problem, not a problem with your change."
         fi
 
         if [ "${{ inputs.warn-only }}" = "true" ]; then
-          echo "::notice title=swe-verify (warn only)::verdict=$verdict exit=$code"
+          echo "::notice title=witness (warn only)::verdict=$verdict exit=$code"
           exit 0
         fi
         exit $code

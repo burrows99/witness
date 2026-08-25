@@ -1,5 +1,5 @@
 {
-  "name": "@swe-verify/mcp",
+  "name": "@witness/mcp",
   "version": "0.1.0",
   "description": "MCP adapter over the CLI. No logic of its own.",
   "license": "Apache-2.0",
@@ -16,7 +16,7 @@
     "dist"
   ],
   "bin": {
-    "swe-verify-mcp": "./dist/bin.js"
+    "witness-mcp": "./dist/bin.js"
   },
   "engines": {
     "node": ">=22"
@@ -26,6 +26,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
-    "@swe-verify/cli": "workspace:*"
+    "@witness/cli": "workspace:*"
   }
 }

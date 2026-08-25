@@ -1,4 +1,4 @@
-import type { GateResult } from '@swe-verify/core'
+import type { GateResult } from '@witness/core'
 
 /** Shared rendering so every provider publishes the same facts. */
 
@@ -12,7 +12,7 @@ export function headline(result: GateResult): string {
   const errors = result.findings.filter((f) => f.severity === 'error').length
   const warns = result.findings.length - errors
   const counts = [errors ? `${errors} error` : '', warns ? `${warns} warning` : ''].filter(Boolean).join(', ')
-  return `swe-verify: ${VERDICT_LABEL[result.verdict]}${counts ? ` — ${counts}` : ''}`
+  return `witness: ${VERDICT_LABEL[result.verdict]}${counts ? ` — ${counts}` : ''}`
 }
 
 export function locusOf(finding: GateResult['findings'][number]): string {

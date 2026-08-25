@@ -1,4 +1,4 @@
-import type { Bypass, GateResult } from '@swe-verify/core'
+import type { Bypass, GateResult } from '@witness/core'
 
 export type ProviderName = 'local' | 'github' | 'gitlab' | 'bitbucket'
 export type ProviderSelector = ProviderName | 'auto'

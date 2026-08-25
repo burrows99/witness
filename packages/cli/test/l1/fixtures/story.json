@@ -1,5 +1,5 @@
 {
-  "schema": "swe-verify/story@1",
+  "schema": "witness/story@1",
   "run_id": "01JB7QK3M9X2VYD8N4T6ZQWERT",
   "plan_id": "p",
   "plan_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

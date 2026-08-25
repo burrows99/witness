@@ -1,4 +1,4 @@
-import { orderEvents, type CoverageLine, type Finding, type GateResult, type Story, type StoryEvent } from '@swe-verify/core'
+import { orderEvents, type CoverageLine, type Finding, type GateResult, type Story, type StoryEvent } from '@witness/core'
 
 /**
  * The story viewer — FR-16.
@@ -28,7 +28,7 @@ export function renderViewer({ story, gate }: ViewerInput): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>swe-verify run ${esc(story.run_id)}</title>
+<title>witness run ${esc(story.run_id)}</title>
 <style>${STYLES}</style>
 </head>
 <body>
@@ -55,7 +55,7 @@ ${section('Artefacts', renderArtifacts(story))}
 ${story.diagnostics.length ? section('Harness diagnostics', renderDiagnostics(story)) : ''}
 
 <footer>
-  <p>Sealed ${story.seal ? `<code>${esc(story.seal.value.slice(0, 23))}…</code>` : 'unsealed'} · rendered offline by swe-verify. Nothing here loads from the network.</p>
+  <p>Sealed ${story.seal ? `<code>${esc(story.seal.value.slice(0, 23))}…</code>` : 'unsealed'} · rendered offline by witness. Nothing here loads from the network.</p>
 </footer>
 </body>
 </html>

@@ -1,5 +1,5 @@
 {
-  "name": "@swe-verify/core",
+  "name": "@witness/core",
   "version": "0.1.0",
   "description": "The gate, the story schema and the arithmetic behind them. Pure: no I/O, no host, no drivers.",
   "license": "Apache-2.0",

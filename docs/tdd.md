@@ -1,15 +1,15 @@
-# swe-verify — Technical Design Document
+# witness — Technical Design Document
 
 | | |
 |---|---|
-| **Document type** | TDD — *how*. Requirements and rationale live in the [PRD](./swe-verify-PRD.md). |
+| **Document type** | TDD — *how*. Requirements and rationale live in the [PRD](./witness-PRD.md). |
 | **Status** | Draft |
 | **Author** | @burrows99 |
 | **Reviewers** | *(unassigned)* |
 | **Created** | 2026-08-24 |
 | **Last updated** | 2026-08-24 |
 | **Version** | 0.1 |
-| **Related** | [PRD](./swe-verify-PRD.md) · [Contracts appendix](./swe-verify-contracts.md) — full schemas, interfaces, error codes |
+| **Related** | [PRD](./witness-PRD.md) · [Contracts appendix](./witness-contracts.md) — full schemas, interfaces, error codes |
 
 > **How to read this.** §2–§5 give the shape in about five minutes. §6–§8 are the design proper. §9–§14 are the parts reviewers usually ask for and authors usually omit: storage, security, failure modes, alternatives, tests, operations. Formal schemas are deliberately *not* inline — they are verbose and go stale in prose. They live in the contracts appendix; this doc references them by name and discusses only the parts that carry a trade-off.
 
@@ -50,7 +50,7 @@ The system sits between an agent runtime and a version-control host, and touches
 - **Downstream:** a CI check that allows or blocks a merge.
 - **Under observation:** the application under test, brought up from the repo in containers.
 
-`swe-verify` does not modify application code, does not run in production, and does not persist anything between runs in its free configuration.
+`witness` does not modify application code, does not run in production, and does not persist anything between runs in its free configuration.
 
 **Constraint shape:** this is a greenfield design with an unusually constrained centre. The protocols are fixed and non-negotiable (DAP, W3C Trace Context, MCP), the enforcement point is fixed (CI), and the primary consumer cannot read images. Most of the design work is composition within those constraints rather than invention.
 
@@ -59,7 +59,7 @@ The system sits between an agent runtime and a version-control host, and touches
 ```mermaid
 flowchart LR
   DEV["Developer"] --> AGT["Agent runtime<br/>any vendor"]
-  AGT --> SV["swe-verify CLI"]
+  AGT --> SV["witness CLI"]
   DEV --> SV
   SV --> APP["Application under test<br/>containers, from the repo"]
   SV --> ST["story.json"]
@@ -118,7 +118,7 @@ flowchart TB
     CU["Cursor / Zed / aider"]
   end
   subgraph CORE["Portable core"]
-    CLI["swe-verify CLI<br/>single source of truth"]
+    CLI["witness CLI<br/>single source of truth"]
     MCPA["MCP adapter"]
     AGM["AGENTS.md"]
   end
@@ -169,7 +169,7 @@ The **driver** is pluggable; the **story** is universal. A backend-only change u
 One pnpm workspace. Each package is independently useful and independently forkable.
 
 ```
-swe-verify/
+witness/
 ├─ AGENTS.md
 ├─ packages/                  Apache-2.0
 │  ├─ core/                   story schema, diff_hash, coverage, gate, redaction
@@ -247,7 +247,7 @@ These four checks are the architecture. Everything else is convention.
 
 A single causally ordered timeline across browser, server and data tiers, threaded by one `trace_id`. The agent declares **intent**, not a collection plan; the harness places probes, runs the flow, and assembles the result.
 
-The full schema is in the [contracts appendix](./swe-verify-contracts.md#3-story1). The parts that carry a trade-off:
+The full schema is in the [contracts appendix](./witness-contracts.md#3-story1). The parts that carry a trade-off:
 
 **Ordering.** "Causally ordered" needs a rule, because containers skew clocks by more than a whole request:
 
@@ -316,7 +316,7 @@ A driver *acts*; a probe *observes inside*; a **recorder captures evidence**. Re
 
 **`readableBy` is the rule that keeps this honest.** A recorder can emit a beautiful video the agent cannot watch. Every artefact declares its readers, and the gate requires at least one agent-readable artefact per step (FR-15). A recorder producing only human-readable output cannot satisfy the gate alone. That is a design constraint, not a bug — it falls directly out of U1 being the primary user.
 
-Adding a layer means implementing `Recorder` and registering it. `core` never changes. Interface definitions: [contracts §7](./swe-verify-contracts.md#7-package-interfaces).
+Adding a layer means implementing `Recorder` and registering it. `core` never changes. Interface definitions: [contracts §7](./witness-contracts.md#7-package-interfaces).
 
 ### 7.5 Diff-driven instrumentation
 
@@ -366,7 +366,7 @@ Conditions, in order — short-circuiting, because a stale story makes coverage 
 5. Every executable changed line has a fired, verified probe. → `SV010`, `SV011`, `SV013`
 6. All assertions pass. → `SV020`
 
-Full finding taxonomy: [contracts §5](./swe-verify-contracts.md#5-gate-contract).
+Full finding taxonomy: [contracts §5](./witness-contracts.md#5-gate-contract).
 
 **Findings carry a `remedy`, not only a message.** "Line 41 never executed" hands the developer a research task. "Add a step reaching `applyTiered` with `tier >= 2`, or waive with a reason" is actionable. Bypass rate (M3) will track this field more than any other.
 
@@ -412,7 +412,7 @@ Same spine every time: the diff says what changed → probes and recorders captu
 ```mermaid
 sequenceDiagram
   participant AGT as Agent
-  participant CLI as swe-verify
+  participant CLI as witness
   participant BR as Browser
   participant API as Server (DAP attached)
   participant DB as Database
@@ -452,13 +452,13 @@ Evidence nobody reads is theatre. The viewer makes a run auditable in ~30 second
 Bash is more universal than MCP; every agent can shell out. CI runs the **same binary** as the agent, so there is one gate and no drift. Precedent: Playwright ships a CLI plus a `Bash(...)` skill, not MCP-first.
 
 ```
-swe-verify init                                    scaffold config
-swe-verify plan   --intent <s> --scope <glob>...   emit a plan skeleton
-swe-verify run    --plan <path>                    execute, emit story
-swe-verify gate   --run <id> | --story <path>      evaluate, publish
-swe-verify verify --plan <path>                    run + gate (the agent's one command)
-swe-verify show   --run <id> [--open]              render viewer
-swe-verify doctor                                  adapters, ports, path mappings
+witness init                                    scaffold config
+witness plan   --intent <s> --scope <glob>...   emit a plan skeleton
+witness run    --plan <path>                    execute, emit story
+witness gate   --run <id> | --story <path>      evaluate, publish
+witness verify --plan <path>                    run + gate (the agent's one command)
+witness show   --run <id> [--open]              render viewer
+witness doctor                                  adapters, ports, path mappings
 ```
 
 | Exit | Meaning | CI reads it as |
@@ -496,7 +496,7 @@ Design points worth review:
 - **The server re-validates the seal.** A client-computed verdict is a claim. The vault's value is that it independently recomputed it — that is the difference between storage and evidence.
 - **Artefacts never proxy through the control plane**; presigned URLs only, so a 4 MB video does not touch the API tier.
 
-Full endpoint definitions: [contracts §10](./swe-verify-contracts.md#10-cloud-api).
+Full endpoint definitions: [contracts §10](./witness-contracts.md#10-cloud-api).
 
 ---
 
@@ -507,7 +507,7 @@ Full endpoint definitions: [contracts §10](./swe-verify-contracts.md#10-cloud-a
 Filesystem plus CI artifact storage is the entire persistence layer, and that is the point — a gate needing a database cannot run on a laptop with no network (NFR-4).
 
 ```
-.swe-verify/
+.witness/
   config.json                        committed
   plans/*.plan.json                  committed
   runs/<run_id>/                     gitignored
@@ -530,7 +530,7 @@ Stories are 10² KB–10¹ MB and write-once. Shredding events into rows at CI v
 | `coverage_lines` | per-line fired / class / hits | the analytics table; hash-partitioned |
 | `artifacts` | kind, uri, bytes, sha256, `readable_by`, `expires_at` | drives retention |
 
-Full DDL: [contracts §9](./swe-verify-contracts.md#9-database-design--needed-where-exactly).
+Full DDL: [contracts §9](./witness-contracts.md#9-database-design--needed-where-exactly).
 
 Three product capabilities fall out of this shape rather than needing separate systems:
 
@@ -594,7 +594,7 @@ The organising principle: **anything that means "we could not observe" is exit 4
 
 | Rule | |
 |---|---|
-| `schema` field mandatory | `swe-verify/story@1` |
+| `schema` field mandatory | `witness/story@1` |
 | Within a major: additive only | new optional fields, event types, finding codes |
 | Unknown major → `SV002`, refuse | never best-effort parse |
 | Unknown minor field → ignore, warn once | old CLI reading a new story |
@@ -632,7 +632,7 @@ The risk is not "is the logic correct" but "does this work on real, messy, polyg
 | **L1** Adapter contract | one tiny fixture app per language, same assertions | every commit, ~1min | the DAP adapter conforms |
 | **L2** Conformance fleet | real OSS apps in containers | every PR, ~10min | it survives real code |
 | **L3** Mutation | inject a known bug, assert the gate **blocks** | every PR | the gate actually gates |
-| **L4** Dogfood | `swe-verify` gates its own PRs | every PR | we believe our own claim |
+| **L4** Dogfood | `witness` gates its own PRs | every PR | we believe our own claim |
 | **L5** Soak | nightly against upstream HEAD | nightly | ecosystem drift caught early |
 
 ### 12.1 L3 is the tier that matters
@@ -691,7 +691,7 @@ flowchart LR
 
 **Backend before UI, deliberately.** DAP logpoints are the novel part and the harder risk; Playwright is known-good. Sequencing the risky work first means a failure at M1 is cheap, whereas discovering it at M3 would invalidate three milestones of work.
 
-Exit criteria per milestone are in [PRD §9](./swe-verify-PRD.md#9-release-criteria).
+Exit criteria per milestone are in [PRD §9](./witness-PRD.md#9-release-criteria).
 
 ---
 
@@ -746,7 +746,7 @@ Exit criteria per milestone are in [PRD §9](./swe-verify-PRD.md#9-release-crite
 
 ## 16. Open questions
 
-Carried from [PRD §13](./swe-verify-PRD.md#13-open-questions); technical framing here.
+Carried from [PRD §13](./witness-PRD.md#13-open-questions); technical framing here.
 
 | # | Question | Blocks |
 |---|---|---|

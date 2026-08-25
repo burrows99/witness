@@ -1,6 +1,6 @@
 import { connect, type Socket } from 'node:net'
 import type { Duplex } from 'node:stream'
-import { groupByFile, type ProbeTarget } from '@swe-verify/core'
+import { groupByFile, type ProbeTarget } from '@witness/core'
 import { DapClient, DapError, type DapClientOptions } from './client.js'
 import { buildLogMessage, parseLogOutput } from './logpoint.js'
 import { parseEvaluationError } from './evalerror.js'
@@ -73,9 +73,9 @@ export interface SessionOptions extends DapClientOptions {
 
 /** The same handshake for a parent connection and for any child it spawns. */
 const INITIALIZE_ARGS: Record<string, unknown> = {
-  clientID: 'swe-verify',
-  clientName: 'swe-verify',
-  adapterID: 'swe-verify',
+  clientID: 'witness',
+  clientName: 'witness',
+  adapterID: 'witness',
   pathFormat: 'path',
   linesStartAt1: true,
   columnsStartAt1: true,
@@ -156,7 +156,7 @@ export class DapSession {
    * to `initialize` depending on the adapter, so the client latches it rather
    * than racing for it.
    */
-  async initialize(clientName = 'swe-verify'): Promise<Record<string, unknown>> {
+  async initialize(clientName = 'witness'): Promise<Record<string, unknown>> {
     const response = await this.client.request('initialize', { ...INITIALIZE_ARGS, clientName })
     return (response.body ?? {}) as Record<string, unknown>
   }

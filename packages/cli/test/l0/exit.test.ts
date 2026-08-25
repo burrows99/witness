@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EXIT, exitCodeFor, HarnessError, UsageError } from '../../src/errors.js'
-import type { GateResult } from '@swe-verify/core'
+import type { GateResult } from '@witness/core'
 
 const result = (verdict: GateResult['verdict']): GateResult => ({
   verdict,
@@ -31,6 +31,6 @@ describe('exit codes (FR-8, contracts §6)', () => {
   })
 
   it('a harness error carries a remedy for doctor', () => {
-    expect(new HarnessError('adapter crashed', 'Run swe-verify doctor.').remedy).toMatch(/doctor/)
+    expect(new HarnessError('adapter crashed', 'Run witness doctor.').remedy).toMatch(/doctor/)
   })
 })

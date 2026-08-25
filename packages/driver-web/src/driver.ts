@@ -1,9 +1,9 @@
 import { createRequire } from 'node:module'
 import { mkdirSync } from 'node:fs'
 import type { Browser, BrowserContext, ConsoleMessage, Page } from 'playwright'
-import { has, readNumber, readString, type Driver, type PlanArgs, type PlanStep, type RunContext, type StepResult, type StoryArtifact, type UnsequencedEvent } from '@swe-verify/core'
-import { newSpanId, traceparent } from '@swe-verify/driver-api'
-import type { ArtifactStore } from '@swe-verify/recorders'
+import { has, readNumber, readString, type Driver, type PlanArgs, type PlanStep, type RunContext, type StepResult, type StoryArtifact, type UnsequencedEvent } from '@witness/core'
+import { newSpanId, traceparent } from '@witness/driver-api'
+import type { ArtifactStore } from '@witness/recorders'
 import { applyChrome, resetChrome, type ProbeReading } from './overlay.js'
 
 /**

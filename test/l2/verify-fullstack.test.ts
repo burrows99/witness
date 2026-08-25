@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import type { GateResult, Plan, Story } from '@swe-verify/core'
-import { adapterFor } from '@swe-verify/probe-dap'
-import { isPlaywrightAvailable } from '@swe-verify/driver-web'
+import type { GateResult, Plan, Story } from '@witness/core'
+import { adapterFor } from '@witness/probe-dap'
+import { isPlaywrightAvailable } from '@witness/driver-web'
 import { TestRepo, cli } from '../helpers/repo.js'
 
 /**
@@ -16,7 +16,7 @@ import { TestRepo, cli } from '../helpers/repo.js'
  * at capture time rather than stitched together by timestamp afterwards.
  */
 
-const PY_ENV = { SWE_VERIFY_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') }
+const PY_ENV = { WITNESS_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') }
 const available = adapterFor('py').detect(process.cwd(), process.env).available && isPlaywrightAvailable()
 
 const APP = `import json
@@ -84,7 +84,7 @@ const CHANGED_APP = APP.replace(
 
 function plan(): Plan {
   return {
-    schema: 'swe-verify/plan@1',
+    schema: 'witness/plan@1',
     id: 'checkout',
     intent: 'placing an order shows a confirmation and totals the cart on the server',
     domain: 'fullstack',
@@ -111,7 +111,7 @@ let base: string
 beforeEach(() => {
   repo = new TestRepo()
   repo.write('app/server.py', APP)
-  repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'local' }))
+  repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'local' }))
   repo.writePlan(plan())
   base = repo.commit('base')
 })
@@ -123,7 +123,7 @@ const storyOf = (): Story => {
 
 /** Artefact paths in a story are relative to the run directory. */
 const latestRunDir = (): string => {
-  const runs = join(repo.dir, '.swe-verify', 'runs')
+  const runs = join(repo.dir, '.witness', 'runs')
   return join(runs, readdirSync(runs).sort().at(-1)!)
 }
 

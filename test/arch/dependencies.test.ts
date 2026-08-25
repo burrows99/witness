@@ -42,9 +42,9 @@ const packages = () =>
 describe('core is pure (NFR-7)', () => {
   const FORBIDDEN = [
     'playwright', '@playwright/test', 'testcontainers',
-    '@swe-verify/driver-web', '@swe-verify/driver-api',
-    '@swe-verify/probe-dap', '@swe-verify/probe-otel',
-    '@swe-verify/recorders', '@swe-verify/vcs', '@swe-verify/cli',
+    '@witness/driver-web', '@witness/driver-api',
+    '@witness/probe-dap', '@witness/probe-otel',
+    '@witness/recorders', '@witness/vcs', '@witness/cli',
   ]
 
   it('does not import drivers, probes or recorders — the gate runs with no browser and no debugger', () => {
@@ -78,7 +78,7 @@ describe('the open core is not a demo (NFR-10)', () => {
     for (const pkg of packages()) {
       for (const { file, imports } of packageSources(pkg)) {
         for (const imported of imports) {
-          expect(imported, `${file} imports ${imported}`).not.toMatch(/(^|\/)cloud(\/|$)|@swe-verify\/cloud/)
+          expect(imported, `${file} imports ${imported}`).not.toMatch(/(^|\/)cloud(\/|$)|@witness\/cloud/)
         }
       }
     }

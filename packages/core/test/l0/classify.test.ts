@@ -93,7 +93,7 @@ describe('gateability — the answer to open question Q7', () => {
   it('recognises files that are not code at all', () => {
     expect(gateability('README.md')).toEqual({ kind: 'not-code' })
     expect(gateability('package.json')).toEqual({ kind: 'not-code' })
-    expect(gateability('.swe-verify/plans/x.plan.json')).toEqual({ kind: 'not-code' })
+    expect(gateability('.witness/plans/x.plan.json')).toEqual({ kind: 'not-code' })
     expect(gateability('assets/logo.svg')).toEqual({ kind: 'not-code' })
     expect(gateability('pnpm-lock.yaml')).toEqual({ kind: 'not-code' })
   })

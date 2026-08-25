@@ -3,10 +3,10 @@ import { createServer, type Server } from 'node:http'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { PlanStep, RunContext } from '@swe-verify/core'
-import { compileRedactionPolicy, DEFAULT_CONFIG } from '@swe-verify/core'
-import { ArtifactStore } from '@swe-verify/recorders'
-import { parseTraceparent } from '@swe-verify/driver-api'
+import type { PlanStep, RunContext } from '@witness/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG } from '@witness/core'
+import { ArtifactStore } from '@witness/recorders'
+import { parseTraceparent } from '@witness/driver-api'
 import { WebDriver, isPlaywrightAvailable } from '../../src/index.js'
 import { uiText } from '../../src/assertions.js'
 
@@ -60,7 +60,7 @@ afterAll(async () => { await new Promise<void>((r) => server.close(() => r())) }
 afterEach(() => { if (runDir) rmSync(runDir, { recursive: true, force: true }) })
 
 function ctx(): RunContext {
-  runDir = mkdtempSync(join(tmpdir(), 'swe-verify-web-'))
+  runDir = mkdtempSync(join(tmpdir(), 'witness-web-'))
   return {
     runId: '01JB7QK3M9X2VYD8N4T6ZQWERT',
     repoRoot: process.cwd(),

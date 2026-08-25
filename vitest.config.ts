@@ -13,15 +13,15 @@ import { fileURLToPath } from 'node:url'
 const pkg = (name: string) => fileURLToPath(new URL(`./packages/${name}/src/index.ts`, import.meta.url))
 
 const alias = {
-  '@swe-verify/core': pkg('core'),
-  '@swe-verify/vcs': pkg('vcs'),
-  '@swe-verify/cli': pkg('cli'),
-  '@swe-verify/probe-dap': pkg('probe-dap'),
-  '@swe-verify/driver-api': pkg('driver-api'),
-  '@swe-verify/driver-web': pkg('driver-web'),
-  '@swe-verify/recorders': pkg('recorders'),
-  '@swe-verify/viewer': pkg('viewer'),
-  '@swe-verify/mcp': pkg('mcp'),
+  '@witness/core': pkg('core'),
+  '@witness/vcs': pkg('vcs'),
+  '@witness/cli': pkg('cli'),
+  '@witness/probe-dap': pkg('probe-dap'),
+  '@witness/driver-api': pkg('driver-api'),
+  '@witness/driver-web': pkg('driver-web'),
+  '@witness/recorders': pkg('recorders'),
+  '@witness/viewer': pkg('viewer'),
+  '@witness/mcp': pkg('mcp'),
 }
 
 const tier = (name: string, include: string[], timeoutMs?: number) => ({

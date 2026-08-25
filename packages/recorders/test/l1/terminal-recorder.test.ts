@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { compileRedactionPolicy, DEFAULT_CONFIG, type RunContext } from '@swe-verify/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG, type RunContext } from '@witness/core'
 import { ArtifactStore } from '../../src/store.js'
 import { TerminalRecorder } from '../../src/terminal-recorder.js'
 import { renderTape, stripTerminalControl } from '../../src/terminal.js'
@@ -34,7 +34,7 @@ function ctx(runDir: string): RunContext {
 }
 
 const setup = () => {
-  const runDir = mkdtempSync(join(tmpdir(), 'swe-verify-term-'))
+  const runDir = mkdtempSync(join(tmpdir(), 'witness-term-'))
   return {
     runDir,
     store: new ArtifactStore({

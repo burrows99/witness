@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { TestRepo, cli, planFor } from '../helpers/repo.js'
 
 /**
- * L2 — `swe-verify skill`, end to end in a real project.
+ * L2 — `witness skill`, end to end in a real project.
  *
  * The point of generating rather than writing the skill is that it tracks the
  * project. These tests pin that: add a plan, and the skill says so; leave it
@@ -17,7 +17,7 @@ beforeEach(() => {
   repo = new TestRepo()
   repo.write('src/pricing/discount.ts', 'export const rate = 0.1\n')
   repo.write('package.json', JSON.stringify({ name: 'acme-checkout', version: '1.0.0' }, null, 2))
-  repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'local' }))
+  repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'local' }))
   repo.commit('base')
 })
 afterEach(() => repo.dispose())
@@ -25,7 +25,7 @@ afterEach(() => repo.dispose())
 const DEFAULT_PATH = join('.claude', 'skills', 'verify-acme-checkout', 'SKILL.md')
 const read = (path = DEFAULT_PATH) => readFileSync(join(repo.dir, path), 'utf8')
 
-describe('swe-verify skill — one command, any project root', () => {
+describe('witness skill — one command, any project root', () => {
   it('writes a skill where Claude Code discovers project skills', async () => {
     const result = await cli(repo, ['skill', '--json'])
     expect(result.code).toBe(0)
@@ -90,8 +90,8 @@ describe('the skill is generated from the project, so it evolves with it', () =>
     await cli(repo, ['skill'])
     expect(read()).toMatch(/at most \*\*10%\*\*/)
 
-    repo.write('.swe-verify/config.json', JSON.stringify({
-      schema: 'swe-verify/config@1',
+    repo.write('.witness/config.json', JSON.stringify({
+      schema: 'witness/config@1',
       vcs: 'local',
       coverage: { policy: 'all-executable', defensive: 'require', waiverCapPct: 3 },
     }))
@@ -102,7 +102,7 @@ describe('the skill is generated from the project, so it evolves with it', () =>
   })
 
   it('reports the adapters actually present in this environment', async () => {
-    await cli(repo, ['skill'], { env: { PATH: process.env.PATH, SWE_VERIFY_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') } })
+    await cli(repo, ['skill'], { env: { PATH: process.env.PATH, WITNESS_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') } })
     expect(read()).toMatch(/\*\*py\*\* \(debugpy\)/)
   })
 
@@ -143,7 +143,7 @@ describe('--check — how the skill stays fresh in CI', () => {
     await cli(repo, ['skill'])
     repo.writePlan(planFor('refunds', ['src/refunds/**']))
     const result = await cli(repo, ['skill', '--check'])
-    expect(result.stderr).toMatch(/swe-verify skill/)
+    expect(result.stderr).toMatch(/witness skill/)
   })
 
   it('fails when the skill has never been generated', async () => {

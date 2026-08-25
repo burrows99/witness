@@ -9,9 +9,9 @@ Every step is a shell command. `--json` on every call: the agent reads JSON, nev
 ## 0. Once per project
 
 ```bash
-swe-verify init --agents        # .swe-verify/config.json + AGENTS.md block
-swe-verify skill                # .claude/skills/verify-<project>/SKILL.md
-swe-verify doctor --json        # which languages this machine can instrument
+witness init --agents        # .witness/config.json + AGENTS.md block
+witness skill                # .claude/skills/verify-<project>/SKILL.md
+witness doctor --json        # which languages this machine can instrument
 ```
 
 Read `doctor` before anything else. If the language you changed has no adapter, the gate
@@ -22,7 +22,7 @@ will not cover it and the PR should say so rather than imply coverage.
 ## 1. Write down what the change proves
 
 ```bash
-swe-verify plan \
+witness plan \
   --intent "deleting a firing rule sends its resolved notification" \
   --scope 'pkg/services/ngalert/**' \
   --json
@@ -39,7 +39,7 @@ A plan with no assertions earns `SV021`: it proves the code ran, not that it beh
 ## 2. Prove it, and film it
 
 ```bash
-swe-verify verify --plan <plan-id> --record --json
+witness verify --plan <plan-id> --record --json
 ```
 
 One command: instruments every changed line, brings the fixture up, drives the plan, evaluates
@@ -52,7 +52,7 @@ Read the exit code:
 | `0` | allow | go to step 3 |
 | `2` | block | act on each finding's `remedy` — never weaken the plan |
 | `3` | usage/config | fix the plan or config |
-| `4` | harness failure | swe-verify could not observe; run `doctor`, report it |
+| `4` | harness failure | witness could not observe; run `doctor`, report it |
 | `5` | bypassed | recorded and amber, not green |
 
 ---
@@ -64,7 +64,7 @@ film of a healthy system. What convinces is the pair.
 
 ```bash
 git stash                                        # or: git checkout <base>
-swe-verify run --plan <plan-id> --record --json  # the bug, reproduced
+witness run --plan <plan-id> --record --json  # the bug, reproduced
 git stash pop
 ```
 
@@ -80,10 +80,10 @@ uncommitted changes — a recording that cannot be reproduced from its commit sa
 ## 4. Collect the artefacts
 
 ```bash
-swe-verify show --run <run-id> --json     # self-contained viewer.html
+witness show --run <run-id> --json     # self-contained viewer.html
 ```
 
-Everything for the run is under `.swe-verify/runs/<run-id>/`:
+Everything for the run is under `.witness/runs/<run-id>/`:
 
 ```
 story.json                  the sealed evidence
@@ -157,5 +157,5 @@ Stated plainly, because a playbook that overstates its tooling wastes the reader
 |---|---|
 | Attaching video to a PR (step 6) | Manual browser. No CLI path exists — the CDN is unreachable from `gh`. |
 | Bringing up a containerised app | `fixture.kind: "compose"` exits 3. Only `process` and `none` work, so an app needing provisioning is driven by a script. |
-| Terminal recordings | Produced by `@swe-verify/recorders` as a library, not yet a registered `Recorder`, and not attached to the story. |
+| Terminal recordings | Produced by `@witness/recorders` as a library, not yet a registered `Recorder`, and not attached to the story. |
 | TypeScript / Java coverage | No vendored adapter — `doctor` reports it, and the gate reports `SV016` rather than pretending. |

@@ -10,7 +10,7 @@
 const sha256Pattern = '^sha256:[0-9a-f]{64}$'
 
 export const planSchema = {
-  $id: 'swe-verify/plan@1',
+  $id: 'witness/plan@1',
   type: 'object',
   required: ['schema', 'id', 'intent', 'scope', 'steps', 'assertions'],
   properties: {
@@ -169,7 +169,7 @@ const event = (type: string, props: Record<string, unknown>, required: string[])
 })
 
 export const storySchema = {
-  $id: 'swe-verify/story@1',
+  $id: 'witness/story@1',
   type: 'object',
   required: ['schema', 'run_id', 'plan_id', 'plan_sha256', 'diff', 'env', 'started_at', 'events', 'coverage', 'assertions', 'artifacts'],
   properties: {
@@ -298,7 +298,7 @@ export const storySchema = {
 } as const
 
 export const configSchema = {
-  $id: 'swe-verify/config@1',
+  $id: 'witness/config@1',
   type: 'object',
   required: ['schema'],
   properties: {

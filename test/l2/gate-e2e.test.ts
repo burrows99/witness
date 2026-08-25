@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { GateResult } from '@swe-verify/core'
+import type { GateResult } from '@witness/core'
 import { TestRepo, cli, planFor, storyFor } from '../helpers/repo.js'
 
 /**
@@ -23,7 +23,7 @@ const SOURCE = `export function applyTiered(total: number, tier: number) {
 beforeEach(() => {
   repo = new TestRepo()
   repo.write('src/pricing/discount.ts', SOURCE)
-  repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'auto' }))
+  repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'auto' }))
   base = repo.commit('base')
 })
 afterEach(() => repo.dispose())
@@ -46,10 +46,10 @@ describe('init and plan', () => {
     const plan = await cli(repo, ['plan', '--intent', 'checkout applies the tiered discount', '--scope', 'src/pricing/**', '--json'])
     expect(plan.code).toBe(0)
     const written = plan.json<{ path: string }>().path
-    expect(written).toBe(join('.swe-verify', 'plans', 'checkout-applies-the-tiered.plan.json'))
+    expect(written).toBe(join('.witness', 'plans', 'checkout-applies-the-tiered.plan.json'))
 
     const onDisk = JSON.parse(readFileSync(join(repo.dir, written), 'utf8'))
-    expect(onDisk.schema).toBe('swe-verify/plan@1')
+    expect(onDisk.schema).toBe('witness/plan@1')
     expect(onDisk.scope.include).toEqual(['src/pricing/**'])
   })
 
@@ -83,7 +83,7 @@ describe('gate — a change with no story (FR-1, US-1 AC1)', () => {
     makeChange()
     const r = await cli(repo, ['gate', '--base', base])
     expect(r.stdout).toMatch(/BLOCK/)
-    expect(r.stdout).toMatch(/swe-verify verify/)
+    expect(r.stdout).toMatch(/witness verify/)
   })
 
   it('allows a comment-only change with no story at all (US-1 AC4)', async () => {
@@ -95,7 +95,7 @@ describe('gate — a change with no story (FR-1, US-1 AC1)', () => {
   })
 
   it('allows a change to a file the config scope excludes', async () => {
-    repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'auto', scope: { exclude: ['**/*.test.ts'] } }))
+    repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'auto', scope: { exclude: ['**/*.test.ts'] } }))
     repo.write('src/pricing/discount.test.ts', 'const x = 1\n')
     base = repo.commit('add a test file')
     repo.write('src/pricing/discount.test.ts', 'const x = 1\nconst y = 2\n')
@@ -105,7 +105,7 @@ describe('gate — a change with no story (FR-1, US-1 AC1)', () => {
 
   it('never gates its own config and plan files — they are data, not code', async () => {
     repo.writePlan(planFor('checkout', ['src/**']))
-    repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'auto', domain: 'fullstack' }))
+    repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'auto', domain: 'fullstack' }))
     const r = await cli(repo, ['gate', '--base', base, '--json'])
     expect(r.code).toBe(0)
   })
@@ -183,7 +183,7 @@ describe('gate — a hand-written story (M0 release criterion)', () => {
 
   it('rejects a story that fails schema validation with a config error, not a verdict', async () => {
     setup()
-    repo.write('.swe-verify/runs/01JB7QK3M9X2VYD8N4T6ZQWERT/story.json', '{"schema":"swe-verify/story@2"}')
+    repo.write('.witness/runs/01JB7QK3M9X2VYD8N4T6ZQWERT/story.json', '{"schema":"witness/story@2"}')
     const r = await cli(repo, ['gate', '--base', base, '--json'])
     expect(r.code).toBe(3)
     expect(r.stderr).toMatch(/unsupported schema major/)
@@ -246,7 +246,7 @@ describe('gate — host independence (US-3, US-5)', () => {
       env: {
         PATH: process.env.PATH,
         GITHUB_ACTIONS: 'true',
-        SWE_VERIFY_EVENT: JSON.stringify({ pull_request: { number: 7, labels: [{ name: 'swe-verify:bypass' }], body: 'swe-verify:bypass: harness is down', user: { login: 'burrows99' } } }),
+        WITNESS_EVENT: JSON.stringify({ pull_request: { number: 7, labels: [{ name: 'witness:bypass' }], body: 'witness:bypass: harness is down', user: { login: 'burrows99' } } }),
       },
     })
     expect(r.code).toBe(5)
@@ -273,7 +273,7 @@ describe('CLI contract (FR-7, FR-8)', () => {
   })
 
   it('exits 3 for an invalid config, and says which file', async () => {
-    repo.write('.swe-verify/config.json', '{"schema":"swe-verify/config@1","runner":"cloud"}')
+    repo.write('.witness/config.json', '{"schema":"witness/config@1","runner":"cloud"}')
     const r = await cli(repo, ['gate', '--base', base])
     expect(r.code).toBe(3)
     expect(r.stderr).toMatch(/config\.json/)
@@ -293,7 +293,7 @@ describe('CLI contract (FR-7, FR-8)', () => {
   it('prints help without a command and exits 0', async () => {
     const r = await cli(repo, ['--help'])
     expect(r.code).toBe(0)
-    expect(r.stdout).toMatch(/swe-verify plan/)
+    expect(r.stdout).toMatch(/witness plan/)
   })
 })
 
@@ -310,11 +310,11 @@ describe('doctor (FR-14, US-7 AC3)', () => {
     const report = (await cli(repo, ['doctor', '--json'])).json<{ checks: Array<{ name: string; status: string; remedy?: string }> }>()
     const plans = report.checks.find((c) => c.name === 'plans')!
     expect(plans.status).toBe('warn')
-    expect(plans.remedy).toMatch(/swe-verify plan/)
+    expect(plans.remedy).toMatch(/witness plan/)
   })
 
   it('reports an unparseable redaction pattern instead of silently redacting nothing', async () => {
-    repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', redact: { patterns: ['([unclosed'] } }))
+    repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', redact: { patterns: ['([unclosed'] } }))
     const report = (await cli(repo, ['doctor', '--json'])).json<{ checks: Array<{ name: string; status: string }> }>()
     expect(report.checks.find((c) => c.name === 'redaction')!.status).toBe('warn')
   })

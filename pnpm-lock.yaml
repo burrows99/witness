@@ -74,25 +74,25 @@ importers:
 
   packages/cli:
     dependencies:
-      '@swe-verify/core':
+      '@witness/core':
         specifier: workspace:*
         version: link:../core
-      '@swe-verify/driver-api':
+      '@witness/driver-api':
         specifier: workspace:*
         version: link:../driver-api
-      '@swe-verify/driver-web':
+      '@witness/driver-web':
         specifier: workspace:*
         version: link:../driver-web
-      '@swe-verify/probe-dap':
+      '@witness/probe-dap':
         specifier: workspace:*
         version: link:../probe-dap
-      '@swe-verify/recorders':
+      '@witness/recorders':
         specifier: workspace:*
         version: link:../recorders
-      '@swe-verify/vcs':
+      '@witness/vcs':
         specifier: workspace:*
         version: link:../vcs
-      '@swe-verify/viewer':
+      '@witness/viewer':
         specifier: workspace:*
         version: link:../viewer
     devDependencies:
@@ -112,10 +112,10 @@ importers:
 
   packages/driver-api:
     dependencies:
-      '@swe-verify/core':
+      '@witness/core':
         specifier: workspace:*
         version: link:../core
-      '@swe-verify/recorders':
+      '@witness/recorders':
         specifier: workspace:*
         version: link:../recorders
     devDependencies:
@@ -125,13 +125,13 @@ importers:
 
   packages/driver-web:
     dependencies:
-      '@swe-verify/core':
+      '@witness/core':
         specifier: workspace:*
         version: link:../core
-      '@swe-verify/driver-api':
+      '@witness/driver-api':
         specifier: workspace:*
         version: link:../driver-api
-      '@swe-verify/recorders':
+      '@witness/recorders':
         specifier: workspace:*
         version: link:../recorders
     devDependencies:
@@ -147,13 +147,13 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 'catalog:'
         version: 1.30.0(zod@4.4.3)
-      '@swe-verify/cli':
+      '@witness/cli':
         specifier: workspace:*
         version: link:../cli
 
   packages/probe-dap:
     dependencies:
-      '@swe-verify/core':
+      '@witness/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -163,7 +163,7 @@ importers:
 
   packages/recorders:
     dependencies:
-      '@swe-verify/core':
+      '@witness/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -173,7 +173,7 @@ importers:
 
   packages/vcs:
     dependencies:
-      '@swe-verify/core':
+      '@witness/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
@@ -183,7 +183,7 @@ importers:
 
   packages/viewer:
     dependencies:
-      '@swe-verify/core':
+      '@witness/core':
         specifier: workspace:*
         version: link:../core
 

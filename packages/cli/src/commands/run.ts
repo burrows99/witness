@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { createProvider, detectProvider, type ProviderSelector } from '@swe-verify/vcs'
+import { createProvider, detectProvider, type ProviderSelector } from '@witness/vcs'
 import { defaultBase, diffAgainst, gitState, isGitRepo } from '../git.js'
 import { EXIT, UsageError } from '../errors.js'
 import { loadPlan, paths, planSha } from '../workspace.js'
@@ -18,7 +18,7 @@ export async function runCommand(ctx: CommandContext, options: { checkArgs?: boo
   // itself; each sub-command re-checking would reject the other's flags.
   if (options.checkArgs !== false) ctx.args.assertKnown(['plan', 'base', 'record'])
   if (!isGitRepo(ctx.repoRoot)) {
-    throw new UsageError('not a git repository', 'Run swe-verify from inside a git worktree; the diff is what gets verified.')
+    throw new UsageError('not a git repository', 'Run witness from inside a git worktree; the diff is what gets verified.')
   }
 
   const planPath = resolvePlanPath(ctx)
@@ -95,9 +95,9 @@ function resolvePlanPath(ctx: CommandContext): string {
     if (!existsSync(explicit)) {
       const inDir = join(paths.plans(ctx.repoRoot, ctx.brand), explicit.endsWith('.plan.json') ? explicit : `${explicit}.plan.json`)
       if (existsSync(inDir)) return inDir
-      throw new UsageError(`no plan at ${explicit}`, 'Pass a path to a .plan.json, or a plan id that exists in .swe-verify/plans/.')
+      throw new UsageError(`no plan at ${explicit}`, 'Pass a path to a .plan.json, or a plan id that exists in .witness/plans/.')
     }
     return explicit
   }
-  throw new UsageError('--plan is required', 'Create one with `swe-verify plan --intent "..." --scope "src/**"`.')
+  throw new UsageError('--plan is required', 'Create one with `witness plan --intent "..." --scope "src/**"`.')
 }

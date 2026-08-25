@@ -1,3 +1,3 @@
-module swe-verify/fixture
+module witness/fixture
 
 go 1.21

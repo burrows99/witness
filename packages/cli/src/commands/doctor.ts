@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { compileRedactionPolicy, SUPPORTED_LANGUAGES } from '@swe-verify/core'
-import { adapterReport } from '@swe-verify/probe-dap'
+import { compileRedactionPolicy, SUPPORTED_LANGUAGES } from '@witness/core'
+import { adapterReport } from '@witness/probe-dap'
 import { isGitRepo } from '../git.js'
 import { configSource, loadPlans, paths } from '../workspace.js'
 import { EXIT } from '../errors.js'
@@ -23,7 +23,7 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
     name: 'repository',
     status: isGitRepo(ctx.cwd) ? 'ok' : 'error',
     detail: isGitRepo(ctx.cwd) ? ctx.cwd : `${ctx.cwd} is not a git worktree`,
-    ...(isGitRepo(ctx.cwd) ? {} : { remedy: 'Run swe-verify from inside a git worktree.' }),
+    ...(isGitRepo(ctx.cwd) ? {} : { remedy: 'Run witness from inside a git worktree.' }),
   })
 
   checks.push({
@@ -33,8 +33,8 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
     // the config was committed silently has none, and every run then uses
     // built-in budgets — which is how a plan sat past a 10-minute default for
     // forty minutes with nothing anywhere saying the file was absent.
-    detail: `${configSource(ctx.repoRoot, ctx.brand) ?? 'built-in defaults (no .swe-verify/config.json)'} — domain=${ctx.config.domain} runner=${ctx.config.runner} store=${ctx.config.artifactStore} telemetry=${ctx.config.telemetry}`,
-    ...(configSource(ctx.repoRoot, ctx.brand) ? {} : { remedy: 'Run `swe-verify init` to create one, and commit it — budgets and scope are per-project.' }),
+    detail: `${configSource(ctx.repoRoot, ctx.brand) ?? 'built-in defaults (no .witness/config.json)'} — domain=${ctx.config.domain} runner=${ctx.config.runner} store=${ctx.config.artifactStore} telemetry=${ctx.config.telemetry}`,
+    ...(configSource(ctx.repoRoot, ctx.brand) ? {} : { remedy: 'Run `witness init` to create one, and commit it — budgets and scope are per-project.' }),
   })
 
   const plansDir = paths.plans(ctx.repoRoot, ctx.brand)
@@ -44,7 +44,7 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
       name: 'plans',
       status: plans.length ? 'ok' : 'warn',
       detail: plans.length ? `${plans.length} plan(s) in ${ctx.relative(plansDir)}` : 'no plans committed',
-      ...(plans.length ? {} : { remedy: 'Create one with `swe-verify plan --intent "..." --scope "src/**"`.' }),
+      ...(plans.length ? {} : { remedy: 'Create one with `witness plan --intent "..." --scope "src/**"`.' }),
     })
   } catch (error) {
     checks.push({ name: 'plans', status: 'error', detail: (error as Error).message, remedy: 'Fix or regenerate the plan.' })
@@ -78,7 +78,7 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
     })
   }
 
-  const browser = await import('@swe-verify/driver-web')
+  const browser = await import('@witness/driver-web')
     .then((web) => web.isPlaywrightAvailable())
     .catch(() => false)
   checks.push({
@@ -102,7 +102,7 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
   return {
     exitCode: failed ? EXIT.HARNESS : EXIT.ALLOW,
     text: [
-      `swe-verify doctor — ${failed ? 'PROBLEMS FOUND' : 'ok'}`,
+      `witness doctor — ${failed ? 'PROBLEMS FOUND' : 'ok'}`,
       ...checks.map((c) => `  ${icon(c.status)} ${c.name.padEnd(12)} ${c.detail}${c.remedy ? `\n      → ${c.remedy}` : ''}`),
     ],
     json: { command: 'doctor', ok: !failed, checks },

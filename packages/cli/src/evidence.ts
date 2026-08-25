@@ -1,5 +1,5 @@
-import { readString, type Plan, type PlanArgs, type PlanStep } from '@swe-verify/core'
-import type { Slide } from '@swe-verify/recorders'
+import { readString, type Plan, type PlanArgs, type PlanStep } from '@witness/core'
+import type { Slide } from '@witness/recorders'
 
 /**
  * Recording, as a property of a run.

@@ -20,7 +20,7 @@ describe('validateStory — story@1', () => {
   })
 
   it('refuses an unknown major rather than best-effort parsing (NFR-9)', () => {
-    const r = validateStory({ ...minimalStory(), schema: 'swe-verify/story@2' })
+    const r = validateStory({ ...minimalStory(), schema: 'witness/story@2' })
     expect(r.ok).toBe(false)
     if (r.ok) return
     expect(r.findings[0]!.code).toBe('SV002')
@@ -28,7 +28,7 @@ describe('validateStory — story@1', () => {
   })
 
   it('rejects a schema string for a different artefact', () => {
-    const r = validateStory({ ...minimalStory(), schema: 'swe-verify/plan@1' })
+    const r = validateStory({ ...minimalStory(), schema: 'witness/plan@1' })
     expect(r.ok).toBe(false)
   })
 
@@ -55,7 +55,7 @@ describe('validateStory — story@1', () => {
   })
 
   it('validates before any field is read — a hostile story is data, never code', () => {
-    const hostile = { schema: 'swe-verify/story@1', run_id: { toString: 'nope' } }
+    const hostile = { schema: 'witness/story@1', run_id: { toString: 'nope' } }
     expect(() => validateStory(hostile)).not.toThrow()
     expect(validateStory(hostile).ok).toBe(false)
   })
@@ -135,7 +135,7 @@ describe('validatePlan — plan@1', () => {
 
 describe('resolveConfig — defaults are the free tier', () => {
   it('fills every default so an empty config is valid and offline', () => {
-    const c = resolveConfig({ schema: 'swe-verify/config@1' })
+    const c = resolveConfig({ schema: 'witness/config@1' })
     expect(c.vcs).toBe('auto')
     expect(c.runner).toBe('local')
     expect(c.artifactStore).toBe('fs')
@@ -147,12 +147,12 @@ describe('resolveConfig — defaults are the free tier', () => {
   })
 
   it('does not silently accept an unknown policy value', () => {
-    expect(validateConfig({ schema: 'swe-verify/config@1', coverage: { policy: 'vibes' } }).ok).toBe(false)
+    expect(validateConfig({ schema: 'witness/config@1', coverage: { policy: 'vibes' } }).ok).toBe(false)
   })
 
   it('keeps user values over defaults', () => {
     const c = resolveConfig({
-      schema: 'swe-verify/config@1',
+      schema: 'witness/config@1',
       coverage: { policy: 'all-executable', defensive: 'require', waiverCapPct: 0 },
     })
     expect(c.coverage.defensive).toBe('require')

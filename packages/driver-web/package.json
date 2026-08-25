@@ -1,5 +1,5 @@
 {
-  "name": "@swe-verify/driver-web",
+  "name": "@witness/driver-web",
   "version": "0.1.0",
   "description": "Playwright driver: accessible-role actions, a11y snapshots, per-request trace spans.",
   "license": "Apache-2.0",
@@ -22,9 +22,9 @@
     "access": "public"
   },
   "dependencies": {
-    "@swe-verify/core": "workspace:*",
-    "@swe-verify/driver-api": "workspace:*",
-    "@swe-verify/recorders": "workspace:*"
+    "@witness/core": "workspace:*",
+    "@witness/driver-api": "workspace:*",
+    "@witness/recorders": "workspace:*"
   },
   "peerDependencies": {
     "playwright": ">=1.40"

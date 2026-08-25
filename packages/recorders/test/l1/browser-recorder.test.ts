@@ -3,7 +3,7 @@ import { mkdtempSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { compileRedactionPolicy, DEFAULT_CONFIG, type RunContext } from '@swe-verify/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG, type RunContext } from '@witness/core'
 import { ArtifactStore } from '../../src/store.js'
 import { BrowserRecorder } from '../../src/browser.js'
 import { hasFfmpeg } from '../../src/video.js'
@@ -37,7 +37,7 @@ function makeWebm(path: string) {
 
 suite('BrowserRecorder', () => {
   const setup = () => {
-    const runDir = mkdtempSync(join(tmpdir(), 'swe-verify-rec-'))
+    const runDir = mkdtempSync(join(tmpdir(), 'witness-rec-'))
     const videoDir = join(runDir, 'raw')
     execFileSync('mkdir', ['-p', videoDir])
     const raw = join(videoDir, 'take.webm')

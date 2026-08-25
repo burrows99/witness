@@ -11,7 +11,7 @@ import { resolveBrand, schemaId,
   type StoryArtifact,
   type StoryDiagnostic,
   type UnsequencedEvent,
-} from '@swe-verify/core'
+} from '@witness/core'
 
 /**
  * Story assembly.

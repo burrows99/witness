@@ -9,17 +9,17 @@
  * what the gate does, and so adding a vendor is a template rather than code.
  */
 
-export const AGENTS_BEGIN = '<!-- swe-verify:begin (generated — edits inside this block are overwritten) -->'
-export const AGENTS_END = '<!-- swe-verify:end -->'
+export const AGENTS_BEGIN = '<!-- witness:begin (generated — edits inside this block are overwritten) -->'
+export const AGENTS_END = '<!-- witness:end -->'
 
 export function renderAgentsBlock(): string {
   return `${AGENTS_BEGIN}
-## Verification (swe-verify)
+## Verification (witness)
 
 Changing code here means proving it ran. One command does both:
 
 \`\`\`bash
-swe-verify verify --plan <plan-id> --json
+witness verify --plan <plan-id> --json
 \`\`\`
 
 If no plan covers what you are changing, write one first — it is committed
@@ -27,7 +27,7 @@ alongside the change, and a reviewer reads it before they look at whether the
 run went green:
 
 \`\`\`bash
-swe-verify plan --intent "<what this change proves>" --scope "<glob>" --json
+witness plan --intent "<what this change proves>" --scope "<glob>" --json
 \`\`\`
 
 Read the JSON verdict. Every finding carries a \`remedy\` saying what to do next.
@@ -36,7 +36,7 @@ The gate blocks when:
 - a changed line was **never executed** (\`SV010\`) — add a step that reaches it,
   or waive it with a dated reason;
 - a probe was accepted but **never verified** (\`SV011\`) — that is a path-mapping
-  problem, run \`swe-verify doctor\`;
+  problem, run \`witness doctor\`;
 - the evidence is **stale** (\`SV003\`) — the code changed after the run, so run it again;
 - an **assertion failed** (\`SV020\`).
 
@@ -84,25 +84,25 @@ export interface VendorHook {
  */
 export function renderPreCommitHook(): string {
   return `#!/bin/sh
-# swe-verify — advisory pre-commit check (generated).
+# witness — advisory pre-commit check (generated).
 #
 # This is fast feedback, not the gate. CI runs the same binary and is what
 # actually blocks a merge; this hook only saves you a round trip.
 #
 # Exit codes: 0 allow · 2 block · 3 usage/config · 4 harness failure · 5 bypassed.
-command -v swe-verify >/dev/null 2>&1 || exit 0
+command -v witness >/dev/null 2>&1 || exit 0
 
-swe-verify gate --quiet
+witness gate --quiet
 status=$?
 
 case "$status" in
   0|5) exit 0 ;;
   4)
-    echo "swe-verify: harness failure (exit 4) — not blocking your commit; CI will report it." >&2
+    echo "witness: harness failure (exit 4) — not blocking your commit; CI will report it." >&2
     exit 0
     ;;
   *)
-    echo "swe-verify: blocked (exit $status). Run 'swe-verify verify --plan <plan>' to see why." >&2
+    echo "witness: blocked (exit $status). Run 'witness verify --plan <plan>' to see why." >&2
     exit 2
     ;;
 esac
@@ -116,7 +116,7 @@ function renderClaudeCodeHook(): string {
     {
       // JSON carries no comments, so the note is a key: anyone reading this
       // file has to be able to tell it is advisory, not the gate.
-      '//': 'swe-verify — advisory fast feedback. CI runs the same binary and is what blocks a merge.',
+      '//': 'witness — advisory fast feedback. CI runs the same binary and is what blocks a merge.',
       hooks: {
         Stop: [
           {
@@ -124,7 +124,7 @@ function renderClaudeCodeHook(): string {
             hooks: [
               {
                 type: 'command',
-                command: 'swe-verify gate --json || true',
+                command: 'witness gate --json || true',
                 timeout: 120,
               },
             ],
@@ -139,13 +139,13 @@ function renderClaudeCodeHook(): string {
 }
 
 function renderCursorRule(): string {
-  return `# swe-verify (generated)
+  return `# witness (generated)
 
 Advisory fast feedback; CI runs the same binary and is what blocks a merge.
 
 After changing code, run:
 
-    swe-verify verify --plan <plan-id> --json
+    witness verify --plan <plan-id> --json
 
 Read the JSON verdict and act on each finding's \`remedy\`. Do not narrow a
 plan's scope or remove assertions to turn a red gate green.
@@ -154,6 +154,6 @@ plan's scope or remove assertions to turn a red gate green.
 
 export const VENDOR_HOOKS: VendorHook[] = [
   { vendor: 'git', path: '.git/hooks/pre-commit', mode: 0o755, render: renderPreCommitHook },
-  { vendor: 'claude-code', path: '.claude/swe-verify.settings.json', render: renderClaudeCodeHook },
-  { vendor: 'cursor', path: '.cursor/rules/swe-verify.md', render: renderCursorRule },
+  { vendor: 'claude-code', path: '.claude/witness.settings.json', render: renderClaudeCodeHook },
+  { vendor: 'cursor', path: '.cursor/rules/witness.md', render: renderCursorRule },
 ]

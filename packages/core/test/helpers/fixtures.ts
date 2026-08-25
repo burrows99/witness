@@ -4,7 +4,7 @@ export { withReversedKeys } from '../../../../test/helpers/objects.js'
 
 export function minimalStory(): Story {
   return {
-    schema: 'swe-verify/story@1',
+    schema: 'witness/story@1',
     run_id: '01JB7QK3M9X2VYD8N4T6ZQWERT',
     plan_id: 'checkout-discount',
     plan_sha256: `sha256:${'a'.repeat(64)}`,
@@ -34,7 +34,7 @@ export function minimalStory(): Story {
 
 export function minimalPlan(): Plan {
   return {
-    schema: 'swe-verify/plan@1',
+    schema: 'witness/plan@1',
     id: 'checkout-discount',
     intent: 'checkout applies the tiered discount',
     domain: 'fullstack',

@@ -10,31 +10,31 @@
       "node"
     ],
     "paths": {
-      "@swe-verify/core": [
+      "@witness/core": [
         "./packages/core/src/index.ts"
       ],
-      "@swe-verify/cli": [
+      "@witness/cli": [
         "./packages/cli/src/index.ts"
       ],
-      "@swe-verify/vcs": [
+      "@witness/vcs": [
         "./packages/vcs/src/index.ts"
       ],
-      "@swe-verify/probe-dap": [
+      "@witness/probe-dap": [
         "./packages/probe-dap/src/index.ts"
       ],
-      "@swe-verify/driver-api": [
+      "@witness/driver-api": [
         "./packages/driver-api/src/index.ts"
       ],
-      "@swe-verify/driver-web": [
+      "@witness/driver-web": [
         "./packages/driver-web/src/index.ts"
       ],
-      "@swe-verify/recorders": [
+      "@witness/recorders": [
         "./packages/recorders/src/index.ts"
       ],
-      "@swe-verify/viewer": [
+      "@witness/viewer": [
         "./packages/viewer/src/index.ts"
       ],
-      "@swe-verify/mcp": [
+      "@witness/mcp": [
         "./packages/mcp/src/index.ts"
       ]
     },

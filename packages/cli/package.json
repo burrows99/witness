@@ -1,7 +1,7 @@
 {
-  "name": "@swe-verify/cli",
+  "name": "@witness/cli",
   "version": "0.1.0",
-  "description": "The swe-verify binary \u2014 the only package that composes everything.",
+  "description": "The witness binary \u2014 the only package that composes everything.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -16,7 +16,7 @@
     "dist"
   ],
   "bin": {
-    "swe-verify": "./dist/bin.js"
+    "witness": "./dist/bin.js"
   },
   "engines": {
     "node": ">=22"
@@ -25,13 +25,13 @@
     "access": "public"
   },
   "dependencies": {
-    "@swe-verify/core": "workspace:*",
-    "@swe-verify/driver-api": "workspace:*",
-    "@swe-verify/driver-web": "workspace:*",
-    "@swe-verify/probe-dap": "workspace:*",
-    "@swe-verify/recorders": "workspace:*",
-    "@swe-verify/vcs": "workspace:*",
-    "@swe-verify/viewer": "workspace:*"
+    "@witness/core": "workspace:*",
+    "@witness/driver-api": "workspace:*",
+    "@witness/driver-web": "workspace:*",
+    "@witness/probe-dap": "workspace:*",
+    "@witness/recorders": "workspace:*",
+    "@witness/vcs": "workspace:*",
+    "@witness/viewer": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

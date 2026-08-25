@@ -31,14 +31,14 @@ describe('composeCommand — v2 plugin, then the standalone binary', () => {
 })
 
 describe('composeArgs — bringing the stack up', () => {
-  const base = { file: 'fixtures/docker-compose.yml', project: 'swe-verify-01JB7QK' }
+  const base = { file: 'fixtures/docker-compose.yml', project: 'witness-01JB7QK' }
 
   it('names the compose file and an isolated project, so runs cannot collide', () => {
     const args = composeArgs(base)
     expect(args).toContain('-f')
     expect(args).toContain('fixtures/docker-compose.yml')
     expect(args).toContain('-p')
-    expect(args).toContain('swe-verify-01JB7QK')
+    expect(args).toContain('witness-01JB7QK')
   })
 
   it('waits for the stack rather than returning the moment containers exist', () => {
@@ -57,7 +57,7 @@ describe('composeArgs — bringing the stack up', () => {
 })
 
 describe('composeDownArgs — leaving nothing behind', () => {
-  const base = { file: 'fixtures/docker-compose.yml', project: 'swe-verify-01JB7QK' }
+  const base = { file: 'fixtures/docker-compose.yml', project: 'witness-01JB7QK' }
 
   it('removes volumes, so the next run does not inherit this run state', () => {
     // A database that survives is the classic way a suite passes for the
@@ -70,7 +70,7 @@ describe('composeDownArgs — leaving nothing behind', () => {
   })
 
   it('targets the same isolated project it brought up', () => {
-    expect(composeDownArgs(base)).toContain('swe-verify-01JB7QK')
+    expect(composeDownArgs(base)).toContain('witness-01JB7QK')
   })
 })
 

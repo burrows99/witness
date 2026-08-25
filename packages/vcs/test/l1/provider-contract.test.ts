@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createProvider, detectProvider, PROVIDERS } from '../../src/index.js'
 import type { PublishTarget, VcsEnv } from '../../src/types.js'
-import type { GateResult } from '@swe-verify/core'
+import type { GateResult } from '@witness/core'
 
 /**
  * L1 — the VcsProvider contract, run against every implementation.
@@ -113,8 +113,8 @@ describe('host-specific bypass signals', () => {
   it('reads a GitHub PR label from the event payload, with a reason from the body', async () => {
     const env = {
       ...envFor.github,
-      SWE_VERIFY_EVENT: JSON.stringify({
-        pull_request: { number: 1234, labels: [{ name: 'swe-verify:bypass' }], body: 'fixes stuff\nswe-verify:bypass: adapter is broken for this repo', user: { login: 'burrows99' } },
+      WITNESS_EVENT: JSON.stringify({
+        pull_request: { number: 1234, labels: [{ name: 'witness:bypass' }], body: 'fixes stuff\nwitness:bypass: adapter is broken for this repo', user: { login: 'burrows99' } },
       }),
     }
     const bypass = await createProvider('github', { env }).resolveBypass()
@@ -122,17 +122,17 @@ describe('host-specific bypass signals', () => {
   })
 
   it('refuses a GitHub bypass label with no reason anywhere', async () => {
-    const env = { ...envFor.github, SWE_VERIFY_EVENT: JSON.stringify({ pull_request: { number: 1, labels: [{ name: 'swe-verify:bypass' }], body: '' } }) }
+    const env = { ...envFor.github, WITNESS_EVENT: JSON.stringify({ pull_request: { number: 1, labels: [{ name: 'witness:bypass' }], body: '' } }) }
     expect(await createProvider('github', { env }).resolveBypass()).toBeNull()
   })
 
   it('ignores an unrelated GitHub label', async () => {
-    const env = { ...envFor.github, SWE_VERIFY_EVENT: JSON.stringify({ pull_request: { number: 1, labels: [{ name: 'bug' }], body: 'swe-verify:bypass: nope' } }) }
+    const env = { ...envFor.github, WITNESS_EVENT: JSON.stringify({ pull_request: { number: 1, labels: [{ name: 'bug' }], body: 'witness:bypass: nope' } }) }
     expect(await createProvider('github', { env }).resolveBypass()).toBeNull()
   })
 
   it('reads a GitLab MR label from CI_MERGE_REQUEST_LABELS', async () => {
-    const env = { ...envFor.gitlab, CI_MERGE_REQUEST_LABELS: 'urgent,swe-verify:bypass', CI_MERGE_REQUEST_DESCRIPTION: 'swe-verify:bypass: flaky adapter' }
+    const env = { ...envFor.gitlab, CI_MERGE_REQUEST_LABELS: 'urgent,witness:bypass', CI_MERGE_REQUEST_DESCRIPTION: 'witness:bypass: flaky adapter' }
     const bypass = await createProvider('gitlab', { env }).resolveBypass()
     expect(bypass).toMatchObject({ reason: 'flaky adapter', source: 'label' })
   })

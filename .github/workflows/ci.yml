@@ -78,7 +78,7 @@ jobs:
       - run: pnpm test:l3
 
   dogfood:
-    name: L4 — swe-verify gates its own change
+    name: L4 — witness gates its own change
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

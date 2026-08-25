@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { brandEnv, brandEnvName } from '@swe-verify/core'
-import type { Language } from '@swe-verify/core'
+import { brandEnv, brandEnvName } from '@witness/core'
+import type { Language } from '@witness/core'
 import type { PathMapping } from './pathmap.js'
 
 /**
@@ -229,7 +229,7 @@ export function jsDebugCandidates(root?: string, env: AdapterEnv = process.env):
   return [
     brandEnv(env, 'JS_DEBUG') ?? '',
     ...(root ? [join(root, 'node_modules', '@vscode', 'js-debug', 'src', 'dapDebugServer.js')] : []),
-    ...(home ? [join(home, '.swe-verify', 'adapters', 'js-debug', 'src', 'dapDebugServer.js')] : []),
+    ...(home ? [join(home, '.witness', 'adapters', 'js-debug', 'src', 'dapDebugServer.js')] : []),
   ].filter(Boolean)
 }
 
@@ -282,7 +282,7 @@ const jsDebugAdapter: AdapterSpec = {
     return {
       available: false,
       detail: 'js-debug (the DAP server for Node/TypeScript) was not found',
-      remedy: `Install it once: gh release download --repo microsoft/vscode-js-debug --pattern 'js-debug-dap-*.tar.gz' -O - | tar xz -C ~/.swe-verify/adapters. It is not published to npm, and Node's own --inspect speaks CDP rather than DAP, so it cannot be used directly.`,
+      remedy: `Install it once: gh release download --repo microsoft/vscode-js-debug --pattern 'js-debug-dap-*.tar.gz' -O - | tar xz -C ~/.witness/adapters. It is not published to npm, and Node's own --inspect speaks CDP rather than DAP, so it cannot be used directly.`,
     }
   },
 }

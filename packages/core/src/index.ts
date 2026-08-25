@@ -1,5 +1,5 @@
 /**
- * @swe-verify/core — the gate, the schemas, and the arithmetic behind them.
+ * @witness/core — the gate, the schemas, and the arithmetic behind them.
  *
  * This package is pure by construction: it never touches the filesystem, the
  * network, a browser, a debugger or a VCS host (NFR-7). The gate must run in
@@ -26,7 +26,7 @@ export * from './findings.js'
 export * from './gate.js'
 
 export const SCHEMA_VERSIONS = {
-  plan: 'swe-verify/plan@1',
-  story: 'swe-verify/story@1',
-  config: 'swe-verify/config@1',
+  plan: 'witness/plan@1',
+  story: 'witness/story@1',
+  config: 'witness/config@1',
 } as const

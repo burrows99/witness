@@ -1,15 +1,15 @@
-# swe-verify — Product Requirements Document
+# witness — Product Requirements Document
 
 | | |
 |---|---|
-| **Document type** | PRD — *what* and *why*. The *how* lives in the [TDD](./swe-verify-TDD.md). |
+| **Document type** | PRD — *what* and *why*. The *how* lives in the [TDD](./witness-TDD.md). |
 | **Status** | Draft |
 | **Owner** | @burrows99 |
 | **Reviewers** | *(unassigned)* |
 | **Created** | 2026-08-24 |
 | **Last updated** | 2026-08-24 |
 | **Version** | 0.1 |
-| **Related** | [Technical Design Doc](./swe-verify-TDD.md) · [Contracts appendix](./swe-verify-contracts.md) |
+| **Related** | [Technical Design Doc](./witness-TDD.md) · [Contracts appendix](./witness-contracts.md) |
 
 ---
 
@@ -17,7 +17,7 @@
 
 Coding agents change code and declare it done without ever running it. The industry's response has been advisory — prompts, skills, `AGENTS.md` — all of which an agent can ignore. The enforcing alternatives are vendor hooks, which stop working the moment you switch from Claude Code to Cursor to Codex.
 
-`swe-verify` moves enforcement to the only layer that is both universal and binding: CI. A run produces one artefact — a **story**, a causally ordered timeline of what was driven and what happened across browser, server and database. CI re-checks that story against the diff it claims to verify and blocks the merge if the changed code was never exercised, the evidence is stale, or the assertions failed.
+`witness` moves enforcement to the only layer that is both universal and binding: CI. A run produces one artefact — a **story**, a causally ordered timeline of what was driven and what happened across browser, server and database. CI re-checks that story against the diff it claims to verify and blocks the merge if the changed code was never exercised, the evidence is stale, or the assertions failed.
 
 Because the gate reads a diff and a JSON file, it works with any vendor's agent, with several at once, or with none. v1 targets solo developers and small teams shipping full-stack web applications with agent assistance. The engine is Apache-2.0; hosted runners and a persistent evidence vault are the commercial layer.
 
@@ -102,7 +102,7 @@ Format: *As a [persona], I want [capability] so that [outcome].* Acceptance crit
 
 - **AC1** Harness failure exits 4, never 2.
 - **AC2** Every finding carries a `remedy` field stating the next action.
-- **AC3** `swe-verify doctor` diagnoses adapter, port and path-mapping problems without running a full verification.
+- **AC3** `witness doctor` diagnoses adapter, port and path-mapping problems without running a full verification.
 
 ---
 
@@ -169,7 +169,7 @@ Priority: **P0** must ship in v1 · **P1** v1 if possible · **P2** post-v1.
 | FR-11 | Distinguish unexercised from unobserved | P1 | US-7 | `SV011` when `Breakpoint.verified === false` |
 | FR-12 | Dated, reasoned coverage waivers | P1 | US-6 | expiry enforced via `SV013`; capped as % of diff |
 | FR-13 | Assemble one cross-tier story on a single correlation id | P1 | US-2 | browser → server → DB share `trace_id` |
-| FR-14 | Diagnose environment problems standalone | P1 | US-7 | `swe-verify doctor` |
+| FR-14 | Diagnose environment problems standalone | P1 | US-7 | `witness doctor` |
 | FR-15 | Require ≥1 agent-readable artefact per step | P2 | US-2 | `SV030` |
 | FR-16 | Human-auditable story viewer | P2 | US-4 | single self-contained HTML, offline |
 | FR-17 | MCP adapter and `AGENTS.md` generation | P2 | US-5 | ≥2 vendors, zero vendor code in core |
@@ -238,7 +238,7 @@ Each milestone ships something usable on its own. Nothing ships until all six ch
 5. L4 — the PR gates itself with its own story.
 6. M1 and M2 posted in the PR.
 
-Rule 5 is the honest one. If `swe-verify` cannot gate its own pull request, there is no argument for asking anyone else to adopt it.
+Rule 5 is the honest one. If `witness` cannot gate its own pull request, there is no argument for asking anyone else to adopt it.
 
 ---
 

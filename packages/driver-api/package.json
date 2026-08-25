@@ -1,5 +1,5 @@
 {
-  "name": "@swe-verify/driver-api",
+  "name": "@witness/driver-api",
   "version": "0.1.0",
   "description": "HTTP driver and W3C trace context propagation.",
   "license": "Apache-2.0",
@@ -22,8 +22,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@swe-verify/core": "workspace:*",
-    "@swe-verify/recorders": "workspace:*"
+    "@witness/core": "workspace:*",
+    "@witness/recorders": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

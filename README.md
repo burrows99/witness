@@ -1,6 +1,6 @@
-# swe-verify
+# witness
 
-**Coding agents change code and declare it done without ever running it.** `swe-verify` moves the
+**Coding agents change code and declare it done without ever running it.** `witness` moves the
 check to the only layer that is both universal and binding: CI. A run produces one artefact — a
 **story**, a causally ordered timeline of what was driven and what happened across browser, server
 and database. CI re-checks that story against the diff it claims to verify, and blocks the merge if
@@ -10,20 +10,20 @@ Because the gate reads a diff and a JSON file, it works with any vendor's agent,
 once, or with none.
 
 ```console
-$ swe-verify init
-wrote .swe-verify/config.json
+$ witness init
+wrote .witness/config.json
 
-$ swe-verify plan --intent "checkout applies the tiered discount" --scope 'src/pricing/**'
-wrote .swe-verify/plans/checkout-applies-the-tiered.plan.json  (1 step, 1 assertion)
+$ witness plan --intent "checkout applies the tiered discount" --scope 'src/pricing/**'
+wrote .witness/plans/checkout-applies-the-tiered.plan.json  (1 step, 1 assertion)
 # edit the plan, commit it with your change
 
-$ swe-verify verify --plan checkout-applies-the-tiered
+$ witness verify --plan checkout-applies-the-tiered
   probes     12 logpoint(s) on 12 changed line(s)   [12 verified]
   coverage   10/12 exercised
   assertions 2/2 passed
-  story      .swe-verify/runs/01M0TZ.../story.json  (47 events)
+  story      .witness/runs/01M0TZ.../story.json  (47 events)
 
-swe-verify: BLOCK — 2 errors
+witness: BLOCK — 2 errors
   SV010  src/pricing/discount.ts:41  changed line never executed: src/pricing/discount.ts:41
          → Add a step to plan "checkout" that reaches src/pricing/discount.ts:41, or waive it with a dated reason.
   SV010  src/pricing/discount.ts:42  changed line never executed: src/pricing/discount.ts:42
@@ -152,7 +152,7 @@ real, messy code".
 | **L1** adapter contract | one tiny fixture app per language, same assertions, real adapters | `pnpm test:l1` |
 | **L2** conformance | the CLI end to end against real apps and a real browser | `pnpm test:l2` |
 | **L3** mutation | inject a known bug, assert the gate **blocks**; publish M1/M2 | `pnpm test:l3` |
-| **L4** dogfood | swe-verify gates its own change | `pnpm test:l4` |
+| **L4** dogfood | witness gates its own change | `pnpm test:l4` |
 | **arch** | dependency rules and workspace hygiene, enforced rather than reviewed | `pnpm test:arch` |
 
 L3 is the tier that matters. A green suite proves the harness *ran*; it does not prove the harness
@@ -167,23 +167,23 @@ would have *caught* anything.
 | TypeScript / JavaScript | js-debug | declared, **not vendored in this build** |
 | Java | java-debug | declared, **not vendored in this build** |
 
-A language with no trustworthy adapter is refused, not degraded: `swe-verify doctor` says which
+A language with no trustworthy adapter is refused, not degraded: `witness doctor` says which
 adapters are present and what would fix the ones that are not. A gate that falls back to
 log-scraping is flaky, and flaky gates get bypassed.
 
-Drivers: `api` (HTTP) and `web` (Playwright). Fixtures: `process` (swe-verify starts the app under
+Drivers: `api` (HTTP) and `web` (Playwright). Fixtures: `process` (witness starts the app under
 the debugger, on randomised ports) and `none` (attach to something already listening).
 
 ## Telling an agent how to work here
 
-`swe-verify skill` writes an [Agent Skills](https://agentskills.io) `SKILL.md` for the project it is
+`witness skill` writes an [Agent Skills](https://agentskills.io) `SKILL.md` for the project it is
 run in, derived from that project rather than written by hand:
 
 ```console
-$ swe-verify skill
+$ witness skill
 wrote .claude/skills/verify-acme-checkout/SKILL.md
 describes 3 plan(s): checkout, refunds, signup
-regenerate whenever the project changes; `swe-verify skill --check` fails in CI when it is stale
+regenerate whenever the project changes; `witness skill --check` fails in CI when it is stale
 ```
 
 The generated file tells an agent which plan covers which paths and what each one intends to prove,
@@ -195,8 +195,8 @@ plan or installing an adapter changes the skill the next time it is generated.
 Two properties make that hold:
 
 - **Generation is deterministic** — no timestamp, no random id — so "is this skill stale?" has an
-  answer. The frontmatter carries a `swe-verify-fingerprint` over the facts it was built from.
-- **`swe-verify skill --check` regenerates in memory and compares**, exiting 3 without writing
+  answer. The frontmatter carries a `witness-fingerprint` over the facts it was built from.
+- **`witness skill --check` regenerates in memory and compares**, exiting 3 without writing
   anything if the file no longer matches the project. Run it in CI: steering that nobody enforces
   drifts, which is the same argument that puts the gate there.
 
@@ -218,7 +218,7 @@ it anywhere else you keep skills.
 Stated plainly, because a spec is not a shipped feature:
 
 - **js-debug and java-debug are not vendored**, so this build cannot instrument TypeScript or Java.
-  It refuses rather than pretending. That also means swe-verify gates the parts of *itself* it can
+  It refuses rather than pretending. That also means witness gates the parts of *itself* it can
   instrument (the Python and Go fixtures) rather than its own TypeScript.
 - **`compose` fixtures** are declared in the plan schema and refused by the runner (exit 3).
 - **OpenTelemetry collection** (`probe-otel`): boundary spans currently come from the drivers

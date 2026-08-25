@@ -1,4 +1,4 @@
-import type { GateResult } from '@swe-verify/core'
+import type { GateResult } from '@witness/core'
 
 /**
  * Exit codes — contracts §6.
@@ -30,7 +30,7 @@ export function exitCodeFor(result: GateResult): number {
 
 export class UsageError extends Error {
   readonly exitCode = EXIT.USAGE
-  constructor(message: string, readonly remedy = 'Run `swe-verify --help`.') {
+  constructor(message: string, readonly remedy = 'Run `witness --help`.') {
     super(message)
     this.name = 'UsageError'
   }
@@ -39,7 +39,7 @@ export class UsageError extends Error {
 /** Anything that means "we could not observe", rather than "it is unverified". */
 export class HarnessError extends Error {
   readonly exitCode = EXIT.HARNESS
-  constructor(message: string, readonly remedy = 'Run `swe-verify doctor` and check .swe-verify/runs/<id>/logs/harness.log.') {
+  constructor(message: string, readonly remedy = 'Run `witness doctor` and check .witness/runs/<id>/logs/harness.log.') {
     super(message)
     this.name = 'HarnessError'
   }

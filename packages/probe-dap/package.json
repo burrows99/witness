@@ -1,5 +1,5 @@
 {
-  "name": "@swe-verify/probe-dap",
+  "name": "@witness/probe-dap",
   "version": "0.1.0",
   "description": "Non-suspending observation via DAP logpoints, with a per-language adapter registry.",
   "license": "Apache-2.0",
@@ -22,7 +22,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@swe-verify/core": "workspace:*"
+    "@witness/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"

@@ -94,7 +94,7 @@ export const TOOLS: ToolSpec[] = [
   },
 ]
 
-export const INSTRUCTIONS = `swe-verify proves that the code you changed was actually executed.
+export const INSTRUCTIONS = `witness proves that the code you changed was actually executed.
 
 After you change code:
   1. Call "plan" once, with what the change proves and the paths it touches. Commit the plan.

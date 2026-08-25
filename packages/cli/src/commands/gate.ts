@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { evaluate, type GateResult, type Story } from '@swe-verify/core'
-import { CollectTarget, createProvider, detectProvider, type ProviderSelector } from '@swe-verify/vcs'
+import { evaluate, type GateResult, type Story } from '@witness/core'
+import { CollectTarget, createProvider, detectProvider, type ProviderSelector } from '@witness/vcs'
 import { defaultBase, diffAgainst, isGitRepo } from '../git.js'
 import { exitCodeFor, UsageError } from '../errors.js'
 import { loadPlans, paths, readStory, runDir } from '../workspace.js'
@@ -17,7 +17,7 @@ import type { CommandContext, CommandResult } from '../context.js'
 export async function gateCommand(ctx: CommandContext, options: { checkArgs?: boolean } = {}): Promise<CommandResult> {
   if (options.checkArgs !== false) ctx.args.assertKnown(['story', 'run', 'base', 'bypass', 'quiet'])
   if (!isGitRepo(ctx.repoRoot)) {
-    throw new UsageError('not a git repository', 'Run swe-verify from inside a git worktree; the diff is what gets gated.')
+    throw new UsageError('not a git repository', 'Run witness from inside a git worktree; the diff is what gets gated.')
   }
 
   const base = ctx.args.flag('base') ?? defaultBase(ctx.repoRoot)
@@ -77,14 +77,14 @@ function summaryFooter(result: GateResult, base: string, story: Story | null): s
 function resolveStory(ctx: CommandContext): Story | null {
   const explicit = ctx.args.flag('story')
   if (explicit) {
-    if (!existsSync(explicit)) throw new UsageError(`no story at ${explicit}`, 'Check the path, or run `swe-verify run` first.')
+    if (!existsSync(explicit)) throw new UsageError(`no story at ${explicit}`, 'Check the path, or run `witness run` first.')
     return readStory(explicit)
   }
 
   const runId = ctx.args.flag('run')
   if (runId) {
     const file = join(runDir(ctx.repoRoot, runId, ctx.brand), 'story.json')
-    if (!existsSync(file)) throw new UsageError(`no story for run ${runId}`, 'Check `swe-verify run` completed and wrote a story.')
+    if (!existsSync(file)) throw new UsageError(`no story for run ${runId}`, 'Check `witness run` completed and wrote a story.')
     return readStory(file)
   }
 

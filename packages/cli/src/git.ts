@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { normaliseDiff, type NormalisedDiff } from '@swe-verify/core'
+import { normaliseDiff, type NormalisedDiff } from '@witness/core'
 import { HarnessError, UsageError } from './errors.js'
 
 /**

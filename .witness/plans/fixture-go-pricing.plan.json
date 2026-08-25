@@ -1,5 +1,5 @@
 {
-  "schema": "swe-verify/plan@1",
+  "schema": "witness/plan@1",
   "id": "fixture-go-pricing",
   "intent": "the Go tiered discount fixture returns a discounted total for a tier-2 customer",
   "domain": "fullstack",

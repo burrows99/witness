@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import type { Recorder } from '@swe-verify/core'
+import type { Recorder } from '@witness/core'
 import type { ArtifactStore } from './store.js'
 import { BrowserRecorder, type BrowserSource } from './browser.js'
 import { TerminalRecorder, type TerminalSource } from './terminal-recorder.js'

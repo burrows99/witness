@@ -11,21 +11,21 @@ import { type Brand, resolveBrand, schemaId,
   type PlanRef,
   type ResolvedConfig,
   type Story,
-} from '@swe-verify/core'
+} from '@witness/core'
 import { UsageError } from './errors.js'
 
 /**
  * The free tier's entire persistence layer: a directory. A gate that needs a
  * database cannot run on a laptop with no network (TDD §9.1).
  *
- *   .swe-verify/
+ *   .witness/
  *     config.json          committed
  *     plans/*.plan.json    committed
  *     runs/<run_id>/       gitignored
  */
 /**
  * Where per-repository state lives. Derived from the brand, so renaming the
- * tool renames the directory with it rather than leaving a `.swe-verify`
+ * tool renames the directory with it rather than leaving a `.witness`
  * behind that nothing calls itself any more.
  */
 /**
@@ -82,7 +82,7 @@ export function loadConfig(cwd: string, brand?: Brand): ResolvedConfig {
   if (!result.ok) {
     throw new UsageError(
       `invalid config.json: ${result.findings.map((f) => f.message).join('; ')}`,
-      'Fix .swe-verify/config.json, or delete it to fall back to defaults.',
+      'Fix .witness/config.json, or delete it to fall back to defaults.',
     )
   }
   return resolveConfig(result.value)
@@ -109,7 +109,7 @@ export function loadPlans(cwd: string, brand?: Brand): PlanRef[] {
     if (!result.ok) {
       throw new UsageError(
         `invalid plan ${entry}: ${result.findings.map((f) => f.message).join('; ')}`,
-        'Fix the plan, or regenerate it with `swe-verify plan`.',
+        'Fix the plan, or regenerate it with `witness plan`.',
       )
     }
     const plan = result.value
@@ -164,7 +164,7 @@ export function writeStory(cwd: string, runId: string, story: Story, brand?: Bra
   return file
 }
 
-const GITIGNORE = `# swe-verify run artefacts are per-run and large; the plan is what gets committed.
+const GITIGNORE = `# witness run artefacts are per-run and large; the plan is what gets committed.
 runs/
 `
 

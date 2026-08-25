@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { join, resolve } from 'node:path'
-import type { PlanFixture, PlanReadyCheck } from '@swe-verify/core'
-import { adapterFor, freePort, type AdapterSpec } from '@swe-verify/probe-dap'
-import { brandEnvName, resolveBrand } from '@swe-verify/core'
+import type { PlanFixture, PlanReadyCheck } from '@witness/core'
+import { adapterFor, freePort, type AdapterSpec } from '@witness/probe-dap'
+import { brandEnvName, resolveBrand } from '@witness/core'
 import { HarnessError, UsageError } from '../errors.js'
 import {
   composeCommand, composeDown, composeLogs, composeUp, publishedPort, resolveComposeUrl,
@@ -87,8 +87,8 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
   const adapter = adapterFor(fixture.language as never)
   const availability = adapter.detect(options.repoRoot, options.env)
   // Without an adapter the app still runs, it is just not watched. Refusing to
-  // start it at all conflated two different things: swe-verify cannot *gate*
-  // this language, and swe-verify cannot *run* this app. Only the first is
+  // start it at all conflated two different things: witness cannot *gate*
+  // this language, and witness cannot *run* this app. Only the first is
   // true, and treating them as one meant a Node app could not have its
   // lifecycle managed by the harness at all — two agents independently ended
   // up starting the server by hand and pointing a `kind: "none"` fixture at
@@ -156,7 +156,7 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
       PORT: String(appPort),
       [brandEnvName('APP_PORT', resolveBrand(options.env))]: String(appPort),
       // The default name too, so a fixture written before a rename keeps working.
-      SWE_VERIFY_APP_PORT: String(appPort),
+      WITNESS_APP_PORT: String(appPort),
       ...fixture.env,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -251,7 +251,7 @@ async function startCompose(
 
   const target: ComposeTarget = {
     file: fixture.file,
-    project: `swe-verify-${(options.runId ?? 'local').slice(-10).toLowerCase()}`,
+    project: `witness-${(options.runId ?? 'local').slice(-10).toLowerCase()}`,
     ...(fixture.build ? { build: true } : {}),
   }
   options.log(`fixture: compose up -p ${target.project} -f ${target.file}`)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
-import type { Language, ProbeTarget } from '@swe-verify/core'
+import type { Language, ProbeTarget } from '@witness/core'
 import { ADAPTERS, adapterFor, adapterReport } from '../../src/adapters.js'
 import { runWithProbes } from '../../src/runner.js'
 
@@ -170,7 +170,7 @@ for (const testCase of CASES) {
  * L1 — driving a Go *library* package through its tests.
  *
  * This is the shape almost all real Go code takes: no `main` to point at, and
- * the thing that exercises a package is `go test`. Without this, swe-verify
+ * the thing that exercises a package is `go test`. Without this, witness
  * can gate a toy program and nothing else.
  */
 describe.skipIf(!adapterFor('go').detect(process.cwd(), process.env).available)('adapter contract: go, mode test', () => {

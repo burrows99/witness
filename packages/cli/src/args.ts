@@ -26,7 +26,7 @@ export class Args {
     const values = this.flags.get(name)
     const value = values?.[values.length - 1]
     if (value === undefined || value === '') {
-      if (options.required) throw new UsageError(`--${name} is required for \`swe-verify ${this.command}\``)
+      if (options.required) throw new UsageError(`--${name} is required for \`witness ${this.command}\``)
       return options.default
     }
     return value
@@ -52,7 +52,7 @@ export class Args {
     const allowed = new Set([...known, 'json', 'help', 'cwd', 'vcs'])
     for (const name of this.flags.keys()) {
       if (!allowed.has(name)) {
-        throw new UsageError(`unknown flag --${name} for \`swe-verify ${this.command}\``)
+        throw new UsageError(`unknown flag --${name} for \`witness ${this.command}\``)
       }
     }
   }

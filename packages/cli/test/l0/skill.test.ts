@@ -20,12 +20,12 @@ const facts = (over: Partial<SkillFacts> = {}): SkillFacts => ({
   ],
   adapters: [
     { language: 'py', name: 'debugpy', available: true, detail: 'debugpy 1.8.21' },
-    { language: 'ts', name: 'js-debug', available: false, detail: 'js-debug is not vendored in this build', remedy: 'Point SWE_VERIFY_JS_DEBUG at a dapDebugServer.js.' },
+    { language: 'ts', name: 'js-debug', available: false, detail: 'js-debug is not vendored in this build', remedy: 'Point WITNESS_JS_DEBUG at a dapDebugServer.js.' },
   ],
   browser: true,
   scope: { include: ['**'], exclude: ['**/*.md'], languages: ['ts', 'py'] },
   assertionKinds: ['terminal-match', 'http-status', 'http-json', 'ui-text'],
-  policy: { defensive: 'warn', waiverCapPct: 10, bypassLabel: 'swe-verify:bypass', runMs: 600_000, probeLines: 500 },
+  policy: { defensive: 'warn', waiverCapPct: 10, bypassLabel: 'witness:bypass', runMs: 600_000, probeLines: 500 },
   ...over,
 })
 
@@ -68,7 +68,7 @@ describe('frontmatter — the Agent Skills spec, and nothing beyond it', () => {
   })
 
   it('carries a fingerprint of the facts it was generated from', () => {
-    expect(renderSkill(facts())).toMatch(/swe-verify-fingerprint: sha256:[0-9a-f]{64}/)
+    expect(renderSkill(facts())).toMatch(/witness-fingerprint: sha256:[0-9a-f]{64}/)
   })
 })
 
@@ -102,14 +102,14 @@ describe('the playbook — numbered steps, each one a command', () => {
   })
 
   it('gives the one command that proves and films in a single step', () => {
-    expect(skill).toMatch(/swe-verify verify --plan <plan-id> --record --json/)
+    expect(skill).toMatch(/witness verify --plan <plan-id> --record --json/)
   })
 
   it('films the reproduction by changing what is checked out, not by a flag', () => {
     // A tool that reverts files mid-run can leave a working tree wrecked if
     // the run dies. Which recording you get is decided by the checkout.
     expect(skill).toMatch(/git stash/)
-    expect(skill).toMatch(/swe-verify run --plan <plan-id> --record/)
+    expect(skill).toMatch(/witness run --plan <plan-id> --record/)
   })
 
   it('warns that reverting the whole commit can film a healthy system', () => {
@@ -242,7 +242,7 @@ describe('what is derived from this project', () => {
 
   it('says which languages this project can actually gate, with the remedy', () => {
     expect(skill).toMatch(/py.*debugpy/)
-    expect(skill).toMatch(/SWE_VERIFY_JS_DEBUG/)
+    expect(skill).toMatch(/WITNESS_JS_DEBUG/)
   })
 
   it('explains every exit code, since that is the agent\'s read path', () => {
@@ -275,7 +275,7 @@ describe('what is derived from this project', () => {
   it('states the policies that decide a verdict here', () => {
     expect(skill).toMatch(/defensive.*warn/i)
     expect(skill).toMatch(/10%/)
-    expect(skill).toMatch(/swe-verify:bypass/)
+    expect(skill).toMatch(/witness:bypass/)
   })
 
   it('says what the tooling cannot do here, rather than implying it can', () => {
@@ -308,13 +308,13 @@ describe('the rules that make a recording evidence', () => {
   })
 })
 
-describe('a project that has not adopted swe-verify yet', () => {
+describe('a project that has not adopted witness yet', () => {
   const fresh = () => facts({ plans: [], adapters: [], browser: false })
 
   it('still generates, and sends the agent to write the first plan', () => {
     const skill = renderSkill(fresh())
     expect(skill).toMatch(/no plans/i)
-    expect(skill).toMatch(/swe-verify plan --intent/)
+    expect(skill).toMatch(/witness plan --intent/)
   })
 
   it('does not claim a language is gateable when no adapter is present', () => {

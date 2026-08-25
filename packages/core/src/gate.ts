@@ -115,7 +115,7 @@ export function evaluate(input: GateInput): GateResult {
       'SV016', 'warn',
       `${file.path} is ${language}, which has no trustworthy debug adapter: ${file.lines.length} changed line(s) are not gated`,
       missingAdapter
-        ? `No debug adapter for ${language} is installed in this build, so these lines cannot be watched. Run \`swe-verify doctor\` for what is missing, and cover this file with tests meanwhile.`
+        ? `No debug adapter for ${language} is installed in this build, so these lines cannot be watched. Run \`witness doctor\` for what is missing, and cover this file with tests meanwhile.`
         : 'Nothing to do here. Support is declared explicitly rather than degraded to log-scraping; cover this file with tests instead.',
       { file: file.path },
     )
@@ -152,7 +152,7 @@ export function evaluate(input: GateInput): GateResult {
     add(
       'SV001', 'error',
       `no story for this change (${diff.changedLines} changed line(s) across ${diff.files.length} file(s))`,
-      'Run `swe-verify verify --plan <plan>` and attach the resulting story to this change.',
+      'Run `witness verify --plan <plan>` and attach the resulting story to this change.',
     )
     return finish('block', findings, EMPTY_METRICS, input, policy)
   }
@@ -166,7 +166,7 @@ export function evaluate(input: GateInput): GateResult {
       story.diff.algo !== diff.algo
         ? `story was normalised by "${story.diff.algo}" but this CLI uses "${diff.algo}"`
         : `stale evidence: story diff_hash ${short(story.diff.hash)} does not match this diff ${short(expectedHash)}`,
-      'Re-run `swe-verify verify` against the current head; the code changed after the story was sealed.',
+      'Re-run `witness verify` against the current head; the code changed after the story was sealed.',
     )
     return finish('block', findings, EMPTY_METRICS, input, policy)
   }
@@ -185,7 +185,7 @@ export function evaluate(input: GateInput): GateResult {
     add(
       'SV004', 'error',
       `plan "${plan.id}" changed after the story was produced (${short(story.plan_sha256)} → ${short(plan.sha256)})`,
-      'Re-run `swe-verify verify` so the story reflects the committed plan.',
+      'Re-run `witness verify` so the story reflects the committed plan.',
     )
     return finish('block', findings, EMPTY_METRICS, input, policy)
   }
@@ -201,7 +201,7 @@ export function evaluate(input: GateInput): GateResult {
       add(
         'SV012', 'error',
         `changed file "${file.path}" is not covered by any committed plan scope`,
-        `Add "${file.path}" to a plan's scope.include and re-run, or exclude it in .swe-verify/config.json if it is not gateable.`,
+        `Add "${file.path}" to a plan's scope.include and re-run, or exclude it in .witness/config.json if it is not gateable.`,
         { file: file.path },
       )
     }
@@ -263,7 +263,7 @@ export function evaluate(input: GateInput): GateResult {
             : `probe on ${file.path}:${line.line} was accepted but never verified — the line was never actually watched`,
           said && /statement|no code|not a line|no executable/i.test(said)
             ? 'The plan probes a line the adapter cannot break on — a declaration, a brace, a blank. Point the scope at executable lines, or exclude the file if it holds none.'
-            : 'Run `swe-verify doctor`: this is almost always a path-mapping problem between the container and the repo, or a build without source information.',
+            : 'Run `witness doctor`: this is almost always a path-mapping problem between the container and the repo, or a build without source information.',
           locus)
         continue
       }

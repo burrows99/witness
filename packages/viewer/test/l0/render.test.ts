@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderViewer } from '../../src/render.js'
-import type { GateResult, Story } from '@swe-verify/core'
+import type { GateResult, Story } from '@witness/core'
 
 /**
  * The viewer exists because evidence nobody reads is theatre (TDD §7.9). It
@@ -13,7 +13,7 @@ import type { GateResult, Story } from '@swe-verify/core'
  */
 
 const story = (over: Partial<Story> = {}): Story => ({
-  schema: 'swe-verify/story@1',
+  schema: 'witness/story@1',
   run_id: '01JB7QK3M9X2VYD8N4T6ZQWERT',
   plan_id: 'checkout',
   plan_sha256: `sha256:${'a'.repeat(64)}`,
@@ -61,7 +61,7 @@ describe('renderViewer — self-contained (NFR-4, FR-16)', () => {
     const html = renderViewer({ story: story(), gate: gate() })
     expect(html.startsWith('<!doctype html>')).toBe(true)
     expect(html).not.toMatch(/src="https?:/)
-    expect(html).not.toMatch(/href="https?:\/\/(?!swe-verify\.invalid)/)
+    expect(html).not.toMatch(/href="https?:\/\/(?!witness\.invalid)/)
     expect(html).not.toMatch(/<script[^>]+src=/)
     expect(html).not.toMatch(/@import/)
   })

@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { run } from '@swe-verify/cli'
+import { run } from '@witness/cli'
 import { INSTRUCTIONS, TOOLS, argvFor } from './tools.js'
 
 /**
@@ -38,7 +38,7 @@ export async function invoke(argv: string[], options: McpServerOptions = {}): Pr
 
 export function createServer(options: McpServerOptions = {}): Server {
   const server = new Server(
-    { name: 'swe-verify', version: options.version ?? '0.1.0' },
+    { name: 'witness', version: options.version ?? '0.1.0' },
     { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
   )
 

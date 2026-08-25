@@ -1,7 +1,7 @@
 import { relative } from 'node:path'
-import type { ResolvedConfig } from '@swe-verify/core'
+import type { ResolvedConfig } from '@witness/core'
 import type { Args } from './args.js'
-import { resolveBrand, type Brand } from '@swe-verify/core'
+import { resolveBrand, type Brand } from '@witness/core'
 import { repoRoot as repoRootOf } from './git.js'
 
 export interface DoctorCheck {

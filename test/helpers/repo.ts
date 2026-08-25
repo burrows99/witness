@@ -2,15 +2,15 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { canonicalJson, diffHash, normaliseDiff, sha256, type Plan, type Story } from '@swe-verify/core'
-import { run, type RunOptions } from '@swe-verify/cli'
+import { canonicalJson, diffHash, normaliseDiff, sha256, type Plan, type Story } from '@witness/core'
+import { run, type RunOptions } from '@witness/cli'
 
-/** A disposable git repository with a swe-verify workspace inside it. */
+/** A disposable git repository with a witness workspace inside it. */
 export class TestRepo {
   readonly dir: string
 
   constructor() {
-    this.dir = mkdtempSync(join(tmpdir(), 'swe-verify-l2-'))
+    this.dir = mkdtempSync(join(tmpdir(), 'witness-l2-'))
     this.git('init', '-q', '-b', 'main')
     this.git('config', 'user.email', 'test@example.com')
     this.git('config', 'user.name', 'test')
@@ -34,7 +34,7 @@ export class TestRepo {
   }
 
   writePlan(plan: Plan): { path: string; sha256: string } {
-    const path = join('.swe-verify', 'plans', `${plan.id}.plan.json`)
+    const path = join('.witness', 'plans', `${plan.id}.plan.json`)
     this.write(path, `${JSON.stringify(plan, null, 2)}\n`)
     return { path, sha256: sha256(canonicalJson(plan)) }
   }
@@ -50,7 +50,7 @@ export class TestRepo {
   }
 
   writeStory(story: Story): string {
-    const path = join('.swe-verify', 'runs', story.run_id, 'story.json')
+    const path = join('.witness', 'runs', story.run_id, 'story.json')
     this.write(path, `${JSON.stringify(story, null, 2)}\n`)
     return join(this.dir, path)
   }
@@ -92,7 +92,7 @@ export async function cli(repo: TestRepo, argv: string[], options: Partial<RunOp
 
 export function planFor(id: string, include: string[], over: Partial<Plan> = {}): Plan {
   return {
-    schema: 'swe-verify/plan@1',
+    schema: 'witness/plan@1',
     id,
     intent: `prove ${id}`,
     domain: 'fullstack',
@@ -124,7 +124,7 @@ export function storyFor(params: {
     hits: l.hits ?? 1,
   }))
   return {
-    schema: 'swe-verify/story@1',
+    schema: 'witness/story@1',
     run_id: params.runId ?? '01JB7QK3M9X2VYD8N4T6ZQWERT',
     plan_id: params.planId,
     plan_sha256: params.planSha,

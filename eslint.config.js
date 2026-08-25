@@ -18,7 +18,7 @@ export default tseslint.config(
   {
     // `worktrees/` holds external repositories cloned for verification
     // experiments. They are someone else's code with someone else's rules.
-    ignores: ['**/dist/**', '**/node_modules/**', '.venv/**', 'fixtures/**', '.swe-verify/**', 'worktrees/**', '.evidence/**'],
+    ignores: ['**/dist/**', '**/node_modules/**', '.venv/**', 'fixtures/**', '.witness/**', 'worktrees/**', '.evidence/**'],
   },
 
   js.configs.recommended,

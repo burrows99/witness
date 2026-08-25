@@ -1,4 +1,4 @@
-# swe-verify — contracts addendum
+# witness — contracts addendum
 
 Companion to the design doc. Everything here is the *what exactly*, not the *why*.
 Merge as a new top-level section (suggested position: after **Design**, before **Extension seams**).
@@ -10,20 +10,20 @@ Merge as a new top-level section (suggested position: after **Design**, before *
 The single biggest readability fix. A reader should see the whole product in 40 lines before any rationale.
 
 ```console
-$ swe-verify init
-wrote .swe-verify/config.json
+$ witness init
+wrote .witness/config.json
 
-$ swe-verify plan --intent "checkout applies the tiered discount" --scope 'src/pricing/**'
-wrote .swe-verify/plans/checkout-discount.plan.json  (3 steps, 2 assertions)
+$ witness plan --intent "checkout applies the tiered discount" --scope 'src/pricing/**'
+wrote .witness/plans/checkout-discount.plan.json  (3 steps, 2 assertions)
 # edit the plan, commit it with your change
 
-$ swe-verify run --plan .swe-verify/plans/checkout-discount.plan.json
+$ witness run --plan .witness/plans/checkout-discount.plan.json
   fixtures  up (compose, 4 services)            2.1s
   probes    12 logpoints on 12 changed lines    0.4s   [12 verified]
   driver    web: goto /cart -> click "Place order"
-  story     .swe-verify/runs/01JB7Q.../story.json  (47 events, 3 tiers)
+  story     .witness/runs/01JB7Q.../story.json  (47 events, 3 tiers)
 
-$ swe-verify gate --run 01JB7Q...
+$ witness gate --run 01JB7Q...
 BLOCK  2 findings
 
   SV010  src/pricing/discount.ts:41   applyTiered()  changed line never executed
@@ -69,7 +69,7 @@ Rule 3 also gives a clean answer to "what if the diff touches files no plan cove
 
 ```jsonc
 {
-  "schema": "swe-verify/plan@1",
+  "schema": "witness/plan@1",
   "id": "checkout-discount",
   "intent": "checkout applies the tiered discount",
   "domain": "fullstack",
@@ -126,7 +126,7 @@ The load-bearing schema. Everything else in the system is a producer or a consum
 
 ```jsonc
 {
-  "schema": "swe-verify/story@1",
+  "schema": "witness/story@1",
   "run_id": "01JB7QK3M9X2VYD8N4T6",          // ULID, client-generated, idempotency key
   "plan_id": "checkout-discount",
   "plan_sha256": "sha256:a13c…",
@@ -305,13 +305,13 @@ Codes are the contract with every consumer: the viewer's gate explainer, the CI 
 ## 6. CLI surface and exit codes
 
 ```
-swe-verify init                                    scaffold config
-swe-verify plan   --intent <s> --scope <glob>...   emit a plan skeleton
-swe-verify run    --plan <path> [--runner local]   execute, emit story
-swe-verify gate   --run <id> | --story <path>      evaluate, publish via vcs
-swe-verify verify --plan <path>                    run + gate (the agent's one command)
-swe-verify show   --run <id> [--open]              render viewer
-swe-verify doctor                                  adapters, ports, path mappings
+witness init                                    scaffold config
+witness plan   --intent <s> --scope <glob>...   emit a plan skeleton
+witness run    --plan <path> [--runner local]   execute, emit story
+witness gate   --run <id> | --story <path>      evaluate, publish via vcs
+witness verify --plan <path>                    run + gate (the agent's one command)
+witness show   --run <id> [--open]              render viewer
+witness doctor                                  adapters, ports, path mappings
 ```
 
 | Exit | Meaning | CI reads it as |
@@ -367,7 +367,7 @@ interface AssertionKind {
 ## 8. On-disk layout
 
 ```
-.swe-verify/
+.witness/
   config.json                          committed
   plans/
     checkout-discount.plan.json        committed
@@ -488,7 +488,7 @@ GET    /v1/repos/{repo_id}/flake    ?file= &line= &window=30d
 
 | Rule | |
 |---|---|
-| `schema` field is mandatory on `plan` and `story` | `swe-verify/story@1` |
+| `schema` field is mandatory on `plan` and `story` | `witness/story@1` |
 | Within a major: additive only | new optional fields, new event types, new finding codes |
 | Unknown **major** → `SV002`, refuse | never best-effort parse |
 | Unknown **minor** field → ignore, warn once | forward compatibility for old CLIs reading new stories |
@@ -502,9 +502,9 @@ That last one is easy to miss and expensive: if you improve normalisation withou
 ## 12. Config
 
 ```jsonc
-// .swe-verify/config.json
+// .witness/config.json
 {
-  "schema": "swe-verify/config@1",
+  "schema": "witness/config@1",
   "domain": "fullstack",
   "vcs": "auto",                         // auto | github | gitlab | bitbucket | local
   "runner": "local",
@@ -521,7 +521,7 @@ That last one is easy to miss and expensive: if you improve normalisation withou
 
   "budgets": { "runMs": 600000, "breakpointMs": 30000, "artifactBytes": 524288000 },
 
-  "bypass": { "allowed": true, "requiresReason": true, "label": "swe-verify:bypass" },
+  "bypass": { "allowed": true, "requiresReason": true, "label": "witness:bypass" },
 
   "redact": {
     "keys": ["password", "token", "secret", "authorization", "cookie", "ssn"],

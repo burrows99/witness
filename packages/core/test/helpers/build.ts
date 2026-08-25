@@ -48,7 +48,7 @@ export function storyFor(
   assertions: StoryAssertion[] = [{ id: 'a1', status: 'pass' }],
 ): Story {
   return {
-    schema: 'swe-verify/story@1',
+    schema: 'witness/story@1',
     run_id: '01JB7QK3M9X2VYD8N4T6ZQWERT',
     plan_id: 'checkout-discount',
     plan_sha256: `sha256:${'a'.repeat(64)}`,

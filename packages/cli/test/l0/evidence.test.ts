@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { narratePlan, recordingLabel, recordingSlide, EVIDENCE_RULES } from '../../src/evidence.js'
-import type { Plan } from '@swe-verify/core'
+import type { Plan } from '@witness/core'
 
 /**
  * Recording is a property of a run, not a workflow the CLI orchestrates.
@@ -12,7 +12,7 @@ import type { Plan } from '@swe-verify/core'
  */
 
 const plan = (over: Partial<Plan> = {}): Plan => ({
-  schema: 'swe-verify/plan@1',
+  schema: 'witness/plan@1',
   id: 'checkout',
   intent: 'placing an order shows a confirmation',
   scope: { include: ['src/**'] },

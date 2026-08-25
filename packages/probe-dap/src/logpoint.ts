@@ -1,4 +1,4 @@
-import type { ProbeTarget } from '@swe-verify/core'
+import type { ProbeTarget } from '@witness/core'
 
 /**
  * Logpoint encoding.
@@ -14,7 +14,7 @@ import type { ProbeTarget } from '@swe-verify/core'
  * value containing a quote or a brace would break any JSON-in-JSON scheme.
  */
 
-export const LOGPOINT_MAGIC = 'SWEV1'
+export const LOGPOINT_MAGIC = 'WTNS1'
 
 /** ASCII unit separator (0x1f): never emitted by a value, always safe to split on. */
 export const FIELD_SEPARATOR = ''

@@ -1,5 +1,5 @@
 {
-  "name": "@swe-verify/viewer",
+  "name": "@witness/viewer",
   "version": "0.1.0",
   "description": "The story viewer \u2014 one self-contained HTML file, readable offline.",
   "license": "Apache-2.0",
@@ -22,6 +22,6 @@
     "access": "public"
   },
   "dependencies": {
-    "@swe-verify/core": "workspace:*"
+    "@witness/core": "workspace:*"
   }
 }

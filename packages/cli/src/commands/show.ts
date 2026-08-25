@@ -1,8 +1,8 @@
 import { existsSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { join } from 'node:path'
-import { evaluate, gatedDiff, type GateResult } from '@swe-verify/core'
-import { renderViewer } from '@swe-verify/viewer'
+import { evaluate, gatedDiff, type GateResult } from '@witness/core'
+import { renderViewer } from '@witness/viewer'
 import { defaultBase, diffAgainst, isGitRepo } from '../git.js'
 import { EXIT, UsageError } from '../errors.js'
 import { loadPlans, readStory, runDir } from '../workspace.js'
@@ -27,7 +27,7 @@ export async function showCommand(ctx: CommandContext): Promise<CommandResult> {
   if (!storyPath || !existsSync(storyPath)) {
     throw new UsageError(
       runId ? `no story for run ${runId}` : 'no run to show',
-      'Run `swe-verify run --plan <plan>` first, or pass --story <path>.',
+      'Run `witness run --plan <plan>` first, or pass --story <path>.',
     )
   }
 

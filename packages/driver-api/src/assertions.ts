@@ -1,4 +1,4 @@
-import { readString, type AssertionKind, type AssertionResult, type StoryView } from '@swe-verify/core'
+import { readString, type AssertionKind, type AssertionResult, type StoryView } from '@witness/core'
 
 /**
  * Assertion kinds for the API tier.

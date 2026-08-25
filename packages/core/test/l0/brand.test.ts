@@ -21,8 +21,8 @@ describe('brandFrom — one name, everything else derived', () => {
   })
 
   it('turns a hyphenated name into a legal environment prefix', () => {
-    // `SWE_VERIFY_JS_DEBUG`, not `SWE-VERIFY_JS_DEBUG`, which no shell exports.
-    expect(brandFrom('swe-verify').envPrefix).toBe('SWE_VERIFY')
+    // `WITNESS_JS_DEBUG`, not `WITNESS_JS_DEBUG`, which no shell exports.
+    expect(brandFrom('witness').envPrefix).toBe('WITNESS')
     expect(brandFrom('my.tool v2').envPrefix).toBe('MY_TOOL_V2')
   })
 
@@ -33,18 +33,18 @@ describe('brandFrom — one name, everything else derived', () => {
   })
 
   it('leaves the default alone', () => {
-    expect(DEFAULT_BRAND.dir).toBe('.swe-verify')
-    expect(DEFAULT_BRAND.envPrefix).toBe('SWE_VERIFY')
+    expect(DEFAULT_BRAND.dir).toBe('.witness')
+    expect(DEFAULT_BRAND.envPrefix).toBe('WITNESS')
   })
 })
 
 describe('resolveBrand — renaming without editing source', () => {
   it('uses the default when nothing says otherwise', () => {
-    expect(resolveBrand({}).cli).toBe('swe-verify')
+    expect(resolveBrand({}).cli).toBe('witness')
   })
 
   it('takes the name from the environment', () => {
-    expect(resolveBrand({ SWE_VERIFY_BRAND: 'acme' }).dir).toBe('.acme')
+    expect(resolveBrand({ WITNESS_BRAND: 'acme' }).dir).toBe('.acme')
   })
 
   it('accepts the renamed variable too, so a rebrand is not one-way', () => {
@@ -54,19 +54,19 @@ describe('resolveBrand — renaming without editing source', () => {
   })
 
   it('ignores a name it could not use, rather than failing every command', () => {
-    expect(resolveBrand({ SWE_VERIFY_BRAND: '../escape' }).cli).toBe('swe-verify')
+    expect(resolveBrand({ WITNESS_BRAND: '../escape' }).cli).toBe('witness')
   })
 })
 
 describe('schemaKind — reading files written under another name', () => {
   /**
-   * The part that must not break. `swe-verify/plan@1` is written into every
+   * The part that must not break. `witness/plan@1` is written into every
    * committed plan and every sealed story. If a rename made those unreadable,
    * renaming would silently orphan a team's entire history — so the brand is
    * ignored on read and only the kind and major version are checked.
    */
   it('reads a document written under the default name', () => {
-    expect(schemaKind('swe-verify/plan@1')).toEqual({ kind: 'plan', major: 1 })
+    expect(schemaKind('witness/plan@1')).toEqual({ kind: 'plan', major: 1 })
   })
 
   it('reads one written under any other name', () => {

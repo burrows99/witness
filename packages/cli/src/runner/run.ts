@@ -23,10 +23,10 @@ import {
   builtinAssertionKinds,
   type UnsequencedEvent,
   type StoryView,
-} from '@swe-verify/core'
-import { DapSession, type InstalledProbe } from '@swe-verify/probe-dap'
-import { ApiDriver, assertionKinds, newTraceId } from '@swe-verify/driver-api'
-import { ArtifactStore, createRecorders, slideDocument, type Slide, type TerminalSource } from '@swe-verify/recorders'
+} from '@witness/core'
+import { DapSession, type InstalledProbe } from '@witness/probe-dap'
+import { ApiDriver, assertionKinds, newTraceId } from '@witness/driver-api'
+import { ArtifactStore, createRecorders, slideDocument, type Slide, type TerminalSource } from '@witness/recorders'
 import { HarnessError, UsageError } from '../errors.js'
 import { runDir as runDirFor } from '../workspace.js'
 import { startFixture, waitForReady } from './fixture.js'
@@ -339,7 +339,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     if (recorders.length > 0 && empty.length === recorders.length) {
       throw new HarnessError(
         `recording was requested but ${empty.join(' and ')} captured nothing`,
-        'Run `swe-verify doctor`; the recording tool (ffmpeg, vhs, or a browser) is missing or failed. The harness log says which.',
+        'Run `witness doctor`; the recording tool (ffmpeg, vhs, or a browser) is missing or failed. The harness log says which.',
       )
     }
 
@@ -429,7 +429,7 @@ async function loadDrivers(
   const drivers = new Map<string, Driver>([['api', new ApiDriver({ store })]])
   if (!plan.steps.some((step) => step.driver === 'web')) return drivers
 
-  const web = await import('@swe-verify/driver-web').catch(() => null)
+  const web = await import('@witness/driver-web').catch(() => null)
   if (!web?.isPlaywrightAvailable()) {
     throw new UsageError(
       'this plan uses the web driver, but Playwright is not installed',
@@ -541,7 +541,7 @@ async function evaluateAssertions(
   // `ui-text` reads the live page, so it only exists when a browser does.
   const web = drivers.get('web')
   if (web) {
-    const { uiText } = await import('@swe-verify/driver-web')
+    const { uiText } = await import('@witness/driver-web')
     const kind = uiText(web as never)
     kinds.set(kind.kind, kind)
   }

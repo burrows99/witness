@@ -49,14 +49,14 @@ export function brandFrom(name: string): Brand {
     name: trimmed,
     cli: trimmed,
     dir: `.${trimmed}`,
-    // `SWE_VERIFY_JS_DEBUG`, not `SWE-VERIFY_JS_DEBUG`, which no shell exports.
+    // `WITNESS_JS_DEBUG`, not `WITNESS_JS_DEBUG`, which no shell exports.
     envPrefix: trimmed.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, ''),
     schemaNs: trimmed,
     bypassLabel: `${trimmed}:bypass`,
   }
 }
 
-export const DEFAULT_BRAND: Brand = brandFrom('swe-verify')
+export const DEFAULT_BRAND: Brand = brandFrom('witness')
 
 /**
  * The brand for this process.
@@ -86,7 +86,7 @@ export function resolveBrand(env: Record<string, string | undefined>): Brand {
 /**
  * What a `schema` field says, ignoring who wrote it.
  *
- * `swe-verify/plan@1` and `acme/plan@1` are the same document. Checking the
+ * `witness/plan@1` and `acme/plan@1` are the same document. Checking the
  * brand on read would mean a rename silently orphaned every plan and story a
  * team had already committed, which is the one thing a rename must never do.
  */
@@ -111,7 +111,7 @@ export function schemaId(brand: Brand, kind: SchemaKind): string {
  *
  * A rename has to work in both directions. Someone who has renamed the tool
  * to `acme` will export `ACME_JS_DEBUG`, while an existing machine, CI job or
- * shell profile still exports `SWE_VERIFY_JS_DEBUG` — and breaking those on a
+ * shell profile still exports `WITNESS_JS_DEBUG` — and breaking those on a
  * rename would make renaming something nobody dares do. Both are honoured,
  * the current brand first.
  */

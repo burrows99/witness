@@ -63,7 +63,7 @@ describe('argvFor — every tool is a CLI invocation', () => {
 
 describe('instructions — steering, not enforcement', () => {
   it('tells the agent what the gate blocks on', () => {
-    expect(INSTRUCTIONS).toMatch(/swe-verify/)
+    expect(INSTRUCTIONS).toMatch(/witness/)
     expect(INSTRUCTIONS).toMatch(/verify/)
   })
 

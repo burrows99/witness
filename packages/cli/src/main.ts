@@ -14,16 +14,16 @@ import { skillCommand } from './commands/skill.js'
 
 import { VERSION } from './version.js'
 
-const HELP = `swe-verify ${VERSION} — prove a change was actually executed
+const HELP = `witness ${VERSION} — prove a change was actually executed
 
-  swe-verify init [--agents] [--hooks]               scaffold config, AGENTS.md, hooks
-  swe-verify plan   --intent <s> --scope <glob>...   emit a plan skeleton
-  swe-verify run    --plan <path> [--record]         execute, emit story (and film it)
-  swe-verify gate   --run <id> | --story <path>      evaluate, publish
-  swe-verify verify --plan <path>                    run + gate (one command)
-  swe-verify show   --run <id> [--open]              render viewer
-  swe-verify skill  [--out <path>] [--check]         generate this project's agent skill
-  swe-verify doctor                                  adapters, ports, path mappings
+  witness init [--agents] [--hooks]               scaffold config, AGENTS.md, hooks
+  witness plan   --intent <s> --scope <glob>...   emit a plan skeleton
+  witness run    --plan <path> [--record]         execute, emit story (and film it)
+  witness gate   --run <id> | --story <path>      evaluate, publish
+  witness verify --plan <path>                    run + gate (one command)
+  witness show   --run <id> [--open]              render viewer
+  witness skill  [--out <path>] [--check]         generate this project's agent skill
+  witness doctor                                  adapters, ports, path mappings
 
 Common flags
   --json          emit machine-readable output on stdout and nothing else
@@ -112,12 +112,12 @@ function fail(error: unknown, stderr: NodeJS.WritableStream, json: boolean): num
   const exitCode = isUsage ? EXIT.USAGE : isHarness ? EXIT.HARNESS : EXIT.HARNESS
   const message = error instanceof Error ? error.message : String(error)
   const remedy = (error as { remedy?: string }).remedy
-    ?? 'This is a harness failure, not a verdict. Run `swe-verify doctor`; if it persists, file it with logs/harness.log.'
+    ?? 'This is a harness failure, not a verdict. Run `witness doctor`; if it persists, file it with logs/harness.log.'
 
   if (json) {
     stderr.write(`${JSON.stringify({ error: { kind: isUsage ? 'usage' : 'harness', message, remedy }, exitCode })}\n`)
   } else {
-    stderr.write(`swe-verify: ${message}\n  → ${remedy}\n`)
+    stderr.write(`witness: ${message}\n  → ${remedy}\n`)
   }
   return exitCode
 }

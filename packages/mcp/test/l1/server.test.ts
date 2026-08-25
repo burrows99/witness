@@ -13,15 +13,15 @@ import { argvFor } from '../../src/tools.js'
  */
 
 function repo(): string {
-  const dir = mkdtempSync(join(tmpdir(), 'swe-verify-mcp-'))
+  const dir = mkdtempSync(join(tmpdir(), 'witness-mcp-'))
   const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8' })
   git('init', '-q', '-b', 'main')
   git('config', 'user.email', 'test@example.com')
   git('config', 'user.name', 'test')
   mkdirSync(join(dir, 'src'), { recursive: true })
   writeFileSync(join(dir, 'src', 'a.ts'), 'export const a = 1\n')
-  mkdirSync(join(dir, '.swe-verify'), { recursive: true })
-  writeFileSync(join(dir, '.swe-verify', 'config.json'), JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'local' }))
+  mkdirSync(join(dir, '.witness'), { recursive: true })
+  writeFileSync(join(dir, '.witness', 'config.json'), JSON.stringify({ schema: 'witness/config@1', vcs: 'local' }))
   git('add', '-A')
   git('commit', '-q', '-m', 'base')
   return dir

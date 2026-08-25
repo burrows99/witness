@@ -40,7 +40,7 @@ export async function initCommand(ctx: CommandContext): Promise<CommandResult> {
 
   const lines = written.length
     ? written.map((f) => `wrote ${ctx.relative(f)}`)
-    : ['.swe-verify/ already initialised; nothing to do']
-  lines.push('next: swe-verify plan --intent "<what this change proves>" --scope "<glob>"')
+    : ['.witness/ already initialised; nothing to do']
+  lines.push('next: witness plan --intent "<what this change proves>" --scope "<glob>"')
   return { exitCode: 0, text: lines, json: { command: 'init', created: written.map((f) => ctx.relative(f)) } }
 }

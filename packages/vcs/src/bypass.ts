@@ -1,6 +1,6 @@
-import type { Bypass } from '@swe-verify/core'
+import type { Bypass } from '@witness/core'
 
-export const DEFAULT_BYPASS_LABEL = 'swe-verify:bypass'
+export const DEFAULT_BYPASS_LABEL = 'witness:bypass'
 
 /**
  * A bypass must carry a reason (FR-6). A label alone says "let me through";
@@ -8,10 +8,10 @@ export const DEFAULT_BYPASS_LABEL = 'swe-verify:bypass'
  * the escape hatch visible to a reviewer instead of silent.
  *
  * The reason is looked for in the change description as
- * `swe-verify:bypass: <reason>`, so it lives with the change rather than in
+ * `witness:bypass: <reason>`, so it lives with the change rather than in
  * CI configuration.
  */
-const REASON_RE = /swe-verify:bypass:\s*(.+)/i
+const REASON_RE = /witness:bypass:\s*(.+)/i
 
 export function reasonFromBody(body: string | undefined): string | null {
   if (!body) return null

@@ -19,7 +19,7 @@ import type { Page } from 'playwright'
  * sit there and would cover it.
  */
 
-export const CHROME_ID = 'swe-verify-chrome'
+export const CHROME_ID = 'witness-chrome'
 export const BAR_HEIGHT = 68
 export const DOCK_WIDTH = 340
 /** Older readings stay for context, but the dock cannot grow without bound. */
@@ -121,7 +121,7 @@ function drawChrome(args: DrawArgs): void {
   // innerText can see it.
   const host = document.createElement('div')
   host.id = args.id
-  host.setAttribute('data-swe-verify', 'chrome')
+  host.setAttribute('data-witness', 'chrome')
   host.style.cssText = [
     'position:fixed',
     'inset:0',
@@ -207,13 +207,13 @@ function drawChrome(args: DrawArgs): void {
     root.appendChild(dock)
   }
 
-  host.setAttribute('data-swe-verify-rendered', JSON.stringify(rendered))
+  host.setAttribute('data-witness-rendered', JSON.stringify(rendered))
   document.body.appendChild(host)
   // Geometry mirrored for the same reason as the text: a closed root cannot
   // be measured from outside, and "does the chrome cover the page, or the
   // player controls?" has to stay answerable.
   host.setAttribute(
-    'data-swe-verify-boxes',
+    'data-witness-boxes',
     JSON.stringify(
       Array.from(root.querySelectorAll('*'))
         .map((el) => el.getBoundingClientRect())

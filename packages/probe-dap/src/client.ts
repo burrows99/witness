@@ -151,7 +151,7 @@ export class DapClient {
         request_seq: message.seq,
         success: handled,
         command,
-        ...(handled ? {} : { message: 'swe-verify runs headless and cannot host a terminal' }),
+        ...(handled ? {} : { message: 'witness runs headless and cannot host a terminal' }),
       }))
     }
   }
