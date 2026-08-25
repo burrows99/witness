@@ -1,3 +1,4 @@
+import { DEFAULT_BRAND } from './brand.js'
 import { Ajv, type ValidateFunction } from 'ajv'
 import { configSchema, planSchema, storySchema } from './schemas.js'
 import type { Config, Finding, Plan, ResolvedConfig, Story } from './types.js'
@@ -22,7 +23,12 @@ const validators = {
   config: ajv.compile(configSchema as object),
 }
 
-const SCHEMA_RE = /^swe-verify\/(plan|story|config)@(\d+)$/
+/**
+ * Any brand, then the kind and the major. The name in front is deliberately
+ * not checked: a document is identified by what it *is*, not by who wrote it,
+ * so renaming the tool never orphans a plan or a story already committed.
+ */
+const SCHEMA_RE = /^[A-Za-z0-9][A-Za-z0-9 ._-]*\/(plan|story|config)@(\d+)$/
 
 function fail(message: string, remedy: string): { ok: false; findings: Finding[] } {
   return { ok: false, findings: [{ code: 'SV002', severity: 'error', message, remedy }] }
@@ -40,10 +46,10 @@ function checkSchemaField(value: unknown, kind: 'plan' | 'story' | 'config', maj
   }
   const schema = (value as Record<string, unknown>).schema
   if (typeof schema !== 'string') {
-    return fail(`${kind} is missing the mandatory "schema" field`, `Add "schema": "swe-verify/${kind}@${major}".`)
+    return fail(`${kind} is missing the mandatory "schema" field`, `Add "schema": "<name>/${kind}@${major}", e.g. "swe-verify/${kind}@${major}".`)
   }
   const m = SCHEMA_RE.exec(schema)
-  if (!m) return fail(`unrecognised schema identifier "${schema}"`, `Expected "swe-verify/${kind}@${major}".`)
+  if (!m) return fail(`unrecognised schema identifier "${schema}"`, `Expected something of the form "<name>/${kind}@${major}".`)
   if (m[1] !== kind) return fail(`expected a ${kind} but got a ${m[1]}`, `Pass the ${kind} artefact, not the ${m[1]}.`)
   if (Number(m[2]) !== major) {
     return fail(
@@ -158,7 +164,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   },
   coverage: { policy: 'all-executable', defensive: 'warn', waiverCapPct: 10 },
   budgets: { runMs: 600_000, breakpointMs: 30_000, artifactBytes: 524_288_000, probeLines: 500, launchMs: 300_000 },
-  bypass: { allowed: true, requiresReason: true, label: 'swe-verify:bypass' },
+  bypass: { allowed: true, requiresReason: true, label: DEFAULT_BRAND.bypassLabel },
   // "the gate requires at least one agent-readable artefact per step" — the
   // rule the design calls the one that keeps recorders honest. Off by
   // default, it never fires, and a recorder can satisfy the gate with a video

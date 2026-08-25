@@ -250,6 +250,30 @@ describe('verify — refusing rather than degrading (NFR-12)', () => {
     expect(result.stderr).toMatch(/relative to that|basename/)
   })
 
+  it('can be called something else entirely', async () => {
+    // The name was spread across 179 literals, so renaming meant a sweep with
+    // no way to tell cosmetic occurrences from wire format. One word now
+    // drives the state directory, the environment prefix and what gets
+    // written into new documents.
+    const result = await cli(repo, ['init', '--json'], { env: { ...PY_ENV, ACME_BRAND: 'acme' } })
+    expect(result.code).toBe(0)
+    expect(result.json<{ created: string[] }>().created.join(' ')).toContain('.acme/config.json')
+    expect(JSON.parse(readFileSync(join(repo.dir, '.acme', 'config.json'), 'utf8')).schema).toBe('acme/config@1')
+  })
+
+  it('still reads what the old name wrote, so a rename orphans nothing', async () => {
+    // The one thing a rename must never do. `swe-verify/plan@1` is written
+    // into every committed plan and sealed story, so the brand is ignored on
+    // read and only the kind and major are checked.
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    const underNewName = await cli(repo, ['gate', '--base', base, '--json'], {
+      env: { ...PY_ENV, ACME_BRAND: 'acme' },
+    })
+    const underOldName = await cli(repo, ['gate', '--base', base, '--json'], { env: PY_ENV })
+    expect(underNewName.json<GateResult>().findings.map((f) => f.code))
+      .toEqual(underOldName.json<GateResult>().findings.map((f) => f.code))
+  })
+
   it('names the missing compose file rather than failing later at spawn', async () => {
     repo.writePlan(planFor('composed', ['app/**'], {
       fixture: { kind: 'compose' },

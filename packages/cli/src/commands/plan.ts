@@ -1,3 +1,4 @@
+import { schemaId } from '@swe-verify/core'
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Plan } from '@swe-verify/core'
@@ -20,7 +21,7 @@ export async function planCommand(ctx: CommandContext): Promise<CommandResult> {
 
   const id = ctx.args.flag('id') ?? slugify(intent)
   const plan: Plan = {
-    schema: 'swe-verify/plan@1',
+    schema: schemaId(ctx.brand, 'plan'),
     id,
     intent,
     domain: ctx.args.flag('domain') ?? ctx.config.domain,
@@ -30,7 +31,7 @@ export async function planCommand(ctx: CommandContext): Promise<CommandResult> {
     assertions: [{ id: 'a1', kind: 'http-status', afterStep: 1, expect: { status: 200 } }],
   }
 
-  const dir = paths.plans(ctx.repoRoot)
+  const dir = paths.plans(ctx.repoRoot, ctx.brand)
   mkdirSync(dir, { recursive: true })
   const file = join(dir, `${id}.plan.json`)
   if (existsSync(file) && !ctx.args.bool('force')) {

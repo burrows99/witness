@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import type { PlanFixture, PlanReadyCheck } from '@swe-verify/core'
 import { adapterFor, freePort, type AdapterSpec } from '@swe-verify/probe-dap'
+import { brandEnvName, resolveBrand } from '@swe-verify/core'
 import { HarnessError, UsageError } from '../errors.js'
 import {
   composeCommand, composeDown, composeLogs, composeUp, publishedPort, resolveComposeUrl,
@@ -153,6 +154,8 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
       ...options.env,
       ...command.env,
       PORT: String(appPort),
+      [brandEnvName('APP_PORT', resolveBrand(options.env))]: String(appPort),
+      // The default name too, so a fixture written before a rename keeps working.
       SWE_VERIFY_APP_PORT: String(appPort),
       ...fixture.env,
     },

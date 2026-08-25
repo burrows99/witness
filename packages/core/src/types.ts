@@ -76,7 +76,8 @@ export interface PlanCoverage {
 }
 
 export interface Plan {
-  schema: 'swe-verify/plan@1'
+  /** `<name>/plan@1`. The name is the brand and is not checked on read. */
+  schema: string
   id: string
   intent: string
   domain?: string
@@ -240,7 +241,8 @@ export interface Seal {
 }
 
 export interface Story {
-  schema: 'swe-verify/story@1'
+  /** `<name>/story@1`. The name is the brand and is not checked on read. */
+  schema: string
   run_id: string
   plan_id: string
   plan_sha256: string
@@ -282,7 +284,8 @@ export interface Story {
 export type DefensivePolicy = 'off' | 'warn' | 'require'
 
 export interface ResolvedConfig {
-  schema: 'swe-verify/config@1'
+  /** `<name>/config@1`. The name is the brand and is not checked on read. */
+  schema: string
   domain: string
   vcs: 'auto' | 'github' | 'gitlab' | 'bitbucket' | 'local'
   runner: 'local'
@@ -296,7 +299,7 @@ export interface ResolvedConfig {
   redact: { keys: string[]; patterns: string[]; onUnknownBinary: 'drop' | 'keep' }
 }
 
-export type Config = Partial<Omit<ResolvedConfig, 'schema'>> & { schema: 'swe-verify/config@1' }
+export type Config = Partial<Omit<ResolvedConfig, 'schema'>> & { schema: string }
 
 /* ------------------------------------------------------------------- gate */
 

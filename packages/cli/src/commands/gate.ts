@@ -22,7 +22,7 @@ export async function gateCommand(ctx: CommandContext, options: { checkArgs?: bo
 
   const base = ctx.args.flag('base') ?? defaultBase(ctx.repoRoot)
   const diff = diffAgainst(ctx.repoRoot, base)
-  const plans = loadPlans(ctx.repoRoot)
+  const plans = loadPlans(ctx.repoRoot, ctx.brand)
   const story = resolveStory(ctx)
 
   const selector = (ctx.args.flag('vcs') ?? ctx.config.vcs) as ProviderSelector
@@ -83,7 +83,7 @@ function resolveStory(ctx: CommandContext): Story | null {
 
   const runId = ctx.args.flag('run')
   if (runId) {
-    const file = join(runDir(ctx.repoRoot, runId), 'story.json')
+    const file = join(runDir(ctx.repoRoot, runId, ctx.brand), 'story.json')
     if (!existsSync(file)) throw new UsageError(`no story for run ${runId}`, 'Check `swe-verify run` completed and wrote a story.')
     return readStory(file)
   }

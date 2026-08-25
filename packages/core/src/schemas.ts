@@ -14,7 +14,7 @@ export const planSchema = {
   type: 'object',
   required: ['schema', 'id', 'intent', 'scope', 'steps', 'assertions'],
   properties: {
-    schema: { const: 'swe-verify/plan@1' },
+    schema: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 ._-]*\\/plan@1$' },
     id: { type: 'string', minLength: 1, pattern: '^[a-zA-Z0-9._-]+$' },
     intent: { type: 'string', minLength: 1 },
     domain: { type: 'string' },
@@ -173,7 +173,7 @@ export const storySchema = {
   type: 'object',
   required: ['schema', 'run_id', 'plan_id', 'plan_sha256', 'diff', 'env', 'started_at', 'events', 'coverage', 'assertions', 'artifacts'],
   properties: {
-    schema: { const: 'swe-verify/story@1' },
+    schema: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 ._-]*\\/story@1$' },
     run_id: { type: 'string', pattern: '^[0-9A-HJKMNP-TV-Z]{26}$' },
     plan_id: { type: 'string', minLength: 1 },
     plan_sha256: { type: 'string', pattern: sha256Pattern },
@@ -302,7 +302,7 @@ export const configSchema = {
   type: 'object',
   required: ['schema'],
   properties: {
-    schema: { const: 'swe-verify/config@1' },
+    schema: { type: 'string', pattern: '^[A-Za-z0-9][A-Za-z0-9 ._-]*\\/config@1$' },
     domain: { type: 'string' },
     vcs: { enum: ['auto', 'github', 'gitlab', 'bitbucket', 'local'] },
     runner: { enum: ['local'] },

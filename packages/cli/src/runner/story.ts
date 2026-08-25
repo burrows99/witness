@@ -1,4 +1,4 @@
-import {
+import { resolveBrand, schemaId,
   changedLinesOf,
   orderEvents,
   sealStory,
@@ -103,7 +103,7 @@ export function assembleStory(params: AssembleParams): Story {
   const events = ordered.map((event, index) => ({ ...event, seq: index + 1 }))
 
   const story: Story = {
-    schema: 'swe-verify/story@1',
+    schema: schemaId(resolveBrand(process.env), 'story'),
     run_id: params.runId,
     plan_id: params.planId,
     plan_sha256: params.planSha256,

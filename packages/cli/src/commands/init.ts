@@ -6,7 +6,7 @@ import type { CommandContext, CommandResult } from '../context.js'
 
 export async function initCommand(ctx: CommandContext): Promise<CommandResult> {
   ctx.args.assertKnown(['agents', 'hooks', 'vendor'])
-  const { created } = scaffold(ctx.repoRoot)
+  const { created } = scaffold(ctx.repoRoot, ctx.brand)
   const written = [...created]
 
   // `AGENTS.md` is vendor-neutral steering; it does not bind, and the block is

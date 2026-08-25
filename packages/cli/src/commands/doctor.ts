@@ -33,13 +33,13 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
     // the config was committed silently has none, and every run then uses
     // built-in budgets — which is how a plan sat past a 10-minute default for
     // forty minutes with nothing anywhere saying the file was absent.
-    detail: `${configSource(ctx.repoRoot) ?? 'built-in defaults (no .swe-verify/config.json)'} — domain=${ctx.config.domain} runner=${ctx.config.runner} store=${ctx.config.artifactStore} telemetry=${ctx.config.telemetry}`,
-    ...(configSource(ctx.repoRoot) ? {} : { remedy: 'Run `swe-verify init` to create one, and commit it — budgets and scope are per-project.' }),
+    detail: `${configSource(ctx.repoRoot, ctx.brand) ?? 'built-in defaults (no .swe-verify/config.json)'} — domain=${ctx.config.domain} runner=${ctx.config.runner} store=${ctx.config.artifactStore} telemetry=${ctx.config.telemetry}`,
+    ...(configSource(ctx.repoRoot, ctx.brand) ? {} : { remedy: 'Run `swe-verify init` to create one, and commit it — budgets and scope are per-project.' }),
   })
 
-  const plansDir = paths.plans(ctx.repoRoot)
+  const plansDir = paths.plans(ctx.repoRoot, ctx.brand)
   try {
-    const plans = loadPlans(ctx.repoRoot)
+    const plans = loadPlans(ctx.repoRoot, ctx.brand)
     checks.push({
       name: 'plans',
       status: plans.length ? 'ok' : 'warn',

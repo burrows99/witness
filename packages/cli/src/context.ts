@@ -1,6 +1,7 @@
 import { relative } from 'node:path'
 import type { ResolvedConfig } from '@swe-verify/core'
 import type { Args } from './args.js'
+import { resolveBrand, type Brand } from '@swe-verify/core'
 import { repoRoot as repoRootOf } from './git.js'
 
 export interface DoctorCheck {
@@ -20,6 +21,13 @@ export interface CommandContext {
    * made the same plan resolve two different ways.
    */
   repoRoot: string
+  /**
+   * The name this tool is running under, resolved from the invocation's own
+   * environment. On the context rather than a module constant because the CLI
+   * is embeddable and the test suite drives it in-process: one brand fixed at
+   * import would ignore what a given invocation asked for.
+   */
+  brand: Brand
   env: Record<string, string | undefined>
   config: ResolvedConfig
   now: Date
@@ -51,6 +59,7 @@ export function makeContext(args: Args, config: ResolvedConfig, cwd: string, env
     args,
     cwd,
     repoRoot: root,
+    brand: resolveBrand(env),
     env,
     config,
     now,

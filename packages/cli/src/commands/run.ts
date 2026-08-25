@@ -93,7 +93,7 @@ function resolvePlanPath(ctx: CommandContext): string {
   const explicit = ctx.args.flag('plan')
   if (explicit) {
     if (!existsSync(explicit)) {
-      const inDir = join(paths.plans(ctx.repoRoot), explicit.endsWith('.plan.json') ? explicit : `${explicit}.plan.json`)
+      const inDir = join(paths.plans(ctx.repoRoot, ctx.brand), explicit.endsWith('.plan.json') ? explicit : `${explicit}.plan.json`)
       if (existsSync(inDir)) return inDir
       throw new UsageError(`no plan at ${explicit}`, 'Pass a path to a .plan.json, or a plan id that exists in .swe-verify/plans/.')
     }

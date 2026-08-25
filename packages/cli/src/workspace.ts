@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import {
+import { type Brand, resolveBrand, schemaId,
   canonicalJson,
   resolveConfig,
   sha256,
@@ -23,17 +23,35 @@ import { UsageError } from './errors.js'
  *     plans/*.plan.json    committed
  *     runs/<run_id>/       gitignored
  */
-export const DIR = '.swe-verify'
-
-export const paths = {
-  root: (cwd: string) => join(cwd, DIR),
-  config: (cwd: string) => join(cwd, DIR, 'config.json'),
-  plans: (cwd: string) => join(cwd, DIR, 'plans'),
-  runs: (cwd: string) => join(cwd, DIR, 'runs'),
+/**
+ * Where per-repository state lives. Derived from the brand, so renaming the
+ * tool renames the directory with it rather than leaving a `.swe-verify`
+ * behind that nothing calls itself any more.
+ */
+/**
+ * Where per-repository state lives, for the brand in force.
+ *
+ * Threaded rather than fixed at import: the CLI is embeddable, and the test
+ * suite drives it in-process, so `process.env` at module load is the wrong
+ * source — it would pin one brand for the lifetime of the process and ignore
+ * what an individual invocation asked for.
+ */
+export function dirFor(brand: Brand = resolveBrand(process.env)): string {
+  return brand.dir
 }
 
-export function runDir(cwd: string, runId: string): string {
-  return join(paths.runs(cwd), runId)
+/** The default state directory, for messages that need to name one. */
+export const DIR = dirFor()
+
+export const paths = {
+  root: (cwd: string, brand?: Brand) => join(cwd, dirFor(brand)),
+  config: (cwd: string, brand?: Brand) => join(cwd, dirFor(brand), 'config.json'),
+  plans: (cwd: string, brand?: Brand) => join(cwd, dirFor(brand), 'plans'),
+  runs: (cwd: string, brand?: Brand) => join(cwd, dirFor(brand), 'runs'),
+}
+
+export function runDir(cwd: string, runId: string, brand?: Brand): string {
+  return join(paths.runs(cwd, brand), runId)
 }
 
 function readJson(file: string, label: string): unknown {
@@ -51,14 +69,14 @@ function readJson(file: string, label: string): unknown {
 }
 
 /** Whether the config came from a file, so `doctor` can say which. */
-export function configSource(cwd: string): string | null {
-  const file = paths.config(cwd)
+export function configSource(cwd: string, brand?: Brand): string | null {
+  const file = paths.config(cwd, brand)
   return existsSync(file) ? file : null
 }
 
-export function loadConfig(cwd: string): ResolvedConfig {
-  const file = paths.config(cwd)
-  if (!existsSync(file)) return resolveConfig({ schema: 'swe-verify/config@1' })
+export function loadConfig(cwd: string, brand?: Brand): ResolvedConfig {
+  const file = paths.config(cwd, brand)
+  if (!existsSync(file)) return resolveConfig({ schema: schemaId(brand ?? resolveBrand(process.env), 'config') })
   const parsed = readJson(file, 'config.json')
   const result = validateConfig(parsed)
   if (!result.ok) {
@@ -79,8 +97,8 @@ export function planSha(plan: unknown): string {
   return sha256(canonicalJson(plan))
 }
 
-export function loadPlans(cwd: string): PlanRef[] {
-  const dir = paths.plans(cwd)
+export function loadPlans(cwd: string, brand?: Brand): PlanRef[] {
+  const dir = paths.plans(cwd, brand)
   if (!existsSync(dir)) return []
   const refs: PlanRef[] = []
   for (const entry of readdirSync(dir).sort()) {
@@ -111,8 +129,8 @@ export function loadPlans(cwd: string): PlanRef[] {
  * (scope, waivers, a hash); the generator needs the intent and the fixture
  * too, and both must read the same directory by the same rules.
  */
-export function loadFullPlans(cwd: string): Plan[] {
-  const dir = paths.plans(cwd)
+export function loadFullPlans(cwd: string, brand?: Brand): Plan[] {
+  const dir = paths.plans(cwd, brand)
   if (!existsSync(dir)) return []
   return readdirSync(dir)
     .filter((entry) => entry.endsWith('.plan.json'))
@@ -138,8 +156,8 @@ export function readStory(file: string): Story {
   return result.value
 }
 
-export function writeStory(cwd: string, runId: string, story: Story): string {
-  const dir = runDir(cwd, runId)
+export function writeStory(cwd: string, runId: string, story: Story, brand?: Brand): string {
+  const dir = runDir(cwd, runId, brand)
   mkdirSync(dir, { recursive: true })
   const file = join(dir, 'story.json')
   writeFileSync(file, `${JSON.stringify(story, null, 2)}\n`)
@@ -150,17 +168,17 @@ const GITIGNORE = `# swe-verify run artefacts are per-run and large; the plan is
 runs/
 `
 
-export function scaffold(cwd: string): { created: string[] } {
+export function scaffold(cwd: string, brand?: Brand): { created: string[] } {
   const created: string[] = []
-  mkdirSync(paths.plans(cwd), { recursive: true })
-  mkdirSync(paths.runs(cwd), { recursive: true })
+  mkdirSync(paths.plans(cwd, brand), { recursive: true })
+  mkdirSync(paths.runs(cwd, brand), { recursive: true })
 
-  const config = paths.config(cwd)
+  const config = paths.config(cwd, brand)
   if (!existsSync(config)) {
     // Written as the minimal explicit form rather than every default, so the
     // file stays readable and defaults can improve without a migration.
     writeFileSync(config, `${JSON.stringify({
-      schema: 'swe-verify/config@1',
+      schema: schemaId(brand ?? resolveBrand(process.env), 'config'),
       domain: 'fullstack',
       vcs: 'auto',
       runner: 'local',
@@ -171,7 +189,7 @@ export function scaffold(cwd: string): { created: string[] } {
     created.push(config)
   }
 
-  const ignore = join(paths.root(cwd), '.gitignore')
+  const ignore = join(paths.root(cwd, brand), '.gitignore')
   if (!existsSync(ignore)) {
     writeFileSync(ignore, GITIGNORE)
     created.push(ignore)

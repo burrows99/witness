@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { brandEnv, brandEnvName } from '@swe-verify/core'
 import type { Language } from '@swe-verify/core'
 import type { PathMapping } from './pathmap.js'
 
@@ -99,7 +100,7 @@ function tryRun(command: string, args: string[]): string | null {
 /** The first Python on this machine that can actually import debugpy. */
 export function findPython(cwd = process.cwd(), env: AdapterEnv = process.env): { python: string; version: string } | null {
   const candidates = [
-    env.SWE_VERIFY_PYTHON,
+    brandEnv(env, 'PYTHON'),
     join(cwd, '.venv', 'bin', 'python'),
     join(cwd, 'venv', 'bin', 'python'),
     'python3',
@@ -114,7 +115,7 @@ export function findPython(cwd = process.cwd(), env: AdapterEnv = process.env): 
 }
 
 export function findDelve(env: AdapterEnv = process.env): { dlv: string; version: string } | null {
-  const candidates = [env.SWE_VERIFY_DLV, join(env.HOME ?? process.env.HOME ?? '', 'go', 'bin', 'dlv'), 'dlv']
+  const candidates = [brandEnv(env, 'DLV'), join(env.HOME ?? process.env.HOME ?? '', 'go', 'bin', 'dlv'), 'dlv']
     .filter((c): c is string => Boolean(c))
   for (const dlv of candidates) {
     const version = tryRun(dlv, ['version'])
@@ -226,7 +227,7 @@ const delveAdapter: AdapterSpec = {
 export function jsDebugCandidates(root?: string, env: AdapterEnv = process.env): string[] {
   const home = env.HOME ?? env.USERPROFILE ?? ''
   return [
-    env.SWE_VERIFY_JS_DEBUG ?? '',
+    brandEnv(env, 'JS_DEBUG') ?? '',
     ...(root ? [join(root, 'node_modules', '@vscode', 'js-debug', 'src', 'dapDebugServer.js')] : []),
     ...(home ? [join(home, '.swe-verify', 'adapters', 'js-debug', 'src', 'dapDebugServer.js')] : []),
   ].filter(Boolean)
@@ -299,12 +300,12 @@ const javaDebugAdapter: AdapterSpec = {
   configureArgs: ({ port }) => ({ hostName: '127.0.0.1', port }),
   plain: ({ program, args }) => ({ command: 'java', args: program.endsWith('.jar') ? ['-jar', program, ...args] : [program, ...args], env: {} }),
   detect: (_root, env) => {
-    const jar = (env ?? process.env).SWE_VERIFY_JAVA_DEBUG
+    const jar = brandEnv(env ?? process.env, 'JAVA_DEBUG')
     if (jar && existsSync(jar)) return { available: true, detail: `java-debug at ${jar}` }
     return {
       available: false,
       detail: 'java-debug (com.microsoft.java.debug.plugin) is not vendored in this build',
-      remedy: 'Point SWE_VERIFY_JAVA_DEBUG at a java-debug plugin jar.',
+      remedy: `Point ${brandEnvName('JAVA_DEBUG')} at a java-debug plugin jar.`,
     }
   },
 }

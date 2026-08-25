@@ -1,3 +1,4 @@
+import { brandEnv } from '@swe-verify/core'
 import type { Bypass, GateResult } from '@swe-verify/core'
 import { DEFAULT_BYPASS_LABEL, explicitBypass, labelBypass } from './bypass.js'
 import { headline, markdownReport, textReport } from './render.js'
@@ -50,7 +51,7 @@ export class GithubProvider extends BaseProvider {
   readonly name = 'github' as const
 
   private event(): GithubEvent | null {
-    const raw = this.env.SWE_VERIFY_EVENT
+    const raw = brandEnv(this.env, 'EVENT')
     if (!raw) return null
     try { return JSON.parse(raw) as GithubEvent } catch { return null }
   }
@@ -120,7 +121,7 @@ export class GitlabProvider extends BaseProvider {
 /**
  * `bitbucket` — build status plus a report. Bitbucket Pipelines exposes no
  * label in the environment, so the bypass signal there is the explicit
- * `--bypass` flag or `SWE_VERIFY_BYPASS_REASON`. Documented rather than
+ * `--bypass` flag or the brand's BYPASS_REASON variable. Documented rather than
  * papered over with an API call that would break NFR-4.
  */
 export class BitbucketProvider extends BaseProvider {
@@ -138,7 +139,7 @@ export class BitbucketProvider extends BaseProvider {
   override async resolveBypass(): Promise<Bypass | null> {
     const explicit = await super.resolveBypass()
     if (explicit) return explicit
-    return explicitBypass(this.env.SWE_VERIFY_BYPASS_REASON)
+    return explicitBypass(brandEnv(this.env, 'BYPASS_REASON'))
   }
 
   async publish(result: GateResult, target: PublishTarget): Promise<void> {
