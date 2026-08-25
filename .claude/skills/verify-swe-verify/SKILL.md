@@ -86,6 +86,20 @@ Which recording you get is decided by **what is checked out** — the tool does 
 for you, because a revert that dies mid-run leaves a wrecked working tree. Each file names its
 own branch and commit, and is marked `-dirty` when the tree had uncommitted changes.
 
+**Checking out the base is wrong when the fix and its test landed together.** Reverting the
+commit reverts the strengthened assertion too, so the old weak test passes against the old buggy
+code and the recording shows green — a reproduction that reproduces nothing. Revert only the
+production line instead, and keep the test that detects the bug:
+
+```bash
+git checkout HEAD~1 -- <the-source-file>          # not the test
+swe-verify run --plan <plan-id> --record --json
+git checkout HEAD -- <the-source-file>            # put it back
+```
+
+Then read the transcript before you attach anything. If the "before" run passed, you filmed a
+healthy system and have no reproduction.
+
 A reproduction **must not end on the working state**: the same plan runs against both builds, so
 a reconciling final beat makes the pair indistinguishable at the frame a reviewer scrubs to.
 

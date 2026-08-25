@@ -69,3 +69,42 @@ describe('hasFfmpeg', () => {
     expect(typeof hasFfmpeg()).toBe('boolean')
   })
 })
+
+describe('a caption that does not fit the frame', () => {
+  /**
+   * A real recording put a Go subtest name on a card —
+   * `TestRuleRoutine/should_exit/and_send_resolved_notifications_...` — and it
+   * ran off both edges of the 1280px frame. Browsers do not break on `/` or
+   * `_`, so the line never wrapped and the narration, which is the whole
+   * point of the card, was unreadable.
+   */
+  it('breaks a long unbroken token instead of running off the frame', () => {
+    const title = 'TestRuleRoutine/should_exit/and_send_resolved_notifications_if_errRuleDeleted_is_the_reason_for_stopping'
+    const html = slideDocument({ title }, 1280, 720)
+    expect(html).toMatch(/overflow-wrap:\s*anywhere/)
+  })
+
+  it('shrinks the type as the caption grows, so a long one still fits', () => {
+    const short = slideDocument({ title: 'The bug' }, 1280, 720)
+    const long = slideDocument({ title: 'x'.repeat(240) }, 1280, 720)
+    const sizeOf = (html: string) => Number(/font-size:(\d+)px;font-weight:700;line-height/.exec(html)?.[1] ?? 0)
+    expect(sizeOf(short)).toBeGreaterThan(sizeOf(long))
+    expect(sizeOf(long)).toBeGreaterThanOrEqual(16)
+  })
+
+  it('keeps the full caption rather than truncating what it cannot fit', () => {
+    // A card that silently drops the end of a sentence is worse than a small
+    // one: the reader cannot tell that anything is missing.
+    const title = 'the resolved notification is sent on a cancelled context and never reaches the receiver'
+    expect(slideDocument({ title }, 1280, 720)).toContain(title)
+  })
+})
+
+describe('the card fits the frame it is rendered into', () => {
+  it('sizes the box including its padding, not outside it', () => {
+    // Content-box sizing put a 1280px column inside 64px of padding: the text
+    // began inside the frame and ran off its right edge, which is how a
+    // caption ends up half-visible in a recording.
+    expect(slideDocument({ title: 'x' }, 1280, 720)).toMatch(/box-sizing:\s*border-box/)
+  })
+})

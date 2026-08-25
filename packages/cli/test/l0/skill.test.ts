@@ -111,6 +111,16 @@ describe('the playbook — numbered steps, each one a command', () => {
     expect(skill).toMatch(/swe-verify run --plan <plan-id> --record/)
   })
 
+  it('warns that reverting the whole commit can film a healthy system', () => {
+    // Found by a fresh agent following this file literally: the fix and its
+    // strengthened test were one commit, so `git checkout <base>` reverted
+    // the assertion too and the old weak test passed against the old buggy
+    // code. The recording was green and proved nothing.
+    expect(skill).toMatch(/HEAD~1 -- /)
+    expect(skill.toLowerCase()).toMatch(/not the test|only the production line/)
+    expect(skill.toLowerCase()).toMatch(/read the transcript|reproduces nothing|no reproduction/)
+  })
+
   it('warns that a reproduction must not end on the working state', () => {
     expect(skill.toLowerCase()).toMatch(/must not end on the working state/)
   })

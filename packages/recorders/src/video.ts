@@ -80,19 +80,30 @@ export function slideDocument(card: Slide, width: number, height: number): strin
   const esc = (raw: string) =>
     String(raw).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
 
+  // A caption is narration, not a heading: it can be a sentence, or a Go
+  // subtest name with no spaces in it at all. Fixed type at 42px ran a real
+  // one off both edges of the frame, so the size follows the length and long
+  // tokens are allowed to break mid-word. Shrinking beats truncating — a card
+  // that drops the end of a sentence gives the reader no sign it did.
+  const title = String(card.title)
+  const titleSize = title.length > 180 ? 20 : title.length > 120 ? 24 : title.length > 70 ? 30 : title.length > 40 ? 36 : 42
+
   const group = card.group?.toUpperCase()
   // The default branch is where a bug is reproduced; anywhere else is where it
   // is fixed. Colouring on that alone is a guess, so it is only a hint.
   const isBaseline = group === 'MAIN' || group === 'MASTER'
   const chip = isBaseline ? 'background:#78350f;color:#fcd34d' : 'background:#065f46;color:#6ee7b7'
 
-  return `<!doctype html><meta charset="utf-8"><body style="margin:0;width:${width}px;height:${height}px;
+  // border-box, or the padding is added *outside* the declared width and the
+  // text starts inside the frame but ends past its right edge.
+  return `<!doctype html><meta charset="utf-8"><body style="margin:0;box-sizing:border-box;width:${width}px;height:${height}px;
   background:radial-gradient(120% 120% at 0% 0%,#312e81 0%,#1e1b4b 55%,#0b1020 100%);
   color:#fff;font-family:-apple-system,system-ui,'Segoe UI',sans-serif;
   display:flex;flex-direction:column;justify-content:center;padding:0 ${px(64)};gap:${px(18)}">
   ${group ? `<div style="align-self:flex-start;padding:${px(5)} ${px(14)};border-radius:999px;
     font-size:${px(13)};letter-spacing:.16em;font-weight:700;${chip}">${esc(group)}</div>` : ''}
-  <div style="font-size:${px(42)};font-weight:700;line-height:1.15;letter-spacing:-.02em">${esc(card.title)}</div>
+  <div style="font-size:${px(titleSize)};font-weight:700;line-height:1.2;letter-spacing:-.02em;
+    overflow-wrap:anywhere;word-break:break-word">${esc(title)}</div>
   ${card.detail ? `<div style="font-size:${px(20)};opacity:.82;line-height:1.4">${esc(card.detail)}</div>` : ''}
   ${card.watch ? `<div style="font-size:${px(17)};opacity:.72;line-height:1.5;border-left:${px(3)} solid #a5b4fc;
     padding-left:${px(14)}">Watch for: ${esc(card.watch)}</div>` : ''}
