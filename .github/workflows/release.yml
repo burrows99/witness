@@ -54,12 +54,22 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@macquery-labs"
 
-      - name: Install, build, test
+      - name: Install and build
         if: steps.gate.outputs.skip != 'true'
         run: |
           pnpm install --frozen-lockfile
           pnpm build
-          pnpm test
+
+      # The browser tiers need a real Chromium, exactly as ci.yml installs one.
+      # Publishing without running them would mean shipping on a narrower proof
+      # than a pull request has to clear.
+      - name: Install Chromium
+        if: steps.gate.outputs.skip != 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Test
+        if: steps.gate.outputs.skip != 'true'
+        run: pnpm test
 
       - name: Work out the next version and tag it
         if: steps.gate.outputs.skip != 'true'
