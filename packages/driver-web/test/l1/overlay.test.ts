@@ -40,7 +40,23 @@ afterAll(async () => {
   await new Promise<void>((r) => server.close(() => r()))
 })
 
-const overlayText = () => page.evaluate((id) => document.getElementById(id)?.innerText ?? '', CHROME_ID)
+/**
+ * What the chrome rendered, read from the host rather than from the page.
+ *
+ * The overlay lives in a closed shadow root so that no locator and no
+ * `innerText` can see its caption — a `waitFor { text }` once matched the
+ * tool's own narration and resolved instantly, filming a reproduction that
+ * showed no bug. That makes it unreadable to a test too, so the rendered
+ * strings are mirrored onto an attribute: readable here, still invisible to
+ * anything treating the page as text.
+ */
+const mirrored = async <T>(attribute: string): Promise<T> =>
+  JSON.parse((await page.locator(`#${CHROME_ID}`).getAttribute(attribute)) ?? '[]') as T
+
+const overlayText = async (): Promise<string> => (await mirrored<string[]>('data-swe-verify-rendered')).join(' ')
+
+const overlayBoxes = async (): Promise<Array<{ top: number; bottom: number; height: number }>> =>
+  await mirrored('data-swe-verify-boxes')
 
 suite('caption — what the frame is rendering', () => {
   it('draws the caption over the page', async () => {
@@ -81,7 +97,7 @@ suite('caption — what the frame is rendering', () => {
     await page.goto(baseUrl)
     await applyChrome(page, { title: 'a caption' })
     const heading = (await page.locator('main h1').boundingBox())!
-    const bar = (await page.locator(`#${CHROME_ID} > div`).first().boundingBox())!
+    const bar = (await overlayBoxes())[0]!
     expect(heading.y, 'the page must start below the caption bar').toBeGreaterThanOrEqual(bar.height - 1)
   })
 
@@ -136,18 +152,52 @@ suite('the overlay stays clear of the player controls', () => {
     await page.goto(baseUrl)
     await applyChrome(page, { title: 'x', probes: [{ label: 'y', value: 'z' }] })
     const viewport = page.viewportSize()!
-    const boxes = await page.evaluate((id) => {
-      const root = document.getElementById(id)
-      const elements = Array.from(root?.querySelectorAll('*') ?? [])
-      return elements.map((el) => {
-        const r = el.getBoundingClientRect()
-        return { bottom: r.bottom, height: r.height }
-      })
-    }, CHROME_ID)
-    const painted = boxes.filter((b) => b.height > 0)
+    const painted = await overlayBoxes()
     expect(painted.length).toBeGreaterThan(0)
     for (const box of painted) {
       expect(box.bottom, 'nothing may reach the bottom 12% of the frame').toBeLessThan(viewport.height * 0.88)
     }
+  })
+})
+
+suite('the chrome is invisible to the page it annotates', () => {
+  /**
+   * The failure this prevents: an agent filming a reproduction wrote a
+   * `waitFor { text: "SECONDS_ELAPSED 6" }` step. The recorder's own caption
+   * bar rendered that same string into the page, so the wait matched the
+   * tool's narration and resolved in 72ms instead of waiting for the state it
+   * was about to prove. The "before" recording showed no bug at all — the
+   * harness fabricating the evidence it exists to collect.
+   *
+   * A closed shadow root still renders, so a reviewer sees the caption, but
+   * nothing inside the page can read it.
+   */
+  it('keeps the caption out of the page text', async () => {
+    await page.goto(baseUrl)
+    await applyChrome(page, { title: 'Wait for SECONDS_ELAPSED 6', probes: [] })
+    expect(await page.locator('body').innerText()).not.toContain('SECONDS_ELAPSED')
+  })
+
+  it('keeps the caption out of every locator', async () => {
+    await page.goto(baseUrl)
+    await applyChrome(page, { title: 'Order confirmed', probes: [] })
+    // The exact shape of the bug: an assertion matching the tool's own words
+    // instead of the application's.
+    expect(await page.getByText('Order confirmed').count()).toBe(0)
+    expect(await page.locator('text=Order confirmed').count()).toBe(0)
+  })
+
+  it('keeps a measured probe value out of the page too', async () => {
+    await page.goto(baseUrl)
+    await applyChrome(page, { title: 'x', probes: [{ label: 'total', value: '424242' }] })
+    expect(await page.locator('body').innerText()).not.toContain('424242')
+  })
+
+  it('still renders it, since the recording is the point', async () => {
+    await page.goto(baseUrl)
+    await applyChrome(page, { title: 'A caption', probes: [] })
+    const host = page.locator(`#${CHROME_ID}`)
+    expect(await host.count()).toBe(1)
+    expect(await host.evaluate((el) => getComputedStyle(el).position)).toBe('fixed')
   })
 })

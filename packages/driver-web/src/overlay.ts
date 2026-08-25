@@ -110,16 +110,33 @@ function drawChrome(args: DrawArgs): void {
   const shift = args.title ? `${args.bar}px` : ''
   document.body.style.setProperty('margin-top', shift)
 
-  const root = document.createElement('div')
-  root.id = args.id
-  root.setAttribute('data-swe-verify', 'chrome')
-  root.style.cssText = [
+  // The chrome lives in a *closed* shadow root, and that is load-bearing
+  // rather than tidiness. In the light DOM its caption text is part of the
+  // page: `body.innerText()` includes it, and a `waitFor { text }` step
+  // matches it. An agent filming a reproduction had its wait resolve in 72ms
+  // against the tool's own caption instead of the state it was waiting for,
+  // and got a "before" recording that showed no bug at all — the harness
+  // fabricating the evidence it exists to collect. A closed root still
+  // renders, so the recording keeps the caption, but no locator and no
+  // innerText can see it.
+  const host = document.createElement('div')
+  host.id = args.id
+  host.setAttribute('data-swe-verify', 'chrome')
+  host.style.cssText = [
     'position:fixed',
     'inset:0',
     'z-index:2147483647',
     'pointer-events:none',
     "font-family:-apple-system,system-ui,'Segoe UI',sans-serif",
   ].join(';')
+
+  const root = host.attachShadow({ mode: 'closed' })
+  // The rendered markup, mirrored onto the host as an attribute. A closed
+  // root is unreadable by design — which is the point, and also means a test
+  // cannot check that the caption says what it should. This is the seam for
+  // that: readable from outside, and still invisible to `innerText` and to
+  // every locator, because attributes are not text.
+  const rendered: string[] = []
 
   if (args.title) {
     const bar = document.createElement('div')
@@ -141,6 +158,7 @@ function drawChrome(args: DrawArgs): void {
       'color:#fff',
       'box-shadow:0 2px 18px rgba(0,0,0,.35)',
     ].join(';')
+    rendered.push(args.title, ...(args.sub ? [args.sub] : []))
     bar.innerHTML =
       `<div style="font-size:20px;font-weight:650;letter-spacing:-.01em">${esc(args.title)}</div>` +
       (args.sub ? `<div style="font-size:14px;opacity:.75">${esc(args.sub)}</div>` : '')
@@ -184,9 +202,23 @@ function drawChrome(args: DrawArgs): void {
       })
       .join('')
 
+    rendered.push('MEASURED — NOT RENDERED BY THE APP', ...args.probes.flatMap((p) => [p.label, p.value]))
     dock.innerHTML = heading + rows
     root.appendChild(dock)
   }
 
-  document.body.appendChild(root)
+  host.setAttribute('data-swe-verify-rendered', JSON.stringify(rendered))
+  document.body.appendChild(host)
+  // Geometry mirrored for the same reason as the text: a closed root cannot
+  // be measured from outside, and "does the chrome cover the page, or the
+  // player controls?" has to stay answerable.
+  host.setAttribute(
+    'data-swe-verify-boxes',
+    JSON.stringify(
+      Array.from(root.querySelectorAll('*'))
+        .map((el) => el.getBoundingClientRect())
+        .filter((r) => r.height > 0)
+        .map((r) => ({ top: r.top, bottom: r.bottom, height: r.height })),
+    ),
+  )
 }
