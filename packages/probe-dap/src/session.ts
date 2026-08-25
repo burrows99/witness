@@ -43,12 +43,21 @@ export interface ProbeHit {
 }
 
 export interface SessionOptions extends DapClientOptions {
+  /**
+   * How long the attach/launch handshake may take. `dlv dap` compiles the
+   * binary during `launch`, so on a real repository this is minutes, not the
+   * seconds an ordinary request needs.
+   */
+  launchTimeoutMs?: number
   /** Repo root, used to record files repo-relative in the story. */
   repoRoot: string
   pathMapping?: PathMapping | null
   /** Extra text the adapter printed, kept for `harness.log`. */
   onOutput?: (text: string) => void
 }
+
+/** Generous by default: a cold Go build of a large package is minutes. */
+const DEFAULT_LAUNCH_TIMEOUT_MS = 300_000
 
 export class DapSession {
   private readonly hits: ProbeHit[] = []
@@ -127,8 +136,8 @@ export class DapSession {
   }
 
   private async configure(command: 'attach' | 'launch', args: Record<string, unknown>): Promise<void> {
-    const initialized = this.client.waitFor('initialized')
-    this.pendingConfigure = this.client.request(command, args)
+    const initialized = this.client.waitFor('initialized', this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
+    this.pendingConfigure = this.client.request(command, args, this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
     // Failures surface when the handshake completes; swallowing here only
     // stops Node treating it as an unhandled rejection in the meantime.
     this.pendingConfigure.catch(() => {})

@@ -63,7 +63,7 @@ export class DapClient {
     return this.options.timeoutMs ?? 15_000
   }
 
-  request(command: string, args?: unknown): Promise<DapResponse> {
+  request(command: string, args?: unknown, timeoutMs = this.timeoutMs): Promise<DapResponse> {
     if (this.closed) return Promise.reject(this.closeReason ?? new DapError('adapter connection closed', command))
     const seq = this.seq++
     const message = { seq, type: 'request', command, ...(args === undefined ? {} : { arguments: args }) }
@@ -72,8 +72,8 @@ export class DapClient {
     return new Promise<DapResponse>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(seq)
-        reject(new DapError(`timed out after ${this.timeoutMs}ms waiting for "${command}"`, command))
-      }, this.timeoutMs)
+        reject(new DapError(`timed out after ${timeoutMs}ms waiting for "${command}"`, command))
+      }, timeoutMs)
       timer.unref?.()
       this.pending.set(seq, { resolve, reject, timer, command })
       this.stream.write(encodeMessage(message))

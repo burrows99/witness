@@ -31,5 +31,10 @@
         "test/**/*.ts"
       ]
     }
-  }
+  },
+  "ignoreBinaries": [
+    "ffmpeg",
+    "ffprobe",
+    "vhs"
+  ]
 }

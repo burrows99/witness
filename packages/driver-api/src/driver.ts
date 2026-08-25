@@ -89,7 +89,9 @@ export class ApiDriver implements Driver {
       const request: ApiRequestRecord = { method, url, headers, ...(hasBody ? { body: requestBody } : {}) }
       const record: ApiResponseRecord = {
         status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
+        // `forEach` is typed the same way by both the DOM and Node's fetch
+        // declarations; iterating or spreading is not.
+        headers: collectHeaders(response.headers),
         body: responseBody,
         durationMs,
       }
@@ -154,6 +156,12 @@ export class ApiDriver implements Driver {
       clearTimeout(timer)
     }
   }
+}
+
+function collectHeaders(headers: Response['headers']): Record<string, string> {
+  const out: Record<string, string> = {}
+  headers.forEach((value, key) => { out[key] = value })
+  return out
 }
 
 function describe(error: unknown): string {

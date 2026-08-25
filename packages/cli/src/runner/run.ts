@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   compileRedactionPolicy,
@@ -23,7 +23,7 @@ import {
 } from '@swe-verify/core'
 import { DapSession, type InstalledProbe } from '@swe-verify/probe-dap'
 import { ApiDriver, assertionKinds, newTraceId } from '@swe-verify/driver-api'
-import { ArtifactStore } from '@swe-verify/recorders'
+import { ArtifactStore, hasFfmpeg, slideDocument, transcodeToMp4, type Slide } from '@swe-verify/recorders'
 import { HarnessError, UsageError } from '../errors.js'
 import { runDir as runDirFor } from '../workspace.js'
 import { startFixture, waitForReady } from './fixture.js'
@@ -47,6 +47,11 @@ export interface RunOptions {
   vcs: { provider: string; change_id?: string; actor?: string }
   cliVersion: string
   now?: Date
+  /**
+   * Film the run. Recording is a property of the browser context, so it is
+   * decided before the first page opens — there is no starting halfway.
+   */
+  record?: { label: string; slide: Slide } | undefined
 }
 
 export interface RunOutcome {
@@ -54,6 +59,8 @@ export interface RunOutcome {
   runId: string
   storyPath: string
   logPath: string
+  /** The finished mp4, when the run was filmed. */
+  videoPath?: string
 }
 
 export async function runPlan(options: RunOptions): Promise<RunOutcome> {
@@ -115,7 +122,14 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     // client connects, so skipping the attach would hang a run whose diff
     // simply had no gateable lines.
     if (fixture.debug && fixture.adapter) {
-      session = await attachProbes({ fixture, targets, cwd: options.cwd, env: options.env, log })
+      session = await attachProbes({
+        fixture,
+        targets,
+        cwd: options.cwd,
+        env: options.env,
+        launchMs: options.config.budgets.launchMs,
+        log,
+      })
       installed = [...session.probes]
       const unverified = installed.filter((p) => !p.verified)
       log(`probes: ${installed.length} installed, ${installed.length - unverified.length} verified`)
@@ -141,7 +155,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       log,
     )
 
-    const drivers = await loadDrivers(store, options.plan, log)
+    const drivers = await loadDrivers(store, options.plan, log, options.record ? join(dir, 'artifacts', 'video') : undefined)
     driversToClose.push(...drivers.values())
     for (const step of [...options.plan.steps].sort((a, b) => a.seq - b.seq)) {
       const driver = drivers.get(step.driver)
@@ -261,13 +275,21 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     const redacted = redactStory(story, compileRedactionPolicy(options.config.redact))
     const storyPath = writeSealedStory(dir, redacted)
     log(`sealed story ${storyPath}`)
-    return { story: redacted, runId, storyPath, logPath }
+
+    // The recording is only finalised when the browser context closes, so the
+    // drivers are shut here rather than in `finally` — a file that is still
+    // being written cannot be transcoded.
+    const videoPath = options.record
+      ? await finishRecording({ drivers: driversToClose, dir, record: options.record, log })
+      : undefined
+
+    return { story: redacted, runId, storyPath, logPath, ...(videoPath ? { videoPath } : {}) }
   } catch (error) {
     if (error instanceof UsageError || error instanceof HarnessError) throw error
     throw new HarnessError(`run failed: ${(error as Error).message}`)
   } finally {
     for (const driver of driversToClose) {
-      try { await driver.close?.() } catch { /* teardown is best-effort */ }
+      try { await driver.close?.() } catch { /* already closed when recording finished */ }
     }
     try { await session?.uninstall() } catch { /* teardown is best-effort */ }
     await fixture.stop()
@@ -281,11 +303,57 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
 }
 
 /**
+ * Close the browser so its recording is flushed, then encode it to something a
+ * reviewer can actually open. Playwright writes `.webm`; a pull request gets
+ * read on a phone.
+ */
+async function finishRecording(params: {
+  drivers: Driver[]
+  dir: string
+  record: { label: string; slide: Slide }
+  log: (line: string) => void
+}): Promise<string | undefined> {
+  for (const driver of params.drivers) {
+    try { await driver.close?.() } catch { /* teardown is best-effort */ }
+  }
+
+  const web = params.drivers.find((driver) => driver.name === 'web') as
+    | { recordedVideo?: () => string | null }
+    | undefined
+  const raw = web?.recordedVideo?.() ?? null
+  if (!raw || !existsSync(raw)) {
+    params.log('recording: the run produced no video file')
+    return undefined
+  }
+
+  const videoDir = join(params.dir, 'artifacts', 'video')
+  mkdirSync(videoDir, { recursive: true })
+  writeFileSync(join(videoDir, `${params.record.label}.slide.html`), slideDocument(params.record.slide, 1280, 720))
+
+  if (!hasFfmpeg()) {
+    // Degrade rather than lose the take: the webm is still evidence, it is
+    // just less portable.
+    params.log('recording: ffmpeg not found, leaving the raw webm in place')
+    return raw
+  }
+
+  const mp4 = join(videoDir, `${params.record.label}.mp4`)
+  await transcodeToMp4({ input: raw, output: mp4, holdLastFrameMs: 1200 })
+  params.log(`recording: ${mp4}`)
+  return mp4
+}
+
+/**
  * Drivers are loaded on demand. `web` pulls in a browser, which must not be a
  * requirement for a backend-only change (NFR-7): a plan that never mentions
  * the web driver never loads Playwright.
  */
-async function loadDrivers(store: ArtifactStore, plan: Plan, log: (line: string) => void): Promise<Map<string, Driver>> {
+async function loadDrivers(
+  store: ArtifactStore,
+  plan: Plan,
+  log: (line: string) => void,
+  videoDir?: string,
+): Promise<Map<string, Driver>> {
   const drivers = new Map<string, Driver>([['api', new ApiDriver({ store })]])
   if (!plan.steps.some((step) => step.driver === 'web')) return drivers
 
@@ -296,8 +364,8 @@ async function loadDrivers(store: ArtifactStore, plan: Plan, log: (line: string)
       'Install playwright and its browsers (npx playwright install chromium), or rewrite the plan to drive the API.',
     )
   }
-  log('drivers: web (playwright)')
-  drivers.set('web', new web.WebDriver({ store }))
+  log(`drivers: web (playwright)${videoDir ? ', recording' : ''}`)
+  drivers.set('web', new web.WebDriver({ store, ...(videoDir ? { videoDir } : {}) }))
   return drivers
 }
 
@@ -331,6 +399,7 @@ async function attachProbes(params: {
   targets: readonly ProbeTarget[]
   cwd: string
   env: Record<string, string | undefined>
+  launchMs: number
   log: (line: string) => void
 }): Promise<DapSession> {
   const { fixture, targets, cwd, log } = params
@@ -341,6 +410,7 @@ async function attachProbes(params: {
     repoRoot: cwd,
     log,
     connectTimeoutMs: 30_000,
+    launchTimeoutMs: params.launchMs,
     onOutput: (text) => log(`app: ${text.trimEnd()}`),
   })
 
@@ -352,6 +422,8 @@ async function attachProbes(params: {
     port: debug.port,
     pathMapping: null,
     env: params.env,
+    ...(fixture.mode ? { mode: fixture.mode } : {}),
+    ...(fixture.args ? { args: fixture.args } : {}),
   })
   if (adapter.configure === 'attach') await session.attach(args)
   else await session.launch(args)

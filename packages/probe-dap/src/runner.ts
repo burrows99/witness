@@ -30,6 +30,10 @@ export interface ProbeRunOptions {
   adapterRoot?: string
   targets: readonly ProbeTarget[]
   pathMapping?: PathMapping | null
+  /** Adapter launch mode, e.g. `test` to drive a Go package through its tests. */
+  mode?: string
+  /** Arguments for the launched binary. */
+  args?: string[]
   env?: Record<string, string | undefined>
   timeoutMs?: number
   log?: (line: string) => void
@@ -74,6 +78,8 @@ export async function runWithProbes(options: ProbeRunOptions): Promise<ProbeRunR
     port,
     pathMapping: options.pathMapping ?? null,
     env: options.env ?? process.env,
+    ...(options.mode ? { mode: options.mode } : {}),
+    ...(options.args ? { args: options.args } : {}),
   }
   const command = spec.debuggee(params)
 

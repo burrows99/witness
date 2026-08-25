@@ -1,8 +1,10 @@
 import { createRequire } from 'node:module'
+import { mkdirSync } from 'node:fs'
 import type { Browser, BrowserContext, ConsoleMessage, Page } from 'playwright'
 import { has, readNumber, readString, type Driver, type PlanArgs, type PlanStep, type RunContext, type StepResult, type StoryArtifact, type UnsequencedEvent } from '@swe-verify/core'
 import { newSpanId, traceparent } from '@swe-verify/driver-api'
 import type { ArtifactStore } from '@swe-verify/recorders'
+import { applyChrome, resetChrome, type ProbeReading } from './overlay.js'
 
 /**
  * The `web` driver — Playwright.
@@ -21,6 +23,12 @@ export interface WebDriverOptions {
   store?: ArtifactStore
   headless?: boolean
   viewport?: { width: number; height: number }
+  /**
+   * Where Playwright writes the raw `.webm`. Recording is a property of the
+   * browser context, so it has to be decided before the first page opens —
+   * there is no way to start filming halfway through a run.
+   */
+  videoDir?: string
 }
 
 interface RequestRecord {
@@ -46,13 +54,19 @@ export function isPlaywrightAvailable(): boolean {
 
 export class WebDriver implements Driver {
   readonly name = 'web'
-  readonly actions = ['goto', 'click', 'fill', 'press', 'select', 'waitFor', 'screenshot', 'evaluate'] as const
+  readonly actions = [
+    'goto', 'click', 'fill', 'press', 'select', 'waitFor', 'screenshot', 'evaluate',
+    // Narration. These exist as plan actions rather than harness code so any
+    // project gets captioned evidence from JSON, without writing a driver.
+    'caption', 'probe', 'beat',
+  ] as const
 
   private browser: Browser | null = null
   private context: BrowserContext | null = null
   private page: Page | null = null
   private consoleLines: string[] = []
   private requests: RequestRecord[] = []
+  private pendingVideo: string | null = null
 
   constructor(private readonly options: WebDriverOptions = {}) {}
 
@@ -124,12 +138,26 @@ export class WebDriver implements Driver {
     return this.page
   }
 
+  /** Where Playwright wrote this run's recording, once the context is closed. */
+  async videoPath(): Promise<string | null> {
+    const video = this.page?.video()
+    if (!video) return null
+    try { return await video.path() } catch { return null }
+  }
+
   async close(): Promise<void> {
+    // The file is only finalised on context close, so the path is taken first.
+    this.pendingVideo = await this.videoPath()
     await this.context?.close().catch(() => {})
     await this.browser?.close().catch(() => {})
     this.context = null
     this.browser = null
     this.page = null
+  }
+
+  /** The finished recording, available after `close()`. */
+  recordedVideo(): string | null {
+    return this.pendingVideo
   }
 
   private async perform(
@@ -172,6 +200,31 @@ export class WebDriver implements Driver {
         return {}
       case 'evaluate':
         return { result: await page.evaluate(readString(args, 'expression', '')) }
+
+      case 'caption': {
+        // What the frame is *rendering*.
+        const text = readString(args, 'text')
+        const sub = has(args, 'sub') ? readString(args, 'sub') : undefined
+        await applyChrome(page, { title: text, ...(sub ? { sub } : {}) })
+        await page.waitForTimeout(readNumber(args, 'holdMs', 900))
+        return { caption: text }
+      }
+
+      case 'probe': {
+        // A value that was *measured* and which the app does not draw. It goes
+        // in the dock, under a heading that says so, because captioning an
+        // unrendered number as though the frame showed it is how video
+        // evidence starts lying.
+        const reading: ProbeReading = { label: readString(args, 'label'), value: readString(args, 'value') }
+        await applyChrome(page, { probes: [reading] })
+        await page.waitForTimeout(readNumber(args, 'holdMs', 900))
+        return { probe: reading }
+      }
+
+      case 'beat':
+        // A pause, so a viewer can read what is on screen.
+        await page.waitForTimeout(readNumber(args, 'ms', 1400))
+        return {}
       default:
         throw new Error(`unhandled action "${step.action}"`)
     }
@@ -238,8 +291,12 @@ export class WebDriver implements Driver {
     if (this.page) return this.page
     const { chromium } = await import('playwright')
     this.browser = await chromium.launch({ headless: this.options.headless ?? true })
+    const videoDir = this.options.videoDir
+    if (videoDir) mkdirSync(videoDir, { recursive: true })
+    const viewport = this.options.viewport ?? { width: 1280, height: 720 }
     this.context = await this.browser.newContext({
-      viewport: this.options.viewport ?? { width: 1280, height: 720 },
+      viewport,
+      ...(videoDir ? { recordVideo: { dir: videoDir, size: viewport } } : {}),
     })
 
     // One traceparent per request, not one per session: the point is to link
@@ -272,6 +329,7 @@ export class WebDriver implements Driver {
     })
 
     this.page = await this.context.newPage()
+    resetChrome(this.page)
     this.page.on('console', (message: ConsoleMessage) => {
       this.consoleLines.push(`[${message.type()}] ${message.text()}`)
     })

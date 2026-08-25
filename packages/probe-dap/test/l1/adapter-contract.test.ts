@@ -165,3 +165,60 @@ for (const testCase of CASES) {
     })
   })
 }
+
+/**
+ * L1 — driving a Go *library* package through its tests.
+ *
+ * This is the shape almost all real Go code takes: no `main` to point at, and
+ * the thing that exercises a package is `go test`. Without this, swe-verify
+ * can gate a toy program and nothing else.
+ */
+describe.skipIf(!adapterFor('go').detect(process.cwd(), process.env).available)('adapter contract: go, mode test', () => {
+  const dir = join(FIXTURES, 'go')
+  const run = (targets: ProbeTarget[], args?: string[]) =>
+    runWithProbes({
+      language: 'go',
+      program: '.',
+      cwd: dir,
+      repoRoot: dir,
+      adapterRoot: process.cwd(),
+      targets,
+      mode: 'test',
+      ...(args ? { args } : {}),
+      timeoutMs: 120_000,
+    })
+
+  it('verifies and fires a probe on a line the tests exercise', async () => {
+    const result = await run([target('p001', 'main.go', 10, 'go', ['tier'])])
+    expect(result.installed[0]!.verified).toBe(true)
+    expect(result.hitsByProbe.get('p001')).toBeGreaterThan(0)
+  })
+
+  it('captures state from inside the test run', async () => {
+    const result = await run([target('p001', 'main.go', 10, 'go', ['tier'])])
+    expect(result.hits.find((h) => h.probeId === 'p001')?.vars.tier).toBe(2)
+  })
+
+  it('does not fire a probe on a line no test reaches', async () => {
+    const result = await run([
+      target('p001', 'main.go', 10, 'go'),
+      target('p002', 'main.go', 13, 'go'),
+    ])
+    expect(result.hitsByProbe.get('p001')).toBeGreaterThan(0)
+    expect(result.hitsByProbe.get('p002')).toBe(0)
+  })
+
+  it('narrows the run to one test, so a probe reports what that test alone reached', async () => {
+    const result = await run(
+      [target('p001', 'main.go', 10, 'go')],
+      ['-test.run', 'TestApplyTieredLeavesTierOneAlone'],
+    )
+    // Tier 1 never enters the discount branch.
+    expect(result.hitsByProbe.get('p001')).toBe(0)
+  })
+
+  it('lets the test binary run to completion', async () => {
+    const result = await run([target('p001', 'main.go', 10, 'go')])
+    expect(result.timedOut).toBe(false)
+  })
+})

@@ -18,7 +18,7 @@ const HELP = `swe-verify ${VERSION} — prove a change was actually executed
 
   swe-verify init [--agents] [--hooks]               scaffold config, AGENTS.md, hooks
   swe-verify plan   --intent <s> --scope <glob>...   emit a plan skeleton
-  swe-verify run    --plan <path>                    execute, emit story
+  swe-verify run    --plan <path> [--record]         execute, emit story (and film it)
   swe-verify gate   --run <id> | --story <path>      evaluate, publish
   swe-verify verify --plan <path>                    run + gate (one command)
   swe-verify show   --run <id> [--open]              render viewer

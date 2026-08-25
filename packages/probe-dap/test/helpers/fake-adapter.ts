@@ -19,6 +19,8 @@ export interface FakeAdapterOptions {
   silent?: boolean
   /** Withhold the attach response until configurationDone, as debugpy does. */
   deferAttachResponse?: boolean
+  /** Delay `initialized`, as an adapter that compiles during launch does. */
+  initializedDelayMs?: number
 }
 
 interface RecordedBreakpoint {
@@ -84,7 +86,11 @@ export class FakeAdapter {
     switch (command) {
       case 'initialize':
         this.respond(message, { supportsLogPoints: true, supportsConfigurationDoneRequest: true })
-        this.send({ type: 'event', event: 'initialized' })
+        if (this.options.initializedDelayMs) {
+          setTimeout(() => this.send({ type: 'event', event: 'initialized' }), this.options.initializedDelayMs).unref?.()
+        } else {
+          this.send({ type: 'event', event: 'initialized' })
+        }
         return
 
       case 'attach':

@@ -7,7 +7,7 @@ import type { CommandContext, CommandResult } from '../context.js'
  * invocation, one artefact, one machine-readable verdict.
  */
 export async function verifyCommand(ctx: CommandContext): Promise<CommandResult> {
-  ctx.args.assertKnown(['plan', 'base', 'bypass', 'quiet', 'story', 'run'])
+  ctx.args.assertKnown(['plan', 'base', 'bypass', 'quiet', 'story', 'run', 'record'])
   const run = await runCommand(ctx, { checkArgs: false })
   const gate = await gateCommand(ctx, { checkArgs: false })
 

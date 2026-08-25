@@ -152,7 +152,7 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
     languages: ['ts', 'py', 'go', 'java'],
   },
   coverage: { policy: 'all-executable', defensive: 'warn', waiverCapPct: 10 },
-  budgets: { runMs: 600_000, breakpointMs: 30_000, artifactBytes: 524_288_000, probeLines: 500 },
+  budgets: { runMs: 600_000, breakpointMs: 30_000, artifactBytes: 524_288_000, probeLines: 500, launchMs: 300_000 },
   bypass: { allowed: true, requiresReason: true, label: 'swe-verify:bypass' },
   artifacts: { requireAgentReadable: false },
   redact: {

@@ -38,7 +38,11 @@
         "./packages/mcp/src/index.ts"
       ]
     },
-    "baseUrl": "."
+    "baseUrl": ".",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
   },
   "include": [
     "packages/*/src/**/*.ts",

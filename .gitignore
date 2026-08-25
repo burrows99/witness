@@ -4,3 +4,9 @@ dist/
 .swe-verify/runs/
 coverage/
 .venv/
+
+# External repositories cloned for verification experiments.
+worktrees/
+
+# Recordings staged for upload; regenerated, never committed.
+.evidence/

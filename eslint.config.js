@@ -16,7 +16,9 @@ import tseslint from 'typescript-eslint'
  */
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/node_modules/**', '.venv/**', 'fixtures/**', '.swe-verify/**'],
+    // `worktrees/` holds external repositories cloned for verification
+    // experiments. They are someone else's code with someone else's rules.
+    ignores: ['**/dist/**', '**/node_modules/**', '.venv/**', 'fixtures/**', '.swe-verify/**', 'worktrees/**', '.evidence/**'],
   },
 
   js.configs.recommended,

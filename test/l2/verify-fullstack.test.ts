@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import type { GateResult, Plan, Story } from '@swe-verify/core'
 import { adapterFor } from '@swe-verify/probe-dap'
@@ -197,5 +198,50 @@ suite('verify — one story across browser, server and HTTP (M2)', () => {
     const result = await cli(repo, ['verify', '--plan', 'checkout', '--base', base, '--json'], { env: PY_ENV })
     expect(result.code).toBe(2)
     expect(result.json<GateResult>().findings.map((f) => f.code)).toContain('SV010')
+  })
+})
+
+suite('recording — evidence a reviewer can watch', () => {
+  it('films the run and leaves an mp4 beside the story', async () => {
+    repo.write('app/server.py', CHANGED_APP)
+    const result = await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    expect(result.code).toBe(0)
+
+    const recording = result.json<{ recording?: string }>().recording
+    expect(recording, 'a filmed run must produce a recording').toBeTruthy()
+    const file = join(repo.dir, recording!)
+    expect(existsSync(file)).toBe(true)
+    expect(statSync(file).size).toBeGreaterThan(10_000)
+  })
+
+  it('names the recording after the plan and the checkout it filmed', async () => {
+    repo.write('app/server.py', CHANGED_APP)
+    const result = await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    // The tree is dirty here (the change is uncommitted), and the name says so
+    // — that recording cannot be reproduced from the commit alone.
+    expect(result.json<{ recording: string }>().recording).toMatch(/checkout-.*-dirty\.mp4$/)
+  })
+
+  it('writes a title card saying which branch and commit it filmed', async () => {
+    repo.write('app/server.py', CHANGED_APP)
+    const result = await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    const card = join(repo.dir, result.json<{ recording: string }>().recording.replace(/\.mp4$/, '.slide.html'))
+    const html = readFileSync(card, 'utf8')
+    expect(html).toMatch(/placing an order/)
+    expect(html).toMatch(/uncommitted/i)
+  })
+
+  it('produces a real H.264 mp4, not a renamed webm', async () => {
+    repo.write('app/server.py', CHANGED_APP)
+    const result = await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    const file = join(repo.dir, result.json<{ recording: string }>().recording)
+    const probe = execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', file], { encoding: 'utf8' })
+    expect(probe.trim()).toBe('h264')
+  })
+
+  it('does not record when it was not asked to', async () => {
+    repo.write('app/server.py', CHANGED_APP)
+    const result = await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--json'], { env: PY_ENV })
+    expect(result.json<{ recording?: string }>().recording).toBeUndefined()
   })
 })

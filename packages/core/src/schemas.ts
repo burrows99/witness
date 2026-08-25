@@ -39,6 +39,10 @@ export const planSchema = {
         // sealing, rather than after the last step. A server never exits, so
         // this is opt-in.
         awaitExit: { type: 'boolean' },
+        // How the adapter starts the program. For Go, `test` runs a package's
+        // tests, which is the only way to drive a library package.
+        mode: { type: 'string' },
+        args: { type: 'array', items: { type: 'string' } },
         attach: {
           type: 'object',
           properties: { host: { type: 'string' }, port: { type: 'integer' } },
@@ -292,6 +296,8 @@ export const configSchema = {
         breakpointMs: { type: 'integer', minimum: 0 },
         artifactBytes: { type: 'integer', minimum: 0 },
         probeLines: { type: 'integer', minimum: 1 },
+        // The adapter handshake, which for Go includes compiling the binary.
+        launchMs: { type: 'integer', minimum: 1000 },
       },
     },
     bypass: {

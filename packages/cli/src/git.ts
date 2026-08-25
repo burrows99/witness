@@ -87,6 +87,17 @@ export function hasCommits(cwd: string): boolean {
   }
 }
 
+/** Where a recording was taken from, so the file can say so on its face. */
+export function gitState(cwd: string): { branch: string; sha: string; dirty: boolean } {
+  const safe = (args: string[]) => { try { return git(cwd, args).trim() } catch { return '' } }
+  return {
+    // Empty on a detached head, which is a fact worth recording rather than faking.
+    branch: safe(['rev-parse', '--abbrev-ref', 'HEAD']).replace(/^HEAD$/, ''),
+    sha: safe(['rev-parse', 'HEAD']),
+    dirty: safe(['status', '--porcelain']) !== '',
+  }
+}
+
 /** The default base: the merge base with the repo's main branch, else HEAD. */
 export function defaultBase(cwd: string, candidates = ['origin/main', 'origin/master', 'main', 'master']): string {
   if (!hasCommits(cwd)) return EMPTY_TREE

@@ -13,6 +13,9 @@ import { HarnessError, UsageError } from '../errors.js'
  */
 
 export interface FixtureHandle {
+  /** Launch mode and arguments the plan asked for, forwarded to the adapter. */
+  mode: string | undefined
+  args: string[] | undefined
   /** Where the DAP client should connect, when the fixture is debuggable. */
   debug: { host: string; port: number } | null
   adapter: AdapterSpec | null
@@ -55,6 +58,8 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
       debug: attach?.port ? { host: attach.host ?? '127.0.0.1', port: attach.port } : null,
       adapter: fixture.language ? adapterFor(fixture.language as never) : null,
       baseUrl: fixture.baseUrl,
+      mode: fixture.mode,
+      args: fixture.args,
       appPort: null,
       substitute: (text: string) => text,
       program: fixture.program ?? '',
@@ -121,6 +126,8 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
     debug: { host: '127.0.0.1', port },
     adapter,
     baseUrl: fixture.baseUrl ? substitute(fixture.baseUrl) : `http://127.0.0.1:${appPort}`,
+    mode: fixture.mode,
+    args: fixture.args,
     appPort,
     substitute,
     program: fixture.program,

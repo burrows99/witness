@@ -204,3 +204,34 @@ describe('teardown', () => {
     await expect(s.uninstall()).resolves.toBeUndefined()
   })
 })
+
+describe('a launch that has to compile first', () => {
+  /**
+   * `dlv dap` builds the binary during `launch`, so on a real repository the
+   * handshake can take minutes. A single fixed request timeout makes the tool
+   * work on toy programs and time out on everything else — which is the least
+   * useful place to draw the line.
+   */
+  it('waits longer for the launch handshake than for an ordinary request', async () => {
+    const adapter = new FakeAdapter({ initializedDelayMs: 300 })
+    const s = DapSession.overStream(adapter.clientStream, {
+      repoRoot: '/repo',
+      timeoutMs: 100,
+      launchTimeoutMs: 3000,
+    })
+    await s.initialize()
+    await expect(s.launch({})).resolves.toBeUndefined()
+    await s.uninstall()
+  })
+
+  it('still gives up eventually, rather than hanging the run (NFR-11)', async () => {
+    const adapter = new FakeAdapter({ initializedDelayMs: 5000 })
+    const s = DapSession.overStream(adapter.clientStream, {
+      repoRoot: '/repo',
+      timeoutMs: 100,
+      launchTimeoutMs: 200,
+    })
+    await s.initialize()
+    await expect(s.launch({})).rejects.toThrow(/timed out/)
+  })
+})

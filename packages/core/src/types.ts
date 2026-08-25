@@ -29,6 +29,10 @@ export interface PlanFixture {
   baseUrl?: string
   /** Wait for the process to exit before sealing: right for a job, wrong for a server. */
   awaitExit?: boolean
+  /** Adapter launch mode. Go: `debug` (a main package) or `test` (a package's tests). */
+  mode?: string
+  /** Arguments for the launched binary, e.g. ["-test.run", "TestThing"]. */
+  args?: string[]
   /** An already-listening debug port, for a fixture brought up elsewhere. */
   attach?: { host?: string; port?: number }
   ready?: PlanReadyCheck[]
@@ -237,7 +241,7 @@ export interface ResolvedConfig {
   telemetry: 'off' | 'on'
   scope: { include: string[]; exclude: string[]; languages: string[] }
   coverage: { policy: 'all-executable'; defensive: DefensivePolicy; waiverCapPct: number }
-  budgets: { runMs: number; breakpointMs: number; artifactBytes: number; probeLines: number }
+  budgets: { runMs: number; breakpointMs: number; artifactBytes: number; probeLines: number; launchMs: number }
   bypass: { allowed: boolean; requiresReason: boolean; label: string }
   artifacts: { requireAgentReadable: boolean }
   redact: { keys: string[]; patterns: string[]; onUnknownBinary: 'drop' | 'keep' }

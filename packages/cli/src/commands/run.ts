@@ -1,10 +1,11 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { createProvider, detectProvider, type ProviderSelector } from '@swe-verify/vcs'
-import { defaultBase, diffAgainst, isGitRepo } from '../git.js'
+import { defaultBase, diffAgainst, gitState, isGitRepo } from '../git.js'
 import { EXIT, UsageError } from '../errors.js'
 import { loadPlan, paths, planSha } from '../workspace.js'
 import { runPlan } from '../runner/run.js'
+import { narratePlan, recordingLabel, recordingSlide } from '../evidence.js'
 import type { CommandContext, CommandResult } from '../context.js'
 import { VERSION } from '../version.js'
 
@@ -15,7 +16,7 @@ import { VERSION } from '../version.js'
 export async function runCommand(ctx: CommandContext, options: { checkArgs?: boolean } = {}): Promise<CommandResult> {
   // `verify` composes run and gate, and checks the union of their flags
   // itself; each sub-command re-checking would reject the other's flags.
-  if (options.checkArgs !== false) ctx.args.assertKnown(['plan', 'base'])
+  if (options.checkArgs !== false) ctx.args.assertKnown(['plan', 'base', 'record'])
   if (!isGitRepo(ctx.cwd)) {
     throw new UsageError('not a git repository', 'Run swe-verify from inside a git worktree; the diff is what gets verified.')
   }
@@ -29,8 +30,13 @@ export async function runCommand(ctx: CommandContext, options: { checkArgs?: boo
   const provider = createProvider(detectProvider(ctx.env, selector), { env: ctx.env })
   const change = await provider.describe()
 
+  // Filming narrates the run and holds the last frame, so the recording is
+  // watchable rather than a silent screen capture.
+  const record = ctx.args.bool('record')
+  const git = gitState(ctx.cwd)
+
   const outcome = await runPlan({
-    plan,
+    plan: record ? narratePlan(plan) : plan,
     planSha256: planSha(plan),
     config: ctx.config,
     diff,
@@ -42,6 +48,7 @@ export async function runCommand(ctx: CommandContext, options: { checkArgs?: boo
       ...(change.actor ? { actor: change.actor } : {}),
     },
     cliVersion: VERSION,
+    ...(record ? { record: { label: recordingLabel(plan, git), slide: recordingSlide(plan, git) } } : {}),
   })
 
   const { coverage, assertions } = outcome.story
@@ -55,8 +62,15 @@ export async function runCommand(ctx: CommandContext, options: { checkArgs?: boo
       `  coverage   ${fired}/${gateable} exercised`,
       `  assertions ${assertions.filter((a) => a.status === 'pass').length}/${assertions.length} passed`,
       `  story      ${ctx.relative(outcome.storyPath)}  (${outcome.story.events.length} events)`,
+      ...(outcome.videoPath ? [`  recording  ${ctx.relative(outcome.videoPath)}`] : []),
     ],
-    json: { command: 'run', run_id: outcome.runId, story: ctx.relative(outcome.storyPath), summary: coverage.summary },
+    json: {
+      command: 'run',
+      run_id: outcome.runId,
+      story: ctx.relative(outcome.storyPath),
+      summary: coverage.summary,
+      ...(outcome.videoPath ? { recording: ctx.relative(outcome.videoPath) } : {}),
+    },
   }
 }
 

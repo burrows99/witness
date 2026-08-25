@@ -35,6 +35,14 @@ export interface ConfigureParams {
   port: number
   pathMapping: PathMapping | null
   env?: AdapterEnv
+  /**
+   * How the adapter should start the program. A real repository is mostly
+   * library packages with no `main`, and what exercises those is their tests —
+   * so `test` is not an afterthought, it is how most code gets driven.
+   */
+  mode?: string
+  /** Arguments for the launched binary, e.g. ['-test.run', 'TestThing']. */
+  args?: string[]
 }
 
 export interface AdapterAvailability {
@@ -126,6 +134,9 @@ const debugpyAdapter: AdapterSpec = {
   },
 }
 
+/** Launch modes `dlv dap` accepts. */
+const DELVE_MODES = ['debug', 'test', 'exec', 'replay', 'core'] as const
+
 const delveAdapter: AdapterSpec = {
   language: 'go',
   name: 'delve',
@@ -140,15 +151,22 @@ const delveAdapter: AdapterSpec = {
       env: {},
     }
   },
-  configureArgs: ({ program, cwd, pathMapping }) => ({
-    request: 'launch',
-    mode: 'debug',
-    program,
-    cwd,
-    ...(pathMapping
-      ? { substitutePath: [{ from: pathMapping.localRoot, to: pathMapping.remoteRoot }] }
-      : {}),
-  }),
+  configureArgs: ({ program, cwd, pathMapping, mode, args }) => {
+    const launch = mode ?? 'debug'
+    if (!(DELVE_MODES as readonly string[]).includes(launch)) {
+      throw new TypeError(`delve has no launch mode "${launch}" (supported: ${DELVE_MODES.join(', ')})`)
+    }
+    return {
+      request: 'launch',
+      mode: launch,
+      program,
+      cwd,
+      ...(args?.length ? { args } : {}),
+      ...(pathMapping
+        ? { substitutePath: [{ from: pathMapping.localRoot, to: pathMapping.remoteRoot }] }
+        : {}),
+    }
+  },
   detect: (_root, env) => {
     const found = findDelve(env ?? process.env)
     return found
