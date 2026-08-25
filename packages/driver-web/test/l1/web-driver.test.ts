@@ -42,7 +42,7 @@ const requests: Array<{ url: string; traceparent?: string }> = []
 
 beforeAll(async () => {
   server = createServer((req, res) => {
-    requests.push({ url: req.url!, traceparent: req.headers['traceparent'] as string | undefined })
+    requests.push({ url: req.url!, traceparent: req.headers.traceparent as string | undefined })
     if (req.url === '/orders') {
       res.writeHead(201, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ message: 'Order confirmed' }))

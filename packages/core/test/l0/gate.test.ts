@@ -16,7 +16,7 @@ const input = (over: Partial<GateInput> = {}): GateInput => {
     ci: over.ci ?? false,
   }
 }
-const codes = (r: { findings: { code: string }[] }) => r.findings.map((f) => f.code)
+const codes = (r: { findings: Array<{ code: string }> }) => r.findings.map((f) => f.code)
 
 describe('gate — the happy path', () => {
   it('allows a change whose every executable line fired and whose assertions passed', () => {

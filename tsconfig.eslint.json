@@ -1,0 +1,49 @@
+{
+  "//": "Type-aware linting needs every file in one program, and the build configs deliberately include only src/. This one covers the whole repo and emits nothing. The paths mirror the vitest aliases so tests type-check against sources, not a stale dist.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "@swe-verify/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@swe-verify/cli": [
+        "./packages/cli/src/index.ts"
+      ],
+      "@swe-verify/vcs": [
+        "./packages/vcs/src/index.ts"
+      ],
+      "@swe-verify/probe-dap": [
+        "./packages/probe-dap/src/index.ts"
+      ],
+      "@swe-verify/driver-api": [
+        "./packages/driver-api/src/index.ts"
+      ],
+      "@swe-verify/driver-web": [
+        "./packages/driver-web/src/index.ts"
+      ],
+      "@swe-verify/recorders": [
+        "./packages/recorders/src/index.ts"
+      ],
+      "@swe-verify/viewer": [
+        "./packages/viewer/src/index.ts"
+      ],
+      "@swe-verify/mcp": [
+        "./packages/mcp/src/index.ts"
+      ]
+    },
+    "baseUrl": "."
+  },
+  "include": [
+    "packages/*/src/**/*.ts",
+    "packages/*/test/**/*.ts",
+    "test/**/*.ts",
+    "*.ts"
+  ]
+}

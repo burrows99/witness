@@ -290,7 +290,7 @@ async function loadDrivers(store: ArtifactStore, plan: Plan, log: (line: string)
   if (!plan.steps.some((step) => step.driver === 'web')) return drivers
 
   const web = await import('@swe-verify/driver-web').catch(() => null)
-  if (!web || !web.isPlaywrightAvailable()) {
+  if (!web?.isPlaywrightAvailable()) {
     throw new UsageError(
       'this plan uses the web driver, but Playwright is not installed',
       'Install playwright and its browsers (npx playwright install chromium), or rewrite the plan to drive the API.',
@@ -303,7 +303,7 @@ async function loadDrivers(store: ArtifactStore, plan: Plan, log: (line: string)
 
 function pushHits(
   events: UnsequencedEvent[],
-  hits: readonly { probeId: string; vars: Record<string, unknown>; monoNs: number; wall: string }[],
+  hits: ReadonlyArray<{ probeId: string; vars: Record<string, unknown>; monoNs: number; wall: string }>,
   installed: readonly InstalledProbe[],
   traceId: string,
   stepSeq: number | undefined,

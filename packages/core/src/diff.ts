@@ -119,7 +119,7 @@ export function normaliseDiff(patch: string, options: NormaliseOptions = {}): No
 
   // Buffered per hunk: an added line that exactly reproduces a removed line
   // once whitespace is normalised is a reformat, not a change (US-1 AC4).
-  type Pending = { file: ChangedFile; line: number; text: string; class: StaticLineClass }
+  interface Pending { file: ChangedFile; line: number; text: string; class: StaticLineClass }
   let added: Pending[] = []
   let removed: string[] = []
 

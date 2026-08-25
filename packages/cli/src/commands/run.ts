@@ -60,7 +60,7 @@ export async function runCommand(ctx: CommandContext, options: { checkArgs?: boo
   }
 }
 
-export function resolvePlanPath(ctx: CommandContext): string {
+function resolvePlanPath(ctx: CommandContext): string {
   const explicit = ctx.args.flag('plan')
   if (explicit) {
     if (!existsSync(explicit)) {

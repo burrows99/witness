@@ -6,17 +6,23 @@ packages:
   - packages/*
 
 # Catalogs: one place to pin every external version, referenced from package
-# manifests as `catalog:`. Upgrading is a one-line change here instead of an
+# manifests as "catalog:". Upgrading is a one-line change here instead of an
 # edit to every package that depends on it, and two packages cannot drift onto
 # different versions of the same library.
 #
-# `catalog:` is rewritten to the real range on publish, exactly like
-# `workspace:`, so published packages work for consumers on any package manager.
+# The protocol is rewritten to the real range on publish, exactly like
+# "workspace:", so published packages work for consumers on any package manager.
 catalog:
+  '@eslint/js': ^10.0.1
   '@modelcontextprotocol/sdk': ^1.30.0
   '@types/node': ^22.10.2
   ajv: ^8.17.1
+  eslint: ^10.9.1
+  knip: ^6.32.2
   playwright: ^1.62.1
-  tsx: ^4.19.2
   typescript: ^5.7.2
-  vitest: ^2.1.8
+  typescript-eslint: ^8.68.0
+  # Not imported anywhere: declared so vitest's transitive vite resolves above
+  # the `server.fs.deny` advisory that <=6.4.2 carries.
+  vite: ^8.2.2
+  vitest: ^4.1.11

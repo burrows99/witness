@@ -1,5 +1,7 @@
 import type { Plan, Story } from '../../src/types.js'
 
+export { withReversedKeys } from '../../../../test/helpers/objects.js'
+
 export function minimalStory(): Story {
   return {
     schema: 'swe-verify/story@1',

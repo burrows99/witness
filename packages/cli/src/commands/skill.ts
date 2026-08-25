@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, dirname, join, relative } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { adapterReport } from '@swe-verify/probe-dap'
 import { EXIT, UsageError } from '../errors.js'
 import { loadFullPlans } from '../workspace.js'
@@ -131,4 +131,3 @@ function projectName(cwd: string): string {
   return basename(cwd) || 'this project'
 }
 
-export { relative }

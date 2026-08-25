@@ -79,8 +79,8 @@ describe('redactStory — every field that can carry captured state', () => {
     const out = redactStory(story, policy)
     const lp = out.events[0] as { vars: Record<string, unknown> }
     expect(lp.vars).toEqual({ password: REDACTED, total: 42 })
-    expect((out.events[1] as { attrs: Record<string, unknown> }).attrs['token']).toBe(REDACTED)
-    expect((out.events[2] as { args: Record<string, unknown> }).args['password']).toBe(REDACTED)
+    expect((out.events[1] as { attrs: Record<string, unknown> }).attrs.token).toBe(REDACTED)
+    expect((out.events[2] as { args: Record<string, unknown> }).args.password).toBe(REDACTED)
     expect(out.assertions[0]!.actual).toEqual({ token: REDACTED })
   })
 

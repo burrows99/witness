@@ -1,4 +1,4 @@
-import type { Driver, PlanStep, RunContext, StepResult, StoryArtifact } from '@swe-verify/core'
+import { readNumber, readString, type Driver, type PlanArgs, type PlanStep, type RunContext, type StepResult } from '@swe-verify/core'
 import type { ArtifactStore } from '@swe-verify/recorders'
 import { newSpanId, traceparent } from './trace.js'
 
@@ -56,28 +56,22 @@ export class ApiDriver implements Driver {
       }
     }
 
-    const args = (step.args ?? {}) as {
-      path?: string
-      query?: Record<string, string | number | boolean>
-      headers?: Record<string, string>
-      body?: unknown
-      timeoutMs?: number
-    }
-
-    const url = resolveUrl(args.path ?? '/', args.query, ctx.baseUrl)
+    const args: PlanArgs = step.args ?? {}
+    const requestBody = args.body
+    const url = resolveUrl(readString(args, 'path', '/'), readRecord(args, 'query'), ctx.baseUrl)
     const spanId = newSpanId()
     const headers: Record<string, string> = {
       // The correlation id goes on the wire, not into a log line to be
       // matched up later (FR-13).
       traceparent: traceparent(ctx.traceId, spanId),
       accept: 'application/json, text/plain, */*',
-      ...args.headers,
+      ...readRecord(args, 'headers'),
     }
-    const hasBody = args.body !== undefined && method !== 'GET' && method !== 'HEAD'
+    const hasBody = requestBody !== undefined && method !== 'GET' && method !== 'HEAD'
     if (hasBody && !headers['content-type']) headers['content-type'] = 'application/json'
 
     const controller = new AbortController()
-    const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS
+    const timeoutMs = readNumber(args, 'timeoutMs', DEFAULT_TIMEOUT_MS)
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     const startedMono = ctx.monoNs()
     const wall = new Date().toISOString()
@@ -86,17 +80,17 @@ export class ApiDriver implements Driver {
       const response = await fetch(url, {
         method,
         headers,
-        ...(hasBody ? { body: typeof args.body === 'string' ? args.body : JSON.stringify(args.body) } : {}),
+        ...(hasBody ? { body: typeof requestBody === 'string' ? requestBody : JSON.stringify(requestBody) } : {}),
         signal: controller.signal,
       })
       const durationMs = Math.max(0, (ctx.monoNs() - startedMono) / 1e6)
-      const body = await readBody(response)
+      const responseBody = await readBody(response)
 
-      const request: ApiRequestRecord = { method, url, headers, ...(hasBody ? { body: args.body } : {}) }
+      const request: ApiRequestRecord = { method, url, headers, ...(hasBody ? { body: requestBody } : {}) }
       const record: ApiResponseRecord = {
         status: response.status,
         headers: Object.fromEntries(response.headers.entries()),
-        body,
+        body: responseBody,
         durationMs,
       }
 
@@ -168,6 +162,16 @@ function describe(error: unknown): string {
   // "fetch failed", which tells a developer nothing.
   const cause = err.cause?.code ?? err.cause?.message
   return cause ? `${err.message} (${cause})` : String(err.message ?? error)
+}
+
+/** A plan may omit a map entirely; anything present must actually be one. */
+function readRecord(args: PlanArgs, key: string): Record<string, string | number | boolean> {
+  const value = args[key]
+  if (value === undefined || value === null) return {}
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new TypeError(`plan argument "${key}" must be an object of values`)
+  }
+  return value as Record<string, string | number | boolean>
 }
 
 function resolveUrl(path: string, query: Record<string, string | number | boolean> | undefined, baseUrl: string | undefined): string {

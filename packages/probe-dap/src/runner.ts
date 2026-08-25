@@ -47,7 +47,7 @@ export interface ProbeRunResult {
 }
 
 export async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
+  return await new Promise((resolve, reject) => {
     const server = createServer()
     server.on('error', reject)
     server.listen(0, '127.0.0.1', () => {
@@ -81,7 +81,7 @@ export async function runWithProbes(options: ProbeRunOptions): Promise<ProbeRunR
   let stderr = ''
   const child: ChildProcess = spawn(command.command, command.args, {
     cwd: options.cwd,
-    env: { ...process.env, ...command.env, ...options.env } as NodeJS.ProcessEnv,
+    env: { ...process.env, ...command.env, ...options.env },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })

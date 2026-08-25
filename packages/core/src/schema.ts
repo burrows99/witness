@@ -17,9 +17,9 @@ export type ValidationResult<T> =
 const ajv = new Ajv({ allErrors: true, strict: false, allowUnionTypes: true })
 
 const validators = {
-  plan: ajv.compile(planSchema as object) as ValidateFunction,
-  story: ajv.compile(storySchema as object) as ValidateFunction,
-  config: ajv.compile(configSchema as object) as ValidateFunction,
+  plan: ajv.compile(planSchema as object),
+  story: ajv.compile(storySchema as object),
+  config: ajv.compile(configSchema as object),
 }
 
 const SCHEMA_RE = /^swe-verify\/(plan|story|config)@(\d+)$/

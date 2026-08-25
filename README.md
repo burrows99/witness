@@ -113,6 +113,34 @@ no step reaches, a renamed response field, money rounded to the wrong unit. The 
 comments, docstrings, reflowed whitespace, reordered imports, and an equivalent rewrite of a line
 the plan does drive.
 
+## Static analysis
+
+Five layers, each earning its place by catching something the others cannot. `pnpm check` runs the
+fast ones together.
+
+| Layer | Catches | Command |
+|---|---|---|
+| `tsc --build` | type errors in shipped code | `pnpm typecheck` |
+| `tsc -p tsconfig.eslint.json` | type errors in **tests**, which the build configs exclude | `pnpm typecheck:all` |
+| ESLint + typescript-eslint, type-aware | floating promises, misused promises, non-exhaustive switches over the event union, unsafe `any` reaching a validated boundary | `pnpm lint` |
+| knip | unused files, exports and dependencies across the workspace | `pnpm knip` |
+| `pnpm audit` + CodeQL | vulnerable dependencies, security patterns | CI |
+
+Two of these paid for themselves immediately. Type-checking the tests — which had never been
+checked, because every `tsconfig.json` includes only `src/` — found two assertions that proved
+nothing: `{ coverage: story.coverage, ...story }` looks like a reordering but the spread puts the key
+straight back, so the "seal is independent of key order" test was vacuous. Both now reorder keys for
+real, and both still pass. knip found a package declaring a dependency it never imported, and four
+exports nothing consumed.
+
+Style is deliberately not enforced. A formatter would rewrite six thousand lines to settle questions
+that have never cost this project anything, and the diff would bury the next real change.
+
+**What this setup does not catch:** an unused export that a barrel file re-exports. `knip
+--include-entry-exports` reports those, but in a library monorepo `export * from './seal.js'` *is*
+the public surface, and running it reports 61 legitimate API entries. It is a useful thing to read
+occasionally and a bad thing to gate on.
+
 ## Test tiers
 
 The pyramid is inverted on purpose: the risk is not "is the logic correct" but "does this work on

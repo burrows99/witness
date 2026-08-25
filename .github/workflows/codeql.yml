@@ -1,0 +1,30 @@
+name: codeql
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  schedule:
+    # Weekly: a dependency that was clean on merge does not stay clean.
+    - cron: '17 4 * * 1'
+
+jobs:
+  analyze:
+    name: analyze javascript-typescript
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # Nothing is generated at build time, so CodeQL can read the sources
+          # directly rather than watching a build.
+          build-mode: none
+          queries: security-and-quality
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript-typescript

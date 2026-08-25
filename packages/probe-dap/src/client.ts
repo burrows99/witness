@@ -136,7 +136,7 @@ export class DapClient {
         type: 'response',
         request_seq: message.seq,
         success: false,
-        command: String(message.command ?? ''),
+        command: typeof message.command === 'string' ? message.command : '',
         message: 'swe-verify runs headless and cannot host a terminal',
       }))
     }

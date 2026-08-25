@@ -1,4 +1,4 @@
-import type { AssertionKind, AssertionResult, StoryView } from '@swe-verify/core'
+import { readString, type AssertionKind, type AssertionResult, type StoryView } from '@swe-verify/core'
 
 /**
  * Assertion kinds for the API tier.
@@ -36,7 +36,7 @@ export const httpJson: AssertionKind = {
       return { status: 'skipped', expected: spec.equals, diff: `step ${step} produced no HTTP response to assert on` }
     }
 
-    const path = String(spec.path ?? 'body')
+    const path = readString(spec, 'path', 'body')
     const found = readPath(response, path)
     if (found.missing) {
       return {
@@ -49,7 +49,7 @@ export const httpJson: AssertionKind = {
 
     if (spec.contains !== undefined) {
       const haystack = typeof found.value === 'string' ? found.value : JSON.stringify(found.value)
-      const needle = String(spec.contains)
+      const needle = readString(spec, 'contains')
       return haystack.includes(needle)
         ? { status: 'pass', expected: needle, actual: found.value }
         : { status: 'fail', expected: needle, actual: found.value, diff: `${path}: expected to contain ${JSON.stringify(needle)}, got ${JSON.stringify(found.value)}` }

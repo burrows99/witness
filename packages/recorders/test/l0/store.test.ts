@@ -18,7 +18,7 @@ const store = (over = {}) => new ArtifactStore({
 
 describe('ArtifactStore', () => {
   it('writes an artefact and describes it for the story', () => {
-    const artifact = store().writeJson({ kind: 'snapshot', name: 'a11y/0002-after.json', stepSeq: 2, readableBy: ['agent'] }, { role: 'button' })
+    const artifact = store().writeJson({ kind: 'snapshot', name: 'a11y/0002-after.json', stepSeq: 2, readableBy: ['agent'] }, { role: 'button' })!
     expect(artifact.path).toBe('artifacts/a11y/0002-after.json')
     expect(artifact.sha256).toMatch(/^sha256:[0-9a-f]{64}$/)
     expect(artifact.step_seq).toBe(2)
@@ -26,26 +26,26 @@ describe('ArtifactStore', () => {
   })
 
   it('records paths relative to the run directory, never absolute', () => {
-    const artifact = store().writeJson({ kind: 'transcript', name: 'api/1.json', readableBy: ['agent'] }, {})
+    const artifact = store().writeJson({ kind: 'transcript', name: 'api/1.json', readableBy: ['agent'] }, {})!
     expect(artifact.path.startsWith('/')).toBe(false)
     expect(artifact.path).not.toContain(dir)
   })
 
   it('redacts before the bytes reach disk (NFR-5)', () => {
-    const artifact = store().writeJson({ kind: 'transcript', name: 'api/1.json', readableBy: ['agent'] }, { password: 'hunter2', ok: 1 })
+    const artifact = store().writeJson({ kind: 'transcript', name: 'api/1.json', readableBy: ['agent'] }, { password: 'hunter2', ok: 1 })!
     const onDisk = readFileSync(join(dir, artifact.path), 'utf8')
     expect(onDisk).not.toContain('hunter2')
     expect(onDisk).toContain('[redacted]')
   })
 
   it('redacts binary-adjacent secrets in text artefacts too', () => {
-    const artifact = store().writeText({ kind: 'log', name: 'app.log', readableBy: ['human'] }, 'GET / with Bearer abc123\n')
+    const artifact = store().writeText({ kind: 'log', name: 'app.log', readableBy: ['human'] }, 'GET / with Bearer abc123\n')!
     expect(readFileSync(join(dir, artifact.path), 'utf8')).not.toContain('abc123')
   })
 
   it('declares who can read each artefact (FR-15)', () => {
-    expect(store().writeJson({ kind: 'snapshot', name: 'a.json', readableBy: ['agent'] }, {}).readableBy).toEqual(['agent'])
-    expect(store().writeBinary({ kind: 'video', name: 'v.webm', readableBy: ['human'] }, Buffer.from([1, 2])).readableBy).toEqual(['human'])
+    expect(store().writeJson({ kind: 'snapshot', name: 'a.json', readableBy: ['agent'] }, {})!.readableBy).toEqual(['agent'])
+    expect(store().writeBinary({ kind: 'video', name: 'v.webm', readableBy: ['human'] }, Buffer.from([1, 2]))!.readableBy).toEqual(['human'])
   })
 
   it('drops human-readable artefacts first when the budget is exhausted', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { sealStory, verifySeal } from '../../src/seal.js'
 import { canonicalJson, sha256 } from '../../src/canonical.js'
-import { minimalStory } from '../helpers/fixtures.js'
+import { minimalStory, withReversedKeys } from '../helpers/fixtures.js'
 
 describe('canonicalJson', () => {
   it('sorts object keys at every depth', () => {
@@ -29,8 +29,9 @@ describe('sealStory / verifySeal', () => {
   })
 
   it('is independent of key insertion order — a third party can recompute it', () => {
-    const a = sealStory(minimalStory())
-    const reordered = JSON.parse(JSON.stringify({ coverage: a.coverage, ...a }))
+    const sealed = sealStory(minimalStory())
+    const reordered = withReversedKeys(sealed)
+    expect(Object.keys(reordered)).not.toEqual(Object.keys(sealed))
     expect(verifySeal(reordered)).toBe(true)
   })
 

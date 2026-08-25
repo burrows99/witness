@@ -11,7 +11,6 @@ import { runCommand } from './commands/run.js'
 import { verifyCommand } from './commands/verify.js'
 import { showCommand } from './commands/show.js'
 import { skillCommand } from './commands/skill.js'
-export { VERSION } from './version.js'
 
 import { VERSION } from './version.js'
 
@@ -82,8 +81,12 @@ export async function run(options: RunOptions): Promise<number> {
       case 'verify': result = await verifyCommand(ctx); break
       case 'show': result = await showCommand(ctx); break
       case 'skill': result = await skillCommand(ctx); break
-      default:
-        throw new UsageError(`unhandled command ${args.command}`)
+      default: {
+        // Provably unreachable: every Command has a case above. The binding
+        // is what makes adding a command without handling it a type error.
+        const unhandled: never = args.command
+        throw new UsageError(`unhandled command ${String(unhandled)}`)
+      }
     }
 
     if (json) stdout.write(`${JSON.stringify(result.json)}\n`)

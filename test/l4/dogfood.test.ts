@@ -47,7 +47,7 @@ suite('the binary works, as a binary (NFR-6)', () => {
     for (const args of [['doctor', '--json'], ['gate', '--json']]) {
       const result = swe(args)
       const payload = result.stdout.trim() || result.stderr.trim()
-      expect(() => JSON.parse(payload.split('\n').pop() ?? ''), args.join(' ')).not.toThrow()
+      expect(() => { JSON.parse(payload.split('\n').pop() ?? '') }, args.join(' ')).not.toThrow()
     }
   })
 })

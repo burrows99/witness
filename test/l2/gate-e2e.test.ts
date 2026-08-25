@@ -259,7 +259,7 @@ describe('CLI contract (FR-7, FR-8)', () => {
     repo.writePlan(planFor('checkout', ['src/**']))
     makeChange()
     const r = await cli(repo, ['gate', '--base', base, '--json'])
-    expect(() => JSON.parse(r.stdout)).not.toThrow()
+    expect(() => { JSON.parse(r.stdout) }).not.toThrow()
   })
 
   it('exits 3 on an unknown flag rather than silently ignoring it', async () => {

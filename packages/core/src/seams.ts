@@ -97,6 +97,6 @@ export interface AssertionKind {
 /** A recorder *captures evidence*. */
 export interface Recorder {
   readonly name: string
-  readonly readableBy: readonly ('agent' | 'human')[]
+  readonly readableBy: ReadonlyArray<'agent' | 'human'>
   capture(step: PlanStep, result: StepResult, ctx: RunContext): Promise<StoryArtifact[]>
 }

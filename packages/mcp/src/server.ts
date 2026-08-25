@@ -51,7 +51,7 @@ export function createServer(options: McpServerOptions = {}): Server {
   }))
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const args = (request.params.arguments ?? {}) as Record<string, unknown>
+    const args = (request.params.arguments ?? {})
     let argv: string[]
     try {
       argv = argvFor(request.params.name, args)

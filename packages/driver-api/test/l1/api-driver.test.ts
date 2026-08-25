@@ -25,7 +25,7 @@ beforeAll(async () => {
     let body = ''
     req.on('data', (chunk) => { body += chunk })
     req.on('end', () => {
-      received.push({ method: req.method!, url: req.url!, headers: req.headers as Record<string, unknown>, body })
+      received.push({ method: req.method!, url: req.url!, headers: req.headers, body })
       if (req.url?.startsWith('/orders/latest')) {
         res.writeHead(200, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ status: 'confirmed', total: 42, items: [{ sku: 'a' }, { sku: 'b' }] }))
@@ -83,7 +83,7 @@ describe('ApiDriver', () => {
 
   it('injects a traceparent so the server frame joins the same story (FR-13)', async () => {
     await new ApiDriver({ store: store() }).execute(step({ args: { path: '/' } }), ctx())
-    const header = received.at(-1)!.headers['traceparent'] as string
+    const header = received.at(-1)!.headers.traceparent as string
     expect(parseTraceparent(header)?.traceId).toBe('a'.repeat(32))
   })
 

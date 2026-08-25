@@ -4,7 +4,9 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig, loadPlans, planSha, scaffold, runDir, writeStory, readStory } from '../../src/workspace.js'
+import type { Story } from '@swe-verify/core'
 import { UsageError } from '../../src/errors.js'
+import { withReversedKeys } from '../../../../test/helpers/objects.js'
 import { diffAgainst, gitHeadSha, isGitRepo, mergeBase } from '../../src/git.js'
 
 let dir: string
@@ -99,7 +101,8 @@ describe('loadPlans', () => {
   it('hashes the plan canonically, so reformatting it does not stale a story', () => {
     const plan = writePlan('checkout')
     const a = planSha(plan)
-    const reordered = JSON.parse(JSON.stringify({ steps: plan.steps, ...plan }))
+    const reordered = withReversedKeys(plan)
+    expect(Object.keys(reordered)).not.toEqual(Object.keys(plan))
     expect(planSha(reordered)).toBe(a)
   })
 
@@ -163,7 +166,7 @@ describe('git integration', () => {
 
 describe('run directory', () => {
   it('writes and reads back a story under .swe-verify/runs/<id>', () => {
-    const story = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'story.json'), 'utf8'))
+    const story = JSON.parse(readFileSync(join(import.meta.dirname, 'fixtures', 'story.json'), 'utf8')) as Story
     const path = writeStory(dir, story.run_id, story)
     expect(path).toContain(join('.swe-verify', 'runs', story.run_id))
     expect(readStory(path).run_id).toBe(story.run_id)

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { evaluate, type GateResult, type Story } from '@swe-verify/core'
-import { CollectTarget, createProvider, detectProvider, textReport, type ProviderSelector } from '@swe-verify/vcs'
+import { CollectTarget, createProvider, detectProvider, type ProviderSelector } from '@swe-verify/vcs'
 import { defaultBase, diffAgainst, isGitRepo } from '../git.js'
 import { exitCodeFor, UsageError } from '../errors.js'
 import { loadPlans, paths, readStory, runDir } from '../workspace.js'
@@ -98,4 +98,3 @@ export function latestRun(cwd: string): string | null {
   return candidates[0] ?? null
 }
 
-export { textReport }

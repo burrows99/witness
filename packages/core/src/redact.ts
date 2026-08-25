@@ -97,8 +97,8 @@ function walk(value: unknown, policy: RedactionPolicy, seen: WeakSet<object>): u
   }
 
   if (typeof value === 'object') {
-    if (seen.has(value as object)) return '[cycle]'
-    seen.add(value as object)
+    if (seen.has(value)) return '[cycle]'
+    seen.add(value)
     try {
       if (Array.isArray(value)) return value.map((v) => walk(v, policy, seen))
       const out: Record<string, unknown> = {}
@@ -109,7 +109,7 @@ function walk(value: unknown, policy: RedactionPolicy, seen: WeakSet<object>): u
       }
       return out
     } finally {
-      seen.delete(value as object)
+      seen.delete(value)
     }
   }
   return REDACTED

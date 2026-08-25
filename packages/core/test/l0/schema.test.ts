@@ -9,7 +9,7 @@ describe('validateStory — story@1', () => {
   })
 
   it('rejects a missing schema field with SV002', () => {
-    const s = minimalStory() as Record<string, unknown>
+    const s = minimalStory() as unknown as Record<string, unknown>
     delete s.schema
     const r = validateStory(s)
     expect(r.ok).toBe(false)
@@ -66,7 +66,7 @@ describe('validatePlan — plan@1', () => {
   })
 
   it('requires an intent and a scope', () => {
-    const p = minimalPlan() as Record<string, unknown>
+    const p = minimalPlan() as unknown as Record<string, unknown>
     delete p.scope
     expect(validatePlan(p).ok).toBe(false)
   })
@@ -117,7 +117,10 @@ describe('resolveConfig — defaults are the free tier', () => {
   })
 
   it('keeps user values over defaults', () => {
-    const c = resolveConfig({ schema: 'swe-verify/config@1', coverage: { defensive: 'require', waiverCapPct: 0 } })
+    const c = resolveConfig({
+      schema: 'swe-verify/config@1',
+      coverage: { policy: 'all-executable', defensive: 'require', waiverCapPct: 0 },
+    })
     expect(c.coverage.defensive).toBe('require')
     expect(c.coverage.waiverCapPct).toBe(0)
   })

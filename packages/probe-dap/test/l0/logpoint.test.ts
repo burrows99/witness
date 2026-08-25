@@ -54,7 +54,7 @@ describe('parseLogOutput', () => {
 
   it('tolerates an adapter that could not evaluate an expression', () => {
     const out = parseLogOutput(fired({}, ['<error: name not defined>', '2']))
-    expect(out!.vars['bonus']).toBe('<error: name not defined>')
+    expect(out!.vars.bonus).toBe('<error: name not defined>')
     expect(out!.probeId).toBe('p001')
   })
 

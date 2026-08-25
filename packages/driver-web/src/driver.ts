@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 import type { Browser, BrowserContext, ConsoleMessage, Page } from 'playwright'
-import type { Driver, PlanStep, RunContext, StepResult, StoryArtifact, UnsequencedEvent } from '@swe-verify/core'
+import { has, readNumber, readString, type Driver, type PlanArgs, type PlanStep, type RunContext, type StepResult, type StoryArtifact, type UnsequencedEvent } from '@swe-verify/core'
 import { newSpanId, traceparent } from '@swe-verify/driver-api'
 import type { ArtifactStore } from '@swe-verify/recorders'
 
@@ -67,8 +67,8 @@ export class WebDriver implements Driver {
     }
 
     const page = await this.ensurePage(ctx)
-    const args = (step.args ?? {}) as Record<string, unknown>
-    const timeout = Number(args.timeoutMs ?? 10_000)
+    const args: PlanArgs = step.args ?? {}
+    const timeout = readNumber(args, 'timeoutMs', 10_000)
     const startedMono = ctx.monoNs()
     const wall = new Date().toISOString()
 
@@ -135,13 +135,13 @@ export class WebDriver implements Driver {
   private async perform(
     page: Page,
     step: PlanStep,
-    args: Record<string, unknown>,
+    args: PlanArgs,
     timeout: number,
     ctx: RunContext,
   ): Promise<Record<string, unknown>> {
     switch (step.action) {
       case 'goto': {
-        const target = String(args.url ?? args.path ?? '/')
+        const target = has(args, 'url') ? readString(args, 'url') : readString(args, 'path', '/')
         const url = /^https?:\/\//.test(target) ? target : new URL(target, ctx.baseUrl ?? 'http://127.0.0.1').toString()
         const response = await page.goto(url, { timeout, waitUntil: 'load' })
         return { status: response?.status() }
@@ -150,28 +150,28 @@ export class WebDriver implements Driver {
         await this.locator(page, args).click({ timeout })
         return {}
       case 'fill': {
-        const value = String(args.value ?? '')
+        const value = readString(args, 'value', '')
         await this.locator(page, args).fill(value, { timeout })
         return { value }
       }
       case 'press':
-        await page.keyboard.press(String(args.key ?? 'Enter'))
+        await page.keyboard.press(readString(args, 'key', 'Enter'))
         return {}
       case 'select':
-        await this.locator(page, args).selectOption(String(args.value ?? ''), { timeout })
+        await this.locator(page, args).selectOption(readString(args, 'value', ''), { timeout })
         return {}
       case 'waitFor': {
-        if (args.text !== undefined) {
-          await page.getByText(String(args.text), { exact: false }).first().waitFor({ timeout, state: 'visible' })
+        if (has(args, 'text')) {
+          await page.getByText(readString(args, 'text'), { exact: false }).first().waitFor({ timeout, state: 'visible' })
           return {}
         }
-        await this.locator(page, args).waitFor({ timeout, state: (args.state as 'visible') ?? 'visible' })
+        await this.locator(page, args).waitFor({ timeout, state: readState(args) })
         return {}
       }
       case 'screenshot':
         return {}
       case 'evaluate':
-        return { result: await page.evaluate(String(args.expression ?? '')) }
+        return { result: await page.evaluate(readString(args, 'expression', '')) }
       default:
         throw new Error(`unhandled action "${step.action}"`)
     }
@@ -182,12 +182,15 @@ export class WebDriver implements Driver {
    * breaks on a refactor that changed nothing a user can see, and a plan is
    * meant to be reviewable by a human.
    */
-  private locator(page: Page, args: Record<string, unknown>) {
-    if (args.role) return page.getByRole(args.role as never, { name: args.name as string | undefined }).first()
-    if (args.label) return page.getByLabel(String(args.label)).first()
-    if (args.text) return page.getByText(String(args.text), { exact: false }).first()
-    if (args.testId) return page.getByTestId(String(args.testId)).first()
-    if (args.selector) return page.locator(String(args.selector)).first()
+  private locator(page: Page, args: PlanArgs) {
+    if (has(args, 'role')) {
+      const name = has(args, 'name') ? readString(args, 'name') : undefined
+      return page.getByRole(readString(args, 'role') as Parameters<Page['getByRole']>[0], { name }).first()
+    }
+    if (has(args, 'label')) return page.getByLabel(readString(args, 'label')).first()
+    if (has(args, 'text')) return page.getByText(readString(args, 'text'), { exact: false }).first()
+    if (has(args, 'testId')) return page.getByTestId(readString(args, 'testId')).first()
+    if (has(args, 'selector')) return page.locator(readString(args, 'selector')).first()
     throw new Error('a web step needs one of: role+name, label, text, testId or selector')
   }
 
@@ -277,6 +280,17 @@ export class WebDriver implements Driver {
     })
     return this.page
   }
+}
+
+const WAIT_STATES = ['attached', 'detached', 'visible', 'hidden'] as const
+type WaitState = (typeof WAIT_STATES)[number]
+
+function readState(args: PlanArgs): WaitState {
+  const state = readString(args, 'state', 'visible')
+  if (!(WAIT_STATES as readonly string[]).includes(state)) {
+    throw new TypeError(`plan argument "state" must be one of ${WAIT_STATES.join(', ')}, got "${state}"`)
+  }
+  return state as WaitState
 }
 
 function safePath(url: string): string {

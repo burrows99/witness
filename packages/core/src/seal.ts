@@ -19,7 +19,7 @@ export function sealStory(story: Story): Story {
 
 export function verifySeal(story: Story): boolean {
   const seal = story.seal
-  if (!seal || seal.algo !== 'sha256') return false
+  if (seal?.algo !== 'sha256') return false
   const { seal: _seal, ...unsealed } = story
   return sha256(canonicalJson(unsealed)) === seal.value
 }

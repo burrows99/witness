@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { verifySeal, type GateResult, type Story } from '@swe-verify/core'
 import { adapterFor } from '@swe-verify/probe-dap'
@@ -86,7 +86,6 @@ afterEach(() => repo.dispose())
 
 const storyOf = (): Story => {
   const runs = join(repo.dir, '.swe-verify', 'runs')
-  const { readdirSync } = require('node:fs') as typeof import('node:fs')
   const id = readdirSync(runs).sort().at(-1)!
   return JSON.parse(readFileSync(join(runs, id, 'story.json'), 'utf8')) as Story
 }

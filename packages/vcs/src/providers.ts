@@ -1,6 +1,6 @@
 import type { Bypass, GateResult } from '@swe-verify/core'
 import { DEFAULT_BYPASS_LABEL, explicitBypass, labelBypass } from './bypass.js'
-import { headline, locusOf, markdownReport, textReport } from './render.js'
+import { headline, markdownReport, textReport } from './render.js'
 import type { ChangeContext, ProviderName, ProviderOptions, PublishTarget, VcsProvider } from './types.js'
 
 abstract class BaseProvider implements VcsProvider {
@@ -145,8 +145,4 @@ export class BitbucketProvider extends BaseProvider {
     for (const line of textReport(result)) target.write(line)
     target.summary(markdownReport(result))
   }
-}
-
-export function findingSummary(result: GateResult): string {
-  return result.findings.map((f) => `${f.code} ${locusOf(f)}`.trim()).join('; ')
 }

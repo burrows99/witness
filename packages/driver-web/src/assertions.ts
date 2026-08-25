@@ -1,4 +1,4 @@
-import type { AssertionKind, AssertionResult } from '@swe-verify/core'
+import { has, readString, type AssertionKind, type AssertionResult } from '@swe-verify/core'
 import type { WebDriver } from './driver.js'
 
 /**
@@ -12,7 +12,7 @@ export function uiText(driver: WebDriver): AssertionKind {
   return {
     kind: 'ui-text',
     async evaluate(spec, view, step): Promise<AssertionResult> {
-      const expected = String(spec.visible ?? spec.text ?? '')
+      const expected = has(spec, 'visible') ? readString(spec, 'visible') : readString(spec, 'text', '')
       if (!view.stepResult(step)) {
         return { status: 'skipped', expected, diff: `step ${step} did not run, so there is no page to look at` }
       }

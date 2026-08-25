@@ -169,7 +169,7 @@ describe('draining probe output', () => {
     adapter.output("name 'tier' is not defined\n")
     await new Promise((r) => setTimeout(r, 20))
     expect(s.hitsFor('p001')).toBe(1)
-    expect(s.drain()[0]!.vars['tier']).toMatch(/not defined/)
+    expect(s.drain()[0]!.vars.tier).toMatch(/not defined/)
     await s.uninstall()
   })
 

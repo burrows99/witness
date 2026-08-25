@@ -10,7 +10,6 @@ import {
   type StoryAssertion,
   type StoryArtifact,
   type StoryDiagnostic,
-  type StoryEvent,
   type UnsequencedEvent,
 } from '@swe-verify/core'
 
@@ -89,7 +88,7 @@ export function assembleCoverage(diff: NormalisedDiff, probes: readonly ProbeOut
 export function assembleStory(params: AssembleParams): Story {
   // `seq` is assigned here, once, in causal order — so every consumer reads
   // the same story from the same file (TDD §7.1).
-  const ordered = orderEvents(params.events.map((event, index) => ({ ...event, seq: index })) as StoryEvent[])
+  const ordered = orderEvents(params.events.map((event, index) => ({ ...event, seq: index })))
   const events = ordered.map((event, index) => ({ ...event, seq: index + 1 }))
 
   const story: Story = {

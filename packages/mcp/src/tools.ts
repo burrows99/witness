@@ -11,7 +11,7 @@
  * and the gate still holds.
  */
 
-export interface ToolFlag {
+interface ToolFlag {
   /** Argument name as the agent supplies it. */
   name: string
   /** CLI flag it maps to. */

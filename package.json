@@ -11,22 +11,31 @@
   },
   "scripts": {
     "build": "tsc --build",
+    "check": "pnpm typecheck && pnpm typecheck:all && pnpm lint && pnpm knip && pnpm test:l0 && pnpm test:arch",
     "clean": "tsc --build --clean && pnpm -r exec rm -rf dist",
-    "typecheck": "tsc --build --force",
+    "knip": "knip",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "swe-verify": "node packages/cli/dist/bin.js",
     "test": "vitest run",
+    "test:arch": "vitest run --project arch",
     "test:l0": "vitest run --project l0",
     "test:l1": "vitest run --project l1",
     "test:l2": "vitest run --project l2",
     "test:l3": "vitest run --project l3",
     "test:l4": "vitest run --project l4",
-    "test:arch": "vitest run --project arch",
-    "swe-verify": "node packages/cli/dist/bin.js"
+    "typecheck": "tsc --build --force",
+    "typecheck:all": "tsc --noEmit -p tsconfig.eslint.json"
   },
   "devDependencies": {
+    "@eslint/js": "catalog:",
     "@types/node": "catalog:",
+    "eslint": "catalog:",
+    "knip": "catalog:",
     "playwright": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:",
+    "typescript-eslint": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

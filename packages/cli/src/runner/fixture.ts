@@ -36,15 +36,8 @@ export interface FixtureOptions {
   log(line: string): void
 }
 
-interface ProcessFixture extends PlanFixture {
-  language?: string
-  program?: string
-  baseUrl?: string
-  attach?: { host?: string; port?: number }
-}
-
 export async function startFixture(options: FixtureOptions): Promise<FixtureHandle> {
-  const fixture = (options.fixture ?? { kind: 'none' }) as ProcessFixture
+  const fixture: PlanFixture = options.fixture ?? { kind: 'none' }
   const cwd = fixture.file ? resolve(options.cwd, join(fixture.file, '..')) : options.cwd
 
   if (fixture.kind === 'compose') {
@@ -116,7 +109,7 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
       PORT: String(appPort),
       SWE_VERIFY_APP_PORT: String(appPort),
       ...fixture.env,
-    } as NodeJS.ProcessEnv,
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })

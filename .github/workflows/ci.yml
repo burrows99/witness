@@ -9,6 +9,26 @@ jobs:
   # The tiers run in the order the design puts them in: cheap logic first,
   # then adapters, then real apps, then the mutation harness that proves the
   # gate would have caught anything at all.
+  static:
+    name: static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Type-checks the build graph, then everything the build excludes —
+      # tests included, which is where two vacuous assertions were hiding.
+      - run: pnpm typecheck
+      - run: pnpm typecheck:all
+      - run: pnpm lint
+      # Unused exports, files and dependencies. In a nine-package workspace
+      # this is how a phantom dependency gets noticed.
+      - run: pnpm knip
+      - name: audit dependencies
+        run: pnpm audit --audit-level=high
+
   unit:
     name: L0 unit + architecture rules
     runs-on: ubuntu-latest
@@ -18,7 +38,6 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
       - run: pnpm test:l0
       - run: pnpm test:arch
 
