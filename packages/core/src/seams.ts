@@ -130,3 +130,68 @@ export interface Recorder {
   /** Everything captured, declared with its readers. */
   stop(): Promise<StoryArtifact[]>
 }
+
+/** The part of a recorder a contract check needs — so a stub can be checked too. */
+export interface RecorderDeclaration {
+  readonly name: string
+  readonly produces: readonly string[]
+}
+
+export interface RecordingCheckOptions {
+  /**
+   * SV030: at least one artefact an agent can read. The agent is the primary
+   * user of this system and cannot watch a video, so a run whose only output
+   * is an mp4 has produced nothing it can check.
+   */
+  requireAgentReadable?: boolean
+}
+
+/**
+ * Hold a recorder to what it declared.
+ *
+ * `produces` is a promise about output, and a promise nothing checks is a
+ * comment. Keeping the check here — pure, in `core`, naming no recording
+ * technology — is what lets the runner, the conformance suite and a
+ * third-party recorder's own tests apply exactly the same one. A recorder
+ * that swaps Playwright for ffmpeg-screen or VHS for asciinema changes
+ * nothing about what a consumer may expect.
+ *
+ * Returns human-readable violations, empty when the output is conformant.
+ */
+export function validateRecording(
+  recorder: RecorderDeclaration,
+  artifacts: readonly StoryArtifact[],
+  options: RecordingCheckOptions = {},
+): string[] {
+  const violations: string[] = []
+  const declared = new Set(recorder.produces)
+
+  for (const kind of recorder.produces) {
+    if (!isArtifactKind(kind)) {
+      violations.push(`recorder "${recorder.name}" declares produces: "${kind}", which is not an artefact kind`)
+    }
+  }
+
+  for (const artifact of artifacts) {
+    if (!isArtifactKind(artifact.kind)) {
+      violations.push(`recorder "${recorder.name}" emitted "${artifact.kind}" (${artifact.path}), which is not an artefact kind`)
+    } else if (!declared.has(artifact.kind)) {
+      violations.push(
+        `recorder "${recorder.name}" emitted "${artifact.kind}" (${artifact.path}) but produces only ${[...declared].join(', ')}`,
+      )
+    }
+    if (artifact.readableBy.length === 0) {
+      violations.push(`recorder "${recorder.name}" emitted ${artifact.path} with no declared reader`)
+    }
+  }
+
+  if (options.requireAgentReadable && artifacts.length > 0) {
+    if (!artifacts.some((a) => a.readableBy.includes('agent'))) {
+      violations.push(
+        `recorder "${recorder.name}" produced nothing an agent can read — a video alone is not evidence the agent can check`,
+      )
+    }
+  }
+
+  return violations
+}

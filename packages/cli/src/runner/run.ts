@@ -19,12 +19,13 @@ import {
   type StoryAssertion,
   type StoryDiagnostic,
   type Recorder,
+  validateRecording,
   type UnsequencedEvent,
   type StoryView,
 } from '@swe-verify/core'
 import { DapSession, type InstalledProbe } from '@swe-verify/probe-dap'
 import { ApiDriver, assertionKinds, newTraceId } from '@swe-verify/driver-api'
-import { ArtifactStore, BrowserRecorder, slideDocument, type Slide } from '@swe-verify/recorders'
+import { ArtifactStore, createRecorders, slideDocument, type Slide, type TerminalSource } from '@swe-verify/recorders'
 import { HarnessError, UsageError } from '../errors.js'
 import { runDir as runDirFor } from '../workspace.js'
 import { startFixture, waitForReady } from './fixture.js'
@@ -52,7 +53,12 @@ export interface RunOptions {
    * Film the run. Recording is a property of the browser context, so it is
    * decided before the first page opens — there is no starting halfway.
    */
-  record?: { label: string; slide: Slide } | undefined
+  record?: {
+    label: string
+    slide: Slide
+    /** Commands to film alongside the browser, for work with no screen. */
+    terminal?: TerminalSource
+  } | undefined
 }
 
 export interface RunOutcome {
@@ -160,24 +166,33 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     const drivers = await loadDrivers(store, options.plan, log, options.record ? join(dir, 'raw-video') : undefined)
     driversToClose.push(...drivers.values())
 
-    // Recording is a recorder's job, not a driver's. Registering it here is
-    // what puts the finished file into `story.artifacts` with a declared
-    // reader, where the gate, the viewer and the agent can all find it.
+    // Recording is a recorder's job, not a driver's, and *which* recorders
+    // exist is the registry's business rather than the runner's. The runner
+    // offers what this run has — a browser context, a list of commands — and
+    // takes back whatever can record from it. Adding a recorder does not
+    // touch this file.
     if (options.record) {
       const web = drivers.get('web') as unknown as BrowserSourceCapable | undefined
-      if (web?.recordedVideo) {
-        recorders.push(new BrowserRecorder({
-          source: {
-            videoDir: () => join(dir, 'raw-video'),
-            recordedVideo: () => web.recordedVideo(),
-            finish: async () => { await (web as unknown as Driver).close?.() },
-          },
-          store,
-          card: options.record.slide,
-          renderCard: renderSlidePng,
-          width: 1280,
-          height: 720,
-        }))
+      recorders.push(...createRecorders({
+        runDir: dir,
+        store,
+        ...(web?.recordedVideo
+          ? {
+              browser: {
+                videoDir: () => join(dir, 'raw-video'),
+                recordedVideo: () => web.recordedVideo(),
+                finish: async () => { await (web as unknown as Driver).close?.() },
+              },
+            }
+          : {}),
+        ...(options.record.terminal ? { terminal: options.record.terminal } : {}),
+        card: options.record.slide,
+        renderCard: renderSlidePng,
+        width: 1280,
+        height: 720,
+      }))
+      if (recorders.length === 0) {
+        log('recording: nothing in this run can be recorded — no browser context and no commands to film')
       }
     }
     for (const recorder of recorders) await recorder.start(ctx)
@@ -260,6 +275,25 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     let videoPath: string | undefined
     for (const recorder of recorders) {
       const produced = await recorder.stop()
+      // The same check the conformance suite applies, applied to the real
+      // output: a recorder that emits a kind it never declared, or an
+      // artefact nobody is declared to read, has broken the contract every
+      // consumer downstream relies on. Better a harness failure than a story
+      // whose artefact list cannot be trusted.
+      //
+      // Agent-readability is deliberately NOT checked here. It is a property
+      // of a *step*, not of a recorder: a video is one continuous artefact
+      // spanning the run, while the a11y snapshot an agent reads is written
+      // per step by the driver. SV030 owns that question in the gate, where
+      // every artefact is in view — asking it of one recorder in isolation
+      // would fail a perfectly well-behaved video recorder.
+      const violations = validateRecording(recorder, produced)
+      if (violations.length > 0) {
+        throw new HarnessError(
+          `recorder "${recorder.name}" broke the recorder contract`,
+          violations.join('; '),
+        )
+      }
       artifacts.push(...produced)
       const video = produced.find((a: StoryArtifact) => a.kind === 'video')
       if (video) {
