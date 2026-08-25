@@ -155,6 +155,13 @@ describe('the playbook — numbered steps, each one a command', () => {
     expect(skill).not.toMatch(/readyState === 4/)
   })
 
+  it('uses a ranged GET, since the presigned URL rejects a HEAD', () => {
+    // The recipe as first written used `curl -I` and answered 403 on healthy
+    // files: the redirect lands on a URL signed for GET alone.
+    expect(skill).toMatch(/--range 0-1023/)
+    expect(skill).not.toMatch(/curl -sI "\$loc"/)
+  })
+
   it('says what a wrong content type means, rather than only what right looks like', () => {
     expect(skill).toMatch(/text\/html/)
     expect(skill.toLowerCase()).toMatch(/placeholder/)

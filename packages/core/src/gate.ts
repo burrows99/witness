@@ -302,6 +302,19 @@ export function evaluate(input: GateInput): GateResult {
   metrics.assertionsTotal = story.assertions.length
   for (const assertion of story.assertions) {
     if (assertion.status === 'pass') { metrics.assertionsPassed += 1; continue }
+    if (assertion.status === 'skipped') {
+      // The worst shape a run can take: `allow`, no findings, exit 0 — and
+      // nothing actually checked. An agent ran `verify` without `--record`,
+      // every assertion was skipped for want of a transcript, and the verdict
+      // was indistinguishable from a real pass. SV021 at least warns that a
+      // plan claims nothing; this is a plan that claims something and never
+      // tested it, which is worse.
+      add('SV023', 'error',
+        `assertion "${assertion.id}" was never evaluated${assertion.diff ? `: ${assertion.diff}` : ''}`,
+        'Make the run produce what the assertion reads — most often that means passing --record — or point the assertion at a step that runs.',
+        { assertion_id: assertion.id })
+      continue
+    }
     if (assertion.status === 'fail') {
       add('SV020', 'error',
         `assertion "${assertion.id}" failed${assertion.diff ? `: ${assertion.diff}` : ''}`,

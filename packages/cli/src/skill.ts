@@ -239,12 +239,16 @@ for id in $(gh pr view <n> --repo <owner>/<repo> --json body -q .body \\
     | grep -o 'user-attachments/assets/[0-9a-f-]*' | cut -d/ -f3 | sort -u); do
   loc=$(curl -sI -H "Authorization: token $(gh auth token)" \\
         "https://github.com/user-attachments/assets/$id" | tr -d '\\r' | sed -n 's/^[Ll]ocation: //p')
-  curl -sI "$loc" | grep -iE '^(HTTP|content-type|content-length)'
+  curl -sD - -o /dev/null --range 0-1023 "$loc" | grep -iE '^(HTTP|content-type|content-range)'
 done
 \`\`\`
 
-\`video/mp4\` and a plausible size is evidence. \`text/html\` means the link resolves to a page,
-not a file. No output at all means the body still has its placeholders in it.
+A **ranged GET**, not \`curl -I\`: the redirect lands on a presigned URL signed for GET alone, so
+a HEAD fails signature validation and answers \`403\` however healthy the file is.
+
+\`206\` with \`video/mp4\` and a plausible \`content-range\` total is evidence. \`text/html\` means
+the link resolves to a page, not a file. No output at all means the body still has its
+placeholders in it.
 
 ## Findings you will meet
 

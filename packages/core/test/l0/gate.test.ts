@@ -626,3 +626,50 @@ describe('a step that failed is reported, not left in the story', () => {
     expect(codes(r)).not.toContain('SV022')
   })
 })
+
+describe('an assertion that was never evaluated cannot pass as green', () => {
+  /**
+   * The worst shape a run can take. An agent ran `verify` without `--record`,
+   * so every `terminal-match` assertion was skipped for want of a transcript
+   * — and the verdict came back `allow`, `findings: []`, exit 0, with
+   * `assertionsPassed: 0/2` the only sign. Indistinguishable from a real pass
+   * unless you happened to read the metrics.
+   *
+   * SV021 warns that a plan claims nothing. This is a plan that claims
+   * something and never tested it, which is worse, so it blocks.
+   */
+  const withSkipped = () => {
+    const diff = diffOf()
+    return storyFor(diff, {}, coverageFor(diff), [
+      { id: 'a1', status: 'skipped', diff: 'the run produced no readable transcript to assert on' },
+      { id: 'a2', status: 'pass' },
+    ])
+  }
+
+  it('blocks, naming the assertion and why it could not run', () => {
+    const diff = diffOf()
+    const r = evaluate(input({ diff, story: withSkipped() }))
+    expect(r.verdict).toBe('block')
+    const finding = r.findings.find((f) => f.code === 'SV023')!
+    expect(finding.message).toMatch(/a1/)
+    expect(finding.message).toMatch(/no readable transcript/)
+  })
+
+  it('points at the likely cause rather than at the plan', () => {
+    const finding = evaluate(input({ diff: diffOf(), story: withSkipped() })).findings.find((f) => f.code === 'SV023')!
+    expect(finding.remedy).toMatch(/--record/)
+  })
+
+  it('does not fire when every assertion actually ran', () => {
+    const diff = diffOf()
+    const story = storyFor(diff, {}, coverageFor(diff), [{ id: 'a1', status: 'pass' }])
+    expect(codes(evaluate(input({ diff, story })))).not.toContain('SV023')
+  })
+
+  it('is not confused with SV021, which is about having none at all', () => {
+    const diff = diffOf()
+    const r = evaluate(input({ diff, story: withSkipped() }))
+    expect(codes(r)).toContain('SV023')
+    expect(codes(r)).not.toContain('SV021')
+  })
+})

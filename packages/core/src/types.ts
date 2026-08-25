@@ -305,6 +305,7 @@ export type GateCode =
   | 'SV010' | 'SV011' | 'SV012' | 'SV013' | 'SV014' | 'SV015' | 'SV016'
   | 'SV020' | 'SV021'
   | 'SV022'
+  | 'SV023'
   | 'SV030'
   | 'SV040' | 'SV041'
   | 'SV090'
