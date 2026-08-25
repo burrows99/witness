@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { compileRedactionPolicy, SUPPORTED_LANGUAGES } from '@swe-verify/core'
 import { adapterReport } from '@swe-verify/probe-dap'
 import { isGitRepo } from '../git.js'
-import { loadPlans, paths } from '../workspace.js'
+import { configSource, loadPlans, paths } from '../workspace.js'
 import { EXIT } from '../errors.js'
 import type { CommandContext, CommandResult, DoctorCheck } from '../context.js'
 
@@ -29,7 +29,12 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
   checks.push({
     name: 'config',
     status: 'ok',
-    detail: `domain=${ctx.config.domain} runner=${ctx.config.runner} store=${ctx.config.artifactStore} telemetry=${ctx.config.telemetry}`,
+    // Where it came from, not only what it says. A branch taken from before
+    // the config was committed silently has none, and every run then uses
+    // built-in budgets — which is how a plan sat past a 10-minute default for
+    // forty minutes with nothing anywhere saying the file was absent.
+    detail: `${configSource(ctx.repoRoot) ?? 'built-in defaults (no .swe-verify/config.json)'} — domain=${ctx.config.domain} runner=${ctx.config.runner} store=${ctx.config.artifactStore} telemetry=${ctx.config.telemetry}`,
+    ...(configSource(ctx.repoRoot) ? {} : { remedy: 'Run `swe-verify init` to create one, and commit it — budgets and scope are per-project.' }),
   })
 
   const plansDir = paths.plans(ctx.repoRoot)

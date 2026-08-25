@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'nod
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfig, loadPlans, planSha, scaffold, runDir, writeStory, readStory } from '../../src/workspace.js'
+import { configSource, loadConfig, loadPlans, planSha, scaffold, runDir, writeStory, readStory } from '../../src/workspace.js'
 import type { Story } from '@swe-verify/core'
 import { UsageError } from '../../src/errors.js'
 import { withReversedKeys } from '../../../../test/helpers/objects.js'
@@ -177,5 +177,27 @@ describe('run directory', () => {
     mkdirSync(join(dir, '.swe-verify', 'runs', '01JB7QK3M9X2VYD8N4T6ZQWERT'), { recursive: true })
     writeFileSync(path, '{"schema":"swe-verify/story@1"}')
     expect(() => readStory(path)).toThrow(/invalid story .*required property 'run_id'/s)
+  })
+})
+
+describe('doctor says where the config came from', () => {
+  /**
+   * An agent branched from a commit that predated the gate config, so git
+   * correctly removed the tracked `.swe-verify/config.json` from the working
+   * tree — and every run on that branch quietly used built-in budgets. It ran
+   * forty minutes against a ten-minute default before anyone noticed, because
+   * `doctor` reported what the config *said* and never whether a file existed
+   * at all. Values without provenance cannot answer "why is this budget
+   * what it is?".
+   */
+  it('names the file when there is one', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'swe-verify-cfg-'))
+    mkdirSync(join(dir, '.swe-verify'), { recursive: true })
+    writeFileSync(join(dir, '.swe-verify', 'config.json'), JSON.stringify({ schema: 'swe-verify/config@1' }))
+    expect(configSource(dir)).toBe(join(dir, '.swe-verify', 'config.json'))
+  })
+
+  it('reports nothing to load, rather than an empty string', () => {
+    expect(configSource(mkdtempSync(join(tmpdir(), 'swe-verify-cfg-')))).toBeNull()
   })
 })

@@ -50,6 +50,12 @@ function readJson(file: string, label: string): unknown {
   }
 }
 
+/** Whether the config came from a file, so `doctor` can say which. */
+export function configSource(cwd: string): string | null {
+  const file = paths.config(cwd)
+  return existsSync(file) ? file : null
+}
+
 export function loadConfig(cwd: string): ResolvedConfig {
   const file = paths.config(cwd)
   if (!existsSync(file)) return resolveConfig({ schema: 'swe-verify/config@1' })
