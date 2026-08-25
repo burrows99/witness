@@ -39,10 +39,10 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      # No version pinned here: package.json's `packageManager` is the single
+      # source of truth, and the action refuses when both name a version.
       - uses: pnpm/action-setup@v4
         if: steps.gate.outputs.skip != 'true'
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         if: steps.gate.outputs.skip != 'true'
