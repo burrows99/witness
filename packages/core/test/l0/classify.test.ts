@@ -113,3 +113,34 @@ describe('gateability — the answer to open question Q7', () => {
     expect(classifyLine('# a ruby comment', 'py').class).toBe('excluded')
   })
 })
+
+describe('a test assertion failure branch is defensive, not uncovered', () => {
+  /**
+   * An agent fixed a real library bug, added a table test for it, and was
+   * blocked by five SV010s — all `t.Errorf` calls inside `if got != want`
+   * branches of its own passing test. A passing test leaves those cold by
+   * definition, so the finding asked for something impossible, and both
+   * offered remedies (reach the line, or waive it) meant weakening a test
+   * that worked. Under the default `warn` policy this now warns instead.
+   */
+  it('classifies t.Errorf and t.Fatalf as defensive', () => {
+    for (const line of ['t.Errorf("got %v, want %v", got, want)', 't.Fatalf("setup failed: %v", err)', 't.Error("mismatch")']) {
+      expect(classifyLine(line, 'go').class, line).toBe('defensive')
+    }
+  })
+
+  it('covers a testing.T bound to another name, which is common in helpers', () => {
+    expect(classifyLine('tb.Fatalf("no fixture: %v", err)', 'go').class).toBe('defensive')
+  })
+
+  it('still treats ordinary Go statements as executable', () => {
+    for (const line of ['total := base * rate', 'return applyTiered(100, 2)', 'x.Errors = nil']) {
+      expect(classifyLine(line, 'go').class, line).toBe('executable')
+    }
+  })
+
+  it('leaves the existing error-handling patterns classified as before', () => {
+    expect(classifyLine('if err != nil {', 'go').class).toBe('defensive')
+    expect(classifyLine('panic("unreachable")', 'go').class).toBe('defensive')
+  })
+})

@@ -100,7 +100,12 @@ const RULES: Record<Language, LanguageRules> = {
     lineComment: ['//'],
     imports: [/^import\s/, /^package\s/, /^\s*"[^"]+"$/],
     typeOnly: [/^type\s+\w+\s+(interface|struct)\b/],
-    defensive: [/^if\s+err\s*!=\s*nil\b/, /^return\s+.*\berr\b\s*$/, /^panic\(/, /^log\.Fatal/],
+    // `t.Error`/`t.Fatal` and friends are the failure branch of an assertion.
+    // A passing test leaves them cold by definition, so reporting them as
+    // "changed line never executed" asks for something impossible: an agent
+    // was blocked by five of them and the only offered remedies were to reach
+    // the line or waive it, both of which mean weakening a test that works.
+    defensive: [/^if\s+err\s*!=\s*nil\b/, /^return\s+.*\berr\b\s*$/, /^panic\(/, /^log\.Fatal/, /^t\.(Error|Fatal|Skip)/, /^\w+\.(Errorf?|Fatalf?)\(/],
   },
   java: {
     lineComment: ['//'],
