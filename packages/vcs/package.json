@@ -1,5 +1,5 @@
 {
-  "name": "@witness/vcs",
+  "name": "@macquery-labs/vcs",
   "version": "0.1.0",
   "description": "VcsProvider: read a bypass signal, publish a result, describe the change. local, github, gitlab, bitbucket.",
   "license": "Apache-2.0",
@@ -19,12 +19,18 @@
     "node": ">=22"
   },
   "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "dependencies": {
-    "@witness/core": "workspace:*"
+    "@macquery-labs/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macquery-labs/witness.git",
+    "directory": "packages/vcs"
   }
 }

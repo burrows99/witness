@@ -1,5 +1,5 @@
 /**
- * @witness/core — the gate, the schemas, and the arithmetic behind them.
+ * @macquery-labs/core — the gate, the schemas, and the arithmetic behind them.
  *
  * This package is pure by construction: it never touches the filesystem, the
  * network, a browser, a debugger or a VCS host (NFR-7). The gate must run in

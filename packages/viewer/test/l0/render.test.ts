@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderViewer } from '../../src/render.js'
-import type { GateResult, Story } from '@witness/core'
+import type { GateResult, Story } from '@macquery-labs/core'
 
 /**
  * The viewer exists because evidence nobody reads is theatre (TDD §7.9). It

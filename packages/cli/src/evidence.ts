@@ -1,5 +1,5 @@
-import { readString, type Plan, type PlanArgs, type PlanStep } from '@witness/core'
-import type { Slide } from '@witness/recorders'
+import { readString, type Plan, type PlanArgs, type PlanStep } from '@macquery-labs/core'
+import type { Slide } from '@macquery-labs/recorders'
 
 /**
  * Recording, as a property of a run.

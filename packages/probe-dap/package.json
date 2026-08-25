@@ -1,5 +1,5 @@
 {
-  "name": "@witness/probe-dap",
+  "name": "@macquery-labs/probe-dap",
   "version": "0.1.0",
   "description": "Non-suspending observation via DAP logpoints, with a per-language adapter registry.",
   "license": "Apache-2.0",
@@ -19,12 +19,18 @@
     "node": ">=22"
   },
   "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "dependencies": {
-    "@witness/core": "workspace:*"
+    "@macquery-labs/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macquery-labs/witness.git",
+    "directory": "packages/probe-dap"
   }
 }

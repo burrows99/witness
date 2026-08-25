@@ -1,5 +1,5 @@
-import { brandEnv } from '@witness/core'
-import type { Bypass, GateResult } from '@witness/core'
+import { brandEnv } from '@macquery-labs/core'
+import type { Bypass, GateResult } from '@macquery-labs/core'
 import { DEFAULT_BYPASS_LABEL, explicitBypass, labelBypass } from './bypass.js'
 import { headline, markdownReport, textReport } from './render.js'
 import type { ChangeContext, ProviderName, ProviderOptions, PublishTarget, VcsProvider } from './types.js'

@@ -157,5 +157,5 @@ Stated plainly, because a playbook that overstates its tooling wastes the reader
 |---|---|
 | Attaching video to a PR (step 6) | Manual browser. No CLI path exists — the CDN is unreachable from `gh`. |
 | Bringing up a containerised app | `fixture.kind: "compose"` exits 3. Only `process` and `none` work, so an app needing provisioning is driven by a script. |
-| Terminal recordings | Produced by `@witness/recorders` as a library, not yet a registered `Recorder`, and not attached to the story. |
+| Terminal recordings | Produced by `@macquery-labs/recorders` as a library, not yet a registered `Recorder`, and not attached to the story. |
 | TypeScript / Java coverage | No vendored adapter — `doctor` reports it, and the gate reports `SV016` rather than pretending. |

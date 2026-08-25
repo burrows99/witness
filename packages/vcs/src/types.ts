@@ -1,4 +1,4 @@
-import type { Bypass, GateResult } from '@witness/core'
+import type { Bypass, GateResult } from '@macquery-labs/core'
 
 export type ProviderName = 'local' | 'github' | 'gitlab' | 'bitbucket'
 export type ProviderSelector = ProviderName | 'auto'

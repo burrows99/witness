@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { createProvider, detectProvider, type ProviderSelector } from '@witness/vcs'
+import { createProvider, detectProvider, type ProviderSelector } from '@macquery-labs/vcs'
 import { defaultBase, diffAgainst, gitState, isGitRepo } from '../git.js'
 import { EXIT, UsageError } from '../errors.js'
 import { loadPlan, paths, planSha } from '../workspace.js'

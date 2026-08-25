@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { compileRedactionPolicy, DEFAULT_CONFIG, validateRecording, type RunContext } from '@witness/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG, validateRecording, type RunContext } from '@macquery-labs/core'
 import { ArtifactStore } from '../../src/store.js'
 import { RECORDERS, createRecorder, type RecorderDeps } from '../../src/registry.js'
 

@@ -10,31 +10,31 @@
       "node"
     ],
     "paths": {
-      "@witness/core": [
+      "@macquery-labs/core": [
         "./packages/core/src/index.ts"
       ],
-      "@witness/cli": [
+      "@macquery-labs/cli": [
         "./packages/cli/src/index.ts"
       ],
-      "@witness/vcs": [
+      "@macquery-labs/vcs": [
         "./packages/vcs/src/index.ts"
       ],
-      "@witness/probe-dap": [
+      "@macquery-labs/probe-dap": [
         "./packages/probe-dap/src/index.ts"
       ],
-      "@witness/driver-api": [
+      "@macquery-labs/driver-api": [
         "./packages/driver-api/src/index.ts"
       ],
-      "@witness/driver-web": [
+      "@macquery-labs/driver-web": [
         "./packages/driver-web/src/index.ts"
       ],
-      "@witness/recorders": [
+      "@macquery-labs/recorders": [
         "./packages/recorders/src/index.ts"
       ],
-      "@witness/viewer": [
+      "@macquery-labs/viewer": [
         "./packages/viewer/src/index.ts"
       ],
-      "@witness/mcp": [
+      "@macquery-labs/mcp": [
         "./packages/mcp/src/index.ts"
       ]
     },

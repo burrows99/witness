@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
-import { adapterReport } from '@witness/probe-dap'
-import { builtinAssertionKinds } from '@witness/core'
-import { assertionKinds } from '@witness/driver-api'
+import { adapterReport } from '@macquery-labs/probe-dap'
+import { builtinAssertionKinds } from '@macquery-labs/core'
+import { assertionKinds } from '@macquery-labs/driver-api'
 import { EXIT, UsageError } from '../errors.js'
 import { loadFullPlans } from '../workspace.js'
 import { renderSkill, skillName, type SkillFacts } from '../skill.js'
@@ -83,7 +83,7 @@ export async function skillCommand(ctx: CommandContext): Promise<CommandResult> 
 
 async function gatherFacts(ctx: CommandContext): Promise<SkillFacts> {
   const plans = loadFullPlans(ctx.cwd)
-  const browser = await import('@witness/driver-web')
+  const browser = await import('@macquery-labs/driver-web')
     .then((web) => web.isPlaywrightAvailable())
     .catch(() => false)
 

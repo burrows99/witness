@@ -1,4 +1,4 @@
-import type { ProbeTarget } from '@witness/core'
+import type { ProbeTarget } from '@macquery-labs/core'
 
 /**
  * Logpoint encoding.

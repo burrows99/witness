@@ -11,7 +11,7 @@ import { type Brand, resolveBrand, schemaId,
   type PlanRef,
   type ResolvedConfig,
   type Story,
-} from '@witness/core'
+} from '@macquery-labs/core'
 import { UsageError } from './errors.js'
 
 /**

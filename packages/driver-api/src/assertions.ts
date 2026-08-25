@@ -1,4 +1,4 @@
-import { readString, type AssertionKind, type AssertionResult, type StoryView } from '@witness/core'
+import { readString, type AssertionKind, type AssertionResult, type StoryView } from '@macquery-labs/core'
 
 /**
  * Assertion kinds for the API tier.

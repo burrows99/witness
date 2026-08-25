@@ -1,5 +1,5 @@
-import { readNumber, readString, type Driver, type PlanArgs, type PlanStep, type RunContext, type StepResult } from '@witness/core'
-import type { ArtifactStore } from '@witness/recorders'
+import { readNumber, readString, type Driver, type PlanArgs, type PlanStep, type RunContext, type StepResult } from '@macquery-labs/core'
+import type { ArtifactStore } from '@macquery-labs/recorders'
 import { newSpanId, traceparent } from './trace.js'
 
 /**

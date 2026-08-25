@@ -42,9 +42,9 @@ const packages = () =>
 describe('core is pure (NFR-7)', () => {
   const FORBIDDEN = [
     'playwright', '@playwright/test', 'testcontainers',
-    '@witness/driver-web', '@witness/driver-api',
-    '@witness/probe-dap', '@witness/probe-otel',
-    '@witness/recorders', '@witness/vcs', '@witness/cli',
+    '@macquery-labs/driver-web', '@macquery-labs/driver-api',
+    '@macquery-labs/probe-dap', '@macquery-labs/probe-otel',
+    '@macquery-labs/recorders', '@macquery-labs/vcs', '@macquery-labs/cli',
   ]
 
   it('does not import drivers, probes or recorders — the gate runs with no browser and no debugger', () => {

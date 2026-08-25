@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { narratePlan, recordingLabel, recordingSlide, EVIDENCE_RULES } from '../../src/evidence.js'
-import type { Plan } from '@witness/core'
+import type { Plan } from '@macquery-labs/core'
 
 /**
  * Recording is a property of a run, not a workflow the CLI orchestrates.

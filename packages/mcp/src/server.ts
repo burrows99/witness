@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { run } from '@witness/cli'
+import { run } from '@macquery-labs/cli'
 import { INSTRUCTIONS, TOOLS, argvFor } from './tools.js'
 
 /**

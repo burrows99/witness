@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { join, resolve } from 'node:path'
-import type { PlanFixture, PlanReadyCheck } from '@witness/core'
-import { adapterFor, freePort, type AdapterSpec } from '@witness/probe-dap'
-import { brandEnvName, resolveBrand } from '@witness/core'
+import type { PlanFixture, PlanReadyCheck } from '@macquery-labs/core'
+import { adapterFor, freePort, type AdapterSpec } from '@macquery-labs/probe-dap'
+import { brandEnvName, resolveBrand } from '@macquery-labs/core'
 import { HarnessError, UsageError } from '../errors.js'
 import {
   composeCommand, composeDown, composeLogs, composeUp, publishedPort, resolveComposeUrl,

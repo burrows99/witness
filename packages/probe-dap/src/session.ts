@@ -1,6 +1,6 @@
 import { connect, type Socket } from 'node:net'
 import type { Duplex } from 'node:stream'
-import { groupByFile, type ProbeTarget } from '@witness/core'
+import { groupByFile, type ProbeTarget } from '@macquery-labs/core'
 import { DapClient, DapError, type DapClientOptions } from './client.js'
 import { buildLogMessage, parseLogOutput } from './logpoint.js'
 import { parseEvaluationError } from './evalerror.js'

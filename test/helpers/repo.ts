@@ -2,8 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { canonicalJson, diffHash, normaliseDiff, sha256, type Plan, type Story } from '@witness/core'
-import { run, type RunOptions } from '@witness/cli'
+import { canonicalJson, diffHash, normaliseDiff, sha256, type Plan, type Story } from '@macquery-labs/core'
+import { run, type RunOptions } from '@macquery-labs/cli'
 
 /** A disposable git repository with a witness workspace inside it. */
 export class TestRepo {

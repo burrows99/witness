@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { ArtifactStore } from '../../src/store.js'
-import { compileRedactionPolicy, DEFAULT_CONFIG } from '@witness/core'
+import { compileRedactionPolicy, DEFAULT_CONFIG } from '@macquery-labs/core'
 
 let dir: string
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'witness-store-')) })

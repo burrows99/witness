@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { compileRedactionPolicy, SUPPORTED_LANGUAGES } from '@witness/core'
-import { adapterReport } from '@witness/probe-dap'
+import { compileRedactionPolicy, SUPPORTED_LANGUAGES } from '@macquery-labs/core'
+import { adapterReport } from '@macquery-labs/probe-dap'
 import { isGitRepo } from '../git.js'
 import { configSource, loadPlans, paths } from '../workspace.js'
 import { EXIT } from '../errors.js'
@@ -78,7 +78,7 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
     })
   }
 
-  const browser = await import('@witness/driver-web')
+  const browser = await import('@macquery-labs/driver-web')
     .then((web) => web.isPlaywrightAvailable())
     .catch(() => false)
   checks.push({

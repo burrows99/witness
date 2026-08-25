@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildLogMessage, parseLogOutput, LOGPOINT_MAGIC } from '../../src/logpoint.js'
-import type { ProbeTarget } from '@witness/core'
+import type { ProbeTarget } from '@macquery-labs/core'
 
 const target = (over: Partial<ProbeTarget> = {}): ProbeTarget => ({
   id: 'p001', file: 'src/a.ts', line: 41, language: 'ts', expressions: ['bonus', 'tier'], ...over,

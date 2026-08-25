@@ -1,4 +1,4 @@
-import { orderEvents, type CoverageLine, type Finding, type GateResult, type Story, type StoryEvent } from '@witness/core'
+import { orderEvents, type CoverageLine, type Finding, type GateResult, type Story, type StoryEvent } from '@macquery-labs/core'
 
 /**
  * The story viewer — FR-16.

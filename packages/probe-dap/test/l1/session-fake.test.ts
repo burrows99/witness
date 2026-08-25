@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FakeAdapter } from '../helpers/fake-adapter.js'
 import { DapSession } from '../../src/session.js'
-import type { ProbeTarget } from '@witness/core'
+import type { ProbeTarget } from '@macquery-labs/core'
 
 /**
  * L1 — session behaviour against a protocol-conformant fake adapter. The real

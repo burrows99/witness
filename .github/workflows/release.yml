@@ -1,0 +1,115 @@
+name: Auto Release
+
+# Every merge to main cuts a version: tests, build, a tag, a GitHub Release with generated notes, and
+# the nine workspace packages on this repository's own npm registry. Releases surface in followers'
+# feeds and notify watchers; the registry is what makes the README's install line true.
+#
+# Nothing here writes to main. The version is bumped in the checkout, read by `npm publish`, and
+# thrown away with the runner. The tags are the record of what shipped, and the next version is
+# computed from them.
+#
+# Put "[skip release]" in the commit SUBJECT (first line) to skip one.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # push the tag, publish the release
+  packages: write # publish to this repository's own npm registry
+
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip if the commit subject says so
+        id: gate
+        run: |
+          subject="$(git log -1 --pretty=%s)"
+          if printf '%s' "$subject" | grep -qiF '[skip release]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: pnpm/action-setup@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          node-version: 24
+          # This repository's own registry: the packages belong to the repo that builds them, and the
+          # workflow's own token is the only credential — nothing to create, rotate or leak. The
+          # scope is the owning organisation, which is what a GitHub Packages namespace is.
+          registry-url: https://npm.pkg.github.com
+          scope: "@macquery-labs"
+
+      - name: Install, build, test
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm test
+
+      - name: Work out the next version and tag it
+        if: steps.gate.outputs.skip != 'true'
+        id: ver
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Semantic Versioning 2.0.0 says a PATCH is for backward compatible bug fixes, a MINOR for
+          # backward compatible additions and a MAJOR for breaks — and only a person knows which a
+          # change was. So the default is the safe one, a patch past the newest tag, and raising the
+          # version in package.json is how a pull request asks for more than that. Asked for, it is
+          # released exactly as written: bumping to 0.2.0 must publish 0.2.0, not 0.2.1.
+          latest="$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)"
+          declared="$(node -p 'require("./package.json").version')"
+
+          if [ -z "$latest" ]; then
+            next="$declared"
+          elif [ "$declared" != "${latest#v}" ] &&
+            [ "$(printf '%s\n%s\n' "${latest#v}" "$declared" | sort -V | tail -n1)" = "$declared" ]; then
+            next="$declared"
+          else
+            next="$(echo "${latest#v}" | awk -F. '{print $1"."$2"."$3 + 1}')"
+          fi
+
+          # Every package moves together. They depend on each other by exact version, so a workspace
+          # that half-publishes is worse than one that does not publish at all: an installed
+          # @macquery-labs/cli would resolve a @macquery-labs/core that was never pushed.
+          npm version "$next" --no-git-tag-version --allow-same-version
+          pnpm -r exec npm version "$next" --no-git-tag-version --allow-same-version
+
+          git tag -a "v$next" -m "Release v$next"
+          git push origin "v$next"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.ver.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --title "${{ steps.ver.outputs.tag }}" \
+            --generate-notes
+
+      - name: Publish the packages
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ github.token }}
+        # `workspace:*` is a pnpm protocol npm cannot resolve, so publishing goes through pnpm,
+        # which rewrites those to the version just set. --no-git-checks because the working tree is
+        # deliberately dirty: the bump is never committed.
+        run: pnpm -r publish --access public --no-git-checks

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { validateConfig, validatePlan, type GateResult } from '@witness/core'
-import { adapterFor } from '@witness/probe-dap'
+import { validateConfig, validatePlan, type GateResult } from '@macquery-labs/core'
+import { adapterFor } from '@macquery-labs/probe-dap'
 
 /**
  * L4 — witness gates its own change.

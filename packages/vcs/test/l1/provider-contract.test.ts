@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createProvider, detectProvider, PROVIDERS } from '../../src/index.js'
 import type { PublishTarget, VcsEnv } from '../../src/types.js'
-import type { GateResult } from '@witness/core'
+import type { GateResult } from '@macquery-labs/core'
 
 /**
  * L1 — the VcsProvider contract, run against every implementation.

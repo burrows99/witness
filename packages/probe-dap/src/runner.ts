@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { createServer } from 'node:net'
-import type { Language, ProbeTarget } from '@witness/core'
+import type { Language, ProbeTarget } from '@macquery-labs/core'
 import { adapterFor, type AdapterSpec } from './adapters.js'
 import { DapSession, type InstalledProbe, type ProbeDiagnostic, type ProbeHit } from './session.js'
 import type { PathMapping } from './pathmap.js'

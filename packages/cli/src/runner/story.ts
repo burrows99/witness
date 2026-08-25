@@ -11,7 +11,7 @@ import { resolveBrand, schemaId,
   type StoryArtifact,
   type StoryDiagnostic,
   type UnsequencedEvent,
-} from '@witness/core'
+} from '@macquery-labs/core'
 
 /**
  * Story assembly.

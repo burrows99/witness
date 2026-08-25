@@ -1,4 +1,4 @@
-import type { Bypass } from '@witness/core'
+import type { Bypass } from '@macquery-labs/core'
 
 export const DEFAULT_BYPASS_LABEL = 'witness:bypass'
 

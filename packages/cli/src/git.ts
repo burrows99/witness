@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { normaliseDiff, type NormalisedDiff } from '@witness/core'
+import { normaliseDiff, type NormalisedDiff } from '@macquery-labs/core'
 import { HarnessError, UsageError } from './errors.js'
 
 /**

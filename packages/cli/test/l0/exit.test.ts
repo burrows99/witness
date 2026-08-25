@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { EXIT, exitCodeFor, HarnessError, UsageError } from '../../src/errors.js'
-import type { GateResult } from '@witness/core'
+import type { GateResult } from '@macquery-labs/core'
 
 const result = (verdict: GateResult['verdict']): GateResult => ({
   verdict,

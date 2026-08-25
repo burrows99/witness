@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { GateResult } from '@witness/core'
+import type { GateResult } from '@macquery-labs/core'
 import { TestRepo, cli, planFor, storyFor } from '../helpers/repo.js'
 
 /**

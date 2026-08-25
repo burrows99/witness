@@ -1,4 +1,4 @@
-import { canonicalJson, FINDING_CATALOG, sha256, type GateCode } from '@witness/core'
+import { canonicalJson, FINDING_CATALOG, sha256, type GateCode } from '@macquery-labs/core'
 
 /**
  * The generated skill.

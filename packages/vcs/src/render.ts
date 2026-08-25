@@ -1,4 +1,4 @@
-import type { GateResult } from '@witness/core'
+import type { GateResult } from '@macquery-labs/core'
 
 /** Shared rendering so every provider publishes the same facts. */
 

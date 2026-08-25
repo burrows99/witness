@@ -1,7 +1,7 @@
 {
-  "name": "@witness/cli",
+  "name": "@macquery-labs/cli",
   "version": "0.1.0",
-  "description": "The witness binary \u2014 the only package that composes everything.",
+  "description": "The witness binary — the only package that composes everything.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,18 +22,24 @@
     "node": ">=22"
   },
   "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "dependencies": {
-    "@witness/core": "workspace:*",
-    "@witness/driver-api": "workspace:*",
-    "@witness/driver-web": "workspace:*",
-    "@witness/probe-dap": "workspace:*",
-    "@witness/recorders": "workspace:*",
-    "@witness/vcs": "workspace:*",
-    "@witness/viewer": "workspace:*"
+    "@macquery-labs/core": "workspace:*",
+    "@macquery-labs/driver-api": "workspace:*",
+    "@macquery-labs/driver-web": "workspace:*",
+    "@macquery-labs/probe-dap": "workspace:*",
+    "@macquery-labs/recorders": "workspace:*",
+    "@macquery-labs/vcs": "workspace:*",
+    "@macquery-labs/viewer": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macquery-labs/witness.git",
+    "directory": "packages/cli"
   }
 }

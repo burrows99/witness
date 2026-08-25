@@ -1,5 +1,5 @@
 {
-  "name": "@witness/driver-web",
+  "name": "@macquery-labs/driver-web",
   "version": "0.1.0",
   "description": "Playwright driver: accessible-role actions, a11y snapshots, per-request trace spans.",
   "license": "Apache-2.0",
@@ -19,12 +19,13 @@
     "node": ">=22"
   },
   "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "dependencies": {
-    "@witness/core": "workspace:*",
-    "@witness/driver-api": "workspace:*",
-    "@witness/recorders": "workspace:*"
+    "@macquery-labs/core": "workspace:*",
+    "@macquery-labs/driver-api": "workspace:*",
+    "@macquery-labs/recorders": "workspace:*"
   },
   "peerDependencies": {
     "playwright": ">=1.40"
@@ -37,5 +38,10 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "playwright": "catalog:"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macquery-labs/witness.git",
+    "directory": "packages/driver-web"
   }
 }

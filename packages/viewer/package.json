@@ -1,7 +1,7 @@
 {
-  "name": "@witness/viewer",
+  "name": "@macquery-labs/viewer",
   "version": "0.1.0",
-  "description": "The story viewer \u2014 one self-contained HTML file, readable offline.",
+  "description": "The story viewer — one self-contained HTML file, readable offline.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -19,9 +19,15 @@
     "node": ">=22"
   },
   "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "dependencies": {
-    "@witness/core": "workspace:*"
+    "@macquery-labs/core": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macquery-labs/witness.git",
+    "directory": "packages/viewer"
   }
 }

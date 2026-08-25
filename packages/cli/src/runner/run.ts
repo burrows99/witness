@@ -23,10 +23,10 @@ import {
   builtinAssertionKinds,
   type UnsequencedEvent,
   type StoryView,
-} from '@witness/core'
-import { DapSession, type InstalledProbe } from '@witness/probe-dap'
-import { ApiDriver, assertionKinds, newTraceId } from '@witness/driver-api'
-import { ArtifactStore, createRecorders, slideDocument, type Slide, type TerminalSource } from '@witness/recorders'
+} from '@macquery-labs/core'
+import { DapSession, type InstalledProbe } from '@macquery-labs/probe-dap'
+import { ApiDriver, assertionKinds, newTraceId } from '@macquery-labs/driver-api'
+import { ArtifactStore, createRecorders, slideDocument, type Slide, type TerminalSource } from '@macquery-labs/recorders'
 import { HarnessError, UsageError } from '../errors.js'
 import { runDir as runDirFor } from '../workspace.js'
 import { startFixture, waitForReady } from './fixture.js'
@@ -429,7 +429,7 @@ async function loadDrivers(
   const drivers = new Map<string, Driver>([['api', new ApiDriver({ store })]])
   if (!plan.steps.some((step) => step.driver === 'web')) return drivers
 
-  const web = await import('@witness/driver-web').catch(() => null)
+  const web = await import('@macquery-labs/driver-web').catch(() => null)
   if (!web?.isPlaywrightAvailable()) {
     throw new UsageError(
       'this plan uses the web driver, but Playwright is not installed',
@@ -541,7 +541,7 @@ async function evaluateAssertions(
   // `ui-text` reads the live page, so it only exists when a browser does.
   const web = drivers.get('web')
   if (web) {
-    const { uiText } = await import('@witness/driver-web')
+    const { uiText } = await import('@macquery-labs/driver-web')
     const kind = uiText(web as never)
     kinds.set(kind.kind, kind)
   }

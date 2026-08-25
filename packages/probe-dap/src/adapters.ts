@@ -1,8 +1,8 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { brandEnv, brandEnvName } from '@witness/core'
-import type { Language } from '@witness/core'
+import { brandEnv, brandEnvName } from '@macquery-labs/core'
+import type { Language } from '@macquery-labs/core'
 import type { PathMapping } from './pathmap.js'
 
 /**

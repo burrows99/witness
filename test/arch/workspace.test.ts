@@ -86,7 +86,7 @@ describe('the workspace is defined in one place', () => {
 describe('every package manifest has the same shape', () => {
   it.each([...manifests.keys()])('packages/%s declares what a consumer needs', (dir) => {
     const manifest = manifests.get(dir)!
-    expect(manifest.name).toBe(`@witness/${dir}`)
+    expect(manifest.name).toBe(`@macquery-labs/${dir}`)
     expect(manifest.version).toBe(root.version)
     expect(manifest.description?.length ?? 0).toBeGreaterThan(20)
     expect(manifest.license).toBe('Apache-2.0')
@@ -118,7 +118,7 @@ describe('dependencies cannot drift', () => {
   it('references sibling packages with the workspace protocol, never a version range', () => {
     for (const [dir, manifest] of manifests) {
       for (const [name, range] of Object.entries(manifest.dependencies ?? {})) {
-        if (!name.startsWith('@witness/')) continue
+        if (!name.startsWith('@macquery-labs/')) continue
         // A plain range here would resolve from the registry the day someone
         // publishes that name, and nobody would notice.
         expect(range, `packages/${dir} → ${name}`).toMatch(/^workspace:/)
@@ -173,8 +173,8 @@ describe('the build graph matches the dependency graph', () => {
       const tsconfig = JSON.parse(readFileSync(tsconfigPath, 'utf8')) as { references?: Array<{ path: string }> }
       const referenced = new Set((tsconfig.references ?? []).map((r) => r.path.replace('../', '')))
       for (const name of Object.keys(manifest.dependencies ?? {})) {
-        if (!name.startsWith('@witness/')) continue
-        const sibling = name.slice('@witness/'.length)
+        if (!name.startsWith('@macquery-labs/')) continue
+        const sibling = name.slice('@macquery-labs/'.length)
         // Without the reference, `tsc --build` compiles against a stale dist.
         expect(referenced.has(sibling), `packages/${dir}/tsconfig.json is missing a reference to ${sibling}`).toBe(true)
       }

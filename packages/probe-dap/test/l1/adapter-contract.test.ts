@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
-import type { Language, ProbeTarget } from '@witness/core'
+import type { Language, ProbeTarget } from '@macquery-labs/core'
 import { ADAPTERS, adapterFor, adapterReport } from '../../src/adapters.js'
 import { runWithProbes } from '../../src/runner.js'
 

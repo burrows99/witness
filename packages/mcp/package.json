@@ -1,5 +1,5 @@
 {
-  "name": "@witness/mcp",
+  "name": "@macquery-labs/mcp",
   "version": "0.1.0",
   "description": "MCP adapter over the CLI. No logic of its own.",
   "license": "Apache-2.0",
@@ -22,10 +22,16 @@
     "node": ">=22"
   },
   "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
     "access": "public"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "catalog:",
-    "@witness/cli": "workspace:*"
+    "@macquery-labs/cli": "workspace:*"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macquery-labs/witness.git",
+    "directory": "packages/mcp"
   }
 }

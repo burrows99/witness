@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import type { GateResult, Plan, Story } from '@witness/core'
-import { adapterFor } from '@witness/probe-dap'
-import { isPlaywrightAvailable } from '@witness/driver-web'
+import type { GateResult, Plan, Story } from '@macquery-labs/core'
+import { adapterFor } from '@macquery-labs/probe-dap'
+import { isPlaywrightAvailable } from '@macquery-labs/driver-web'
 import { TestRepo, cli } from '../helpers/repo.js'
 
 /**

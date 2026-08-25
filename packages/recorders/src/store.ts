@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { redact, sha256, sha256Bytes, type RedactionPolicy, type Reader, type StoryArtifact } from '@witness/core'
+import { redact, sha256, sha256Bytes, type RedactionPolicy, type Reader, type StoryArtifact } from '@macquery-labs/core'
 
 /**
  * Where evidence is written, and the one place it is written.
