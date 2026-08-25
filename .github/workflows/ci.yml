@@ -73,6 +73,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: python -m venv .venv && .venv/bin/pip install debugpy
       - run: npx playwright install --with-deps chromium
+      # The recording tier transcodes to H.264 and then proves it did. Without
+      # these the run degrades to a raw webm and the proof cannot run at all,
+      # so CI would never check the one artefact a reviewer actually opens.
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: pnpm test:l2
       # M1 and M2 are published from this job's log every run (PRD §6).
       - run: pnpm test:l3
