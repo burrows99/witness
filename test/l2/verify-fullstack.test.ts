@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
-import type { GateResult, Plan, Story } from '@macquery-labs/core'
-import { adapterFor } from '@macquery-labs/probe-dap'
-import { isPlaywrightAvailable } from '@macquery-labs/driver-web'
+import type { GateResult, Plan, Story } from '../../src/core/index.js'
+import { adapterFor } from '../../src/probe-dap/index.js'
+import { isPlaywrightAvailable } from '../../src/driver-web/index.js'
 import { TestRepo, cli } from '../helpers/repo.js'
 
 /**

@@ -96,4 +96,4 @@ jobs:
       # The generated skill describes this project's plans, adapters and
       # policies. Steering that nobody enforces drifts, so its freshness is
       # checked where the gate is: in CI.
-      - run: node packages/cli/dist/bin.js skill --check
+      - run: node dist/cli/bin.js skill --check

@@ -1,37 +1,17 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "workspaces": {
-    ".": {
-      "entry": [
-        "test/**/*.test.ts",
-        "test/helpers/*.ts"
-      ],
-      "project": [
-        "test/**/*.ts",
-        "*.ts",
-        "*.js"
-      ]
-    },
-    "packages/*": {
-      "entry": [
-        "test/**/*.test.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "test/**/*.ts"
-      ]
-    },
-    "packages/probe-dap": {
-      "entry": [
-        "test/**/*.test.ts",
-        "test/helpers/*.ts"
-      ],
-      "project": [
-        "src/**/*.ts",
-        "test/**/*.ts"
-      ]
-    }
-  },
+  "entry": [
+    "src/*/index.ts",
+    "src/*/bin.ts",
+    "test/**/*.test.ts",
+    "test/helpers/**/*.ts"
+  ],
+  "project": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "*.ts",
+    "*.js"
+  ],
   "ignoreBinaries": [
     "ffmpeg",
     "ffprobe",

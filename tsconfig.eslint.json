@@ -1,52 +1,21 @@
 {
-  "//": "Type-aware linting needs every file in one program, and the build configs deliberately include only src/. This one covers the whole repo and emits nothing. The paths mirror the vitest aliases so tests type-check against sources, not a stale dist.",
-  "extends": "./tsconfig.base.json",
+  "//": "Type-aware linting needs every file in one program, and tsconfig.json deliberately includes only src/. This one covers the whole repo and emits nothing.",
+  "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "composite": false,
     "declaration": false,
     "declarationMap": false,
     "types": [
       "node"
     ],
-    "paths": {
-      "@macquery-labs/core": [
-        "./packages/core/src/index.ts"
-      ],
-      "@macquery-labs/cli": [
-        "./packages/cli/src/index.ts"
-      ],
-      "@macquery-labs/vcs": [
-        "./packages/vcs/src/index.ts"
-      ],
-      "@macquery-labs/probe-dap": [
-        "./packages/probe-dap/src/index.ts"
-      ],
-      "@macquery-labs/driver-api": [
-        "./packages/driver-api/src/index.ts"
-      ],
-      "@macquery-labs/driver-web": [
-        "./packages/driver-web/src/index.ts"
-      ],
-      "@macquery-labs/recorders": [
-        "./packages/recorders/src/index.ts"
-      ],
-      "@macquery-labs/viewer": [
-        "./packages/viewer/src/index.ts"
-      ],
-      "@macquery-labs/mcp": [
-        "./packages/mcp/src/index.ts"
-      ]
-    },
-    "baseUrl": ".",
     "lib": [
       "ES2022",
       "DOM"
-    ]
+    ],
+    "rootDir": "."
   },
   "include": [
-    "packages/*/src/**/*.ts",
-    "packages/*/test/**/*.ts",
+    "src/**/*.ts",
     "test/**/*.ts",
     "*.ts"
   ]

@@ -1,9 +1,8 @@
 {
-  "name": "witness",
+  "name": "@macquery-labs/witness",
   "version": "0.1.0",
-  "description": "Block a merge when the changed code was never executed.",
+  "description": "A CI gate that blocks a merge when changed code was never executed.",
   "license": "Apache-2.0",
-  "private": true,
   "type": "module",
   "packageManager": "pnpm@10.33.2",
   "engines": {
@@ -28,14 +27,54 @@
     "typecheck:all": "tsc --noEmit -p tsconfig.eslint.json"
   },
   "devDependencies": {
-    "@eslint/js": "catalog:",
-    "@types/node": "catalog:",
-    "eslint": "catalog:",
-    "knip": "catalog:",
-    "playwright": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
-    "vite": "catalog:",
-    "vitest": "catalog:"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.10.2",
+    "eslint": "^10.9.1",
+    "knip": "^6.32.2",
+    "playwright": "^1.62.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.68.0",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  },
+  "bin": {
+    "witness": "./dist/cli/bin.js"
+  },
+  "main": "./dist/core/index.js",
+  "types": "./dist/core/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "default": "./dist/cli/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/macquery-labs/witness.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com",
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ajv": "^8.17.1"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
   }
 }

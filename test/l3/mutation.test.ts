@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { GateResult, Plan } from '@macquery-labs/core'
-import { adapterFor } from '@macquery-labs/probe-dap'
+import type { GateResult, Plan } from '../../src/core/index.js'
+import { adapterFor } from '../../src/probe-dap/index.js'
 import { TestRepo, cli } from '../helpers/repo.js'
 
 /**
