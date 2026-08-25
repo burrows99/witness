@@ -125,10 +125,16 @@ commit reverts the strengthened assertion too, so the old weak test passes again
 code and the recording shows green — a reproduction that reproduces nothing. Revert only the
 production line instead, and keep the test that detects the bug:
 
+**Commit your fix before you film anything.** `git checkout HEAD -- <file>` restores the file as
+`HEAD` has it — so if the fix is still uncommitted, "putting it back" overwrites it with the
+original and the work is gone. There is no stash, no dangling blob, nothing to recover: this has
+already destroyed a finished fix once.
+
 ```bash
+git add -A && git commit -m "<the fix>"           # first, always
 git checkout HEAD~1 -- <the-source-file>          # not the test
 swe-verify run --plan <plan-id> --record --json
-git checkout HEAD -- <the-source-file>            # put it back
+git checkout HEAD -- <the-source-file>            # now this restores the fix
 ```
 
 Then read the transcript before you attach anything. If the "before" run passed, you filmed a

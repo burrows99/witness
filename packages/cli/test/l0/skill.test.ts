@@ -122,6 +122,16 @@ describe('the playbook — numbered steps, each one a command', () => {
     expect(skill.toLowerCase()).toMatch(/read the transcript|reproduces nothing|no reproduction/)
   })
 
+  it('says to commit before filming, because the restore overwrites from HEAD', () => {
+    // This destroyed a finished fix. `git checkout HEAD -- <file>` restores
+    // the file as HEAD has it, so with the fix still uncommitted the
+    // "put it back" step overwrote the work with the original — no stash, no
+    // dangling blob, nothing to recover.
+    expect(skill).toMatch(/git add -A && git commit/)
+    expect(skill.toLowerCase()).toMatch(/before you film|first, always/)
+    expect(skill.toLowerCase()).toMatch(/overwrites it with the original|the work is gone/)
+  })
+
   it('warns that a reproduction must not end on the working state', () => {
     expect(skill.toLowerCase()).toMatch(/must not end on the working state/)
   })
