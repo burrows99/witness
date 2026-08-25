@@ -177,6 +177,21 @@ describe('the playbook — numbered steps, each one a command', () => {
     expect(skill.toLowerCase()).toMatch(/placeholder/)
   })
 
+  it('documents the fixture kinds, which two agents had to reverse-engineer', () => {
+    // Both worked them out by reading other repositories' committed plans,
+    // and both then lost a run to `program` being resolved inside `file`'s
+    // directory rather than from the repository root.
+    expect(skill).toMatch(/"kind": "process"/)
+    expect(skill).toMatch(/"kind": "compose"|`compose`/)
+    expect(skill).toMatch(/resolved inside that directory/)
+    expect(skill).toMatch(/awaitExit/)
+    expect(skill).toMatch(/"ready"|`ready`/)
+  })
+
+  it('shows that http-json can read headers, not only the body', () => {
+    expect(skill).toMatch(/headers\.content-type/)
+  })
+
   it('names an assertion kind that fits a fixture with no HTTP and no page', () => {
     // An agent hit SV021 on a process fixture and had to read the tool's own
     // source to discover `terminal-match` existed. The skill named no

@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { join, resolve } from 'node:path'
 import type { PlanFixture, PlanReadyCheck } from '@swe-verify/core'
@@ -97,6 +98,26 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
     options.log(
       `fixture: no debug adapter for ${fixture.language} (${availability.detail}) — starting the app unwatched; its changed lines will report SV016`,
     )
+  }
+
+  // `file` decides the working directory and `program` is resolved inside it,
+  // so naming the same repo-relative path in both doubles the prefix. Two
+  // agents lost a run each to that: the debuggee died with "Cannot find
+  // module .../examples/app/examples/app/index.js", which surfaced as
+  // "fixture never became ready" — a harness failure whose real cause was
+  // only in the log. Checking here turns it into a usage error that names
+  // exactly what was tried.
+  if (looksLikePath(fixture.program)) {
+    const resolved = resolve(cwd, fixture.program)
+    if (!existsSync(resolved)) {
+      const fromRoot = resolve(options.cwd, fixture.program)
+      throw new UsageError(
+        `fixture.program "${fixture.program}" does not exist at ${resolved}`,
+        existsSync(fromRoot)
+          ? `It exists at ${fromRoot}. "program" is resolved inside the directory holding "file" (${cwd}), so name it relative to that — usually just the basename.`
+          : `"program" is resolved inside the directory holding "file" (${cwd}). Check the path, or drop "file" to resolve from the repository root.`,
+      )
+    }
   }
 
   const port = await freePort()
@@ -281,4 +302,15 @@ async function startCompose(
     stderr: () => '',
     stop,
   }
+}
+
+
+/**
+ * Whether `program` names a file rather than a package or module spec.
+ *
+ * Go takes `.` or `./pkg/...`, Java takes a class name; neither is a path on
+ * disk to check. Only something with a file extension is worth resolving.
+ */
+function looksLikePath(program: string | undefined): program is string {
+  return typeof program === 'string' && /\.[cm]?[jt]sx?$|\.py$|\.jar$/.test(program)
 }

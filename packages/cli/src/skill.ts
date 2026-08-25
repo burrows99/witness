@@ -138,6 +138,27 @@ record, and a green verdict with no film is what recording exists to prevent.
 | \`4\` | **harness failure** | swe-verify could not observe. Not your change's fault; run \`swe-verify doctor\` and report it |
 | \`5\` | bypassed | recorded and amber, never green |
 
+### Bringing the app up
+
+The \`fixture\` says how. Three kinds:
+
+\`\`\`json
+"fixture": { "kind": "process", "language": "py", "program": "server.py",
+             "file": "app/server.py", "awaitExit": true }
+\`\`\`
+
+- **\`process\`** starts the program under a debugger. \`file\` locates the fixture and its
+  directory becomes the working directory; **\`program\` is resolved inside that directory**, so it
+  is usually just the basename — naming the same repo-relative path in both doubles the prefix.
+  Go takes a package (\`"."\` with \`"mode": "test"\`), Java a class. \`awaitExit: true\` for a job or
+  test binary; leave it off for a server, which never exits.
+- **\`none\`** for an app already running — set \`baseUrl\`, and \`attach\` if a debug port is open.
+- **\`compose\`** for a stack: \`file\` is the compose file, \`service\` and \`port\` name the container
+  port that \`{port}\` resolves to, and \`build: true\` rebuilds first.
+
+\`ready\` holds the app up until it serves — \`[{ "http": "http://127.0.0.1:{port}/health", "status": 200, "timeoutMs": 30000 }]\`.
+Without it a plan starts driving a process that has not finished booting.
+
 ### Make it prove behaviour, not just execution
 
 Without an assertion a green run says only that the code ran — that is \`SV021\`. Which kind fits
@@ -366,7 +387,7 @@ function renderAssertionKinds(facts: SkillFacts): string {
     },
     'http-json': {
       when: 'a field in an API response',
-      example: '{ "id": "a2", "kind": "http-json", "afterStep": 3,\n  "expect": { "path": "body.todos.0.text", "equals": "buy milk" } }',
+      example: '{ "id": "a2", "kind": "http-json", "afterStep": 3,\n  "expect": { "path": "body.todos.0.text", "equals": "buy milk" } }\n\n  // `path` reads headers too, which is how you assert on a binary response:\n  { "id": "a3", "kind": "http-json", "afterStep": 3,\n    "expect": { "path": "headers.content-type", "equals": "application/octet-stream" } }',
     },
     'ui-text': {
       when: 'what the page showed — evaluated from the story, so it works while recording',

@@ -231,6 +231,25 @@ describe('verify — refusing rather than degrading (NFR-12)', () => {
       .toEqual(fromRoot.json<{ findings: Array<{ code: string }> }>().findings.map((f) => f.code))
   })
 
+  it('names the doubled path when program repeats the directory from file', async () => {
+    // `file` sets the working directory and `program` resolves inside it, so
+    // naming the same repo-relative path in both doubles the prefix. Two
+    // agents lost a run each to this: the debuggee died with "Cannot find
+    // module", which surfaced as "fixture never became ready" — a harness
+    // failure whose real cause was only in the log.
+    repo.write('svc/server.py', 'print("up")\n')
+    repo.writePlan(planFor('doubled', ['svc/**'], {
+      fixture: { kind: 'process', language: 'py', file: 'svc/server.py', program: 'svc/server.py', awaitExit: true },
+      steps: [],
+      assertions: [],
+    }))
+    repo.commit('add a plan whose program repeats the directory')
+    const result = await cli(repo, ['run', '--plan', 'doubled', '--base', base], { env: PY_ENV })
+    expect(result.code).toBe(3)
+    expect(result.stderr).toMatch(/svc\/svc\/server\.py|does not exist/)
+    expect(result.stderr).toMatch(/relative to that|basename/)
+  })
+
   it('names the missing compose file rather than failing later at spawn', async () => {
     repo.writePlan(planFor('composed', ['app/**'], {
       fixture: { kind: 'compose' },
