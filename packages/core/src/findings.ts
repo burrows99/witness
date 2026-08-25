@@ -30,6 +30,7 @@ export const FINDING_CATALOG: Record<GateCode, FindingDescription> = {
   SV016: { summary: 'changed code in a language with no trustworthy debug adapter, so it was not gated', severity: 'warn' },
   SV020: { summary: 'an assertion failed', severity: 'error' },
   SV021: { summary: 'the plan has no assertions, so a green run proves execution but not behaviour', severity: 'warn' },
+  SV022: { summary: 'a plan step failed, so the run did not execute as written', severity: 'warn' },
   SV030: { summary: 'a step produced no artefact its primary reader — the agent — can read', severity: 'error' },
   SV040: { summary: 'a suspending breakpoint was used in CI', severity: 'error' },
   SV041: { summary: 'the run exceeded its time budget', severity: 'error' },

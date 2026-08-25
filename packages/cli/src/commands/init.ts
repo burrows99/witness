@@ -6,13 +6,13 @@ import type { CommandContext, CommandResult } from '../context.js'
 
 export async function initCommand(ctx: CommandContext): Promise<CommandResult> {
   ctx.args.assertKnown(['agents', 'hooks', 'vendor'])
-  const { created } = scaffold(ctx.cwd)
+  const { created } = scaffold(ctx.repoRoot)
   const written = [...created]
 
   // `AGENTS.md` is vendor-neutral steering; it does not bind, and the block is
   // regenerated in place so a human's own rules survive.
   if (ctx.args.bool('agents')) {
-    const file = join(ctx.cwd, 'AGENTS.md')
+    const file = join(ctx.repoRoot, 'AGENTS.md')
     const existing = existsSync(file) ? readFileSync(file, 'utf8') : ''
     const updated = upsertAgentsBlock(existing)
     if (updated !== existing) {

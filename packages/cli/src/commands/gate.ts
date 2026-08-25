@@ -16,13 +16,13 @@ import type { CommandContext, CommandResult } from '../context.js'
  */
 export async function gateCommand(ctx: CommandContext, options: { checkArgs?: boolean } = {}): Promise<CommandResult> {
   if (options.checkArgs !== false) ctx.args.assertKnown(['story', 'run', 'base', 'bypass', 'quiet'])
-  if (!isGitRepo(ctx.cwd)) {
+  if (!isGitRepo(ctx.repoRoot)) {
     throw new UsageError('not a git repository', 'Run swe-verify from inside a git worktree; the diff is what gets gated.')
   }
 
-  const base = ctx.args.flag('base') ?? defaultBase(ctx.cwd)
-  const diff = diffAgainst(ctx.cwd, base)
-  const plans = loadPlans(ctx.cwd)
+  const base = ctx.args.flag('base') ?? defaultBase(ctx.repoRoot)
+  const diff = diffAgainst(ctx.repoRoot, base)
+  const plans = loadPlans(ctx.repoRoot)
   const story = resolveStory(ctx)
 
   const selector = (ctx.args.flag('vcs') ?? ctx.config.vcs) as ProviderSelector
@@ -83,12 +83,12 @@ function resolveStory(ctx: CommandContext): Story | null {
 
   const runId = ctx.args.flag('run')
   if (runId) {
-    const file = join(runDir(ctx.cwd, runId), 'story.json')
+    const file = join(runDir(ctx.repoRoot, runId), 'story.json')
     if (!existsSync(file)) throw new UsageError(`no story for run ${runId}`, 'Check `swe-verify run` completed and wrote a story.')
     return readStory(file)
   }
 
-  const latest = latestRun(ctx.cwd)
+  const latest = latestRun(ctx.repoRoot)
   return latest ? readStory(latest) : null
 }
 

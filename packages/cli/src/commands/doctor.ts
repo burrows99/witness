@@ -32,9 +32,9 @@ export async function doctorCommand(ctx: CommandContext): Promise<CommandResult>
     detail: `domain=${ctx.config.domain} runner=${ctx.config.runner} store=${ctx.config.artifactStore} telemetry=${ctx.config.telemetry}`,
   })
 
-  const plansDir = paths.plans(ctx.cwd)
+  const plansDir = paths.plans(ctx.repoRoot)
   try {
-    const plans = loadPlans(ctx.cwd)
+    const plans = loadPlans(ctx.repoRoot)
     checks.push({
       name: 'plans',
       status: plans.length ? 'ok' : 'warn',

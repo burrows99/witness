@@ -590,3 +590,39 @@ describe('scope.languages actually filters, rather than only describing', () => 
     expect(evaluate(input({ diff, story: null, policy })).verdict).toBe('block')
   })
 })
+
+describe('a step that failed is reported, not left in the story', () => {
+  /**
+   * A real run had five of fourteen steps time out. The run kept going — a
+   * failed step is often the interesting one — but `--json` said nothing
+   * about any of them, and `verify --json` returns only the gate's verdict.
+   * The reader saw a bewildering final assertion diff and would have had to
+   * know to go digging in story.diagnostics.
+   */
+  it('warns once per failed step, with what the step reported', () => {
+    const diff = diffOf()
+    const story = storyFor(diff, {
+      diagnostics: [
+        { code: 'SVH030', severity: 'warn', message: 'step 10 failed: locator.click: Timeout 10000ms exceeded' },
+        { code: 'SVH001', severity: 'warn', message: 'something else entirely' },
+      ],
+    })
+    const r = evaluate(input({ diff, story }))
+    const failed = r.findings.filter((f) => f.code === 'SV022')
+    expect(failed).toHaveLength(1)
+    expect(failed[0]!.message).toMatch(/Timeout 10000ms/)
+  })
+
+  it('does not block on its own — the assertions decide that', () => {
+    const diff = diffOf()
+    const story = storyFor(diff, {
+      diagnostics: [{ code: 'SVH030', severity: 'warn', message: 'step 3 failed: boom' }],
+    })
+    expect(evaluate(input({ diff, story })).verdict).toBe('allow')
+  })
+
+  it('says nothing when every step ran', () => {
+    const r = evaluate(input({ diff: diffOf() }))
+    expect(codes(r)).not.toContain('SV022')
+  })
+})

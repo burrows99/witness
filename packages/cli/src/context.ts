@@ -1,6 +1,7 @@
 import { relative } from 'node:path'
 import type { ResolvedConfig } from '@swe-verify/core'
 import type { Args } from './args.js'
+import { repoRoot as repoRootOf } from './git.js'
 
 export interface DoctorCheck {
   name: string
@@ -12,6 +13,13 @@ export interface DoctorCheck {
 export interface CommandContext {
   args: Args
   cwd: string
+  /**
+   * The git root. Every path in a run — diff paths, scope globs, probe files,
+   * fixture programs — is relative to this and nothing else. `cwd` only says
+   * which repository to work in; letting it also be the path base is what
+   * made the same plan resolve two different ways.
+   */
+  repoRoot: string
   env: Record<string, string | undefined>
   config: ResolvedConfig
   now: Date
@@ -37,13 +45,16 @@ export interface CommandResult {
 }
 
 export function makeContext(args: Args, config: ResolvedConfig, cwd: string, env: Record<string, string | undefined>, now = new Date()): CommandContext {
+  // Resolved once: it shells out to git, and every path in the run leans on it.
+  const root = repoRootOf(cwd)
   return {
     args,
     cwd,
+    repoRoot: root,
     env,
     config,
     now,
     ci: Boolean(env.CI || env.GITHUB_ACTIONS || env.GITLAB_CI || env.BITBUCKET_BUILD_NUMBER),
-    relative: (path: string) => relative(cwd, path) || path,
+    relative: (path: string) => relative(root, path) || path,
   }
 }

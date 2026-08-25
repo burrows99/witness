@@ -22,7 +22,7 @@ export async function showCommand(ctx: CommandContext): Promise<CommandResult> {
   const runId = ctx.args.flag('run')
   const explicit = ctx.args.flag('story')
   const storyPath = explicit
-    ?? (runId ? join(runDir(ctx.cwd, runId), 'story.json') : latestRun(ctx.cwd))
+    ?? (runId ? join(runDir(ctx.repoRoot, runId), 'story.json') : latestRun(ctx.repoRoot))
 
   if (!storyPath || !existsSync(storyPath)) {
     throw new UsageError(
@@ -59,7 +59,7 @@ function recomputeGate(ctx: CommandContext, story: ReturnType<typeof readStory>)
     return evaluate({
       story,
       diff,
-      plans: loadPlans(ctx.cwd),
+      plans: loadPlans(ctx.repoRoot),
       policy: ctx.config,
       bypass: null,
       now: ctx.now,

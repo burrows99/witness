@@ -309,6 +309,18 @@ export function evaluate(input: GateInput): GateResult {
         { assertion_id: assertion.id })
     }
   }
+  // A step that timed out or threw. The run continues deliberately — a failed
+  // step is often the interesting one — but it must not pass unmentioned: a
+  // real run had five of fourteen steps fail, and the only sign in the JSON
+  // contract was a bewildering assertion diff at the end. The recording shows
+  // a broken interaction either way.
+  for (const diagnostic of story.diagnostics ?? []) {
+    if (diagnostic.code !== 'SVH030') continue
+    add('SV022', 'warn',
+      diagnostic.message,
+      'Fix the step — a wrong selector, or a wait that resolved before the page had navigated. The evidence covers less than the plan claims until you do.')
+  }
+
   if (plan.assertionCount === 0) {
     add('SV021', 'warn',
       `plan "${plan.id}" has no assertions: the run proves the code was exercised, not that it behaved`,

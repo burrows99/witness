@@ -32,6 +32,27 @@ function git(cwd: string, args: string[]): string {
   }
 }
 
+/**
+ * The repository root, which is the only base every path in a run agrees on.
+ *
+ * `git diff` reports paths relative to the root regardless of where it is
+ * invoked, so pointing `--cwd` at a subdirectory silently doubles the prefix:
+ * a probe on `examples/tutorial/flaskr/blog.py` was sent to the adapter as
+ * `examples/tutorial/examples/tutorial/flaskr/blog.py`, which Delve and
+ * debugpy both reject as a file that does not exist — surfacing as SV011,
+ * "almost always a path-mapping problem", with no hint that `--cwd` caused
+ * it. Scope globs matched the root-relative path while fixture paths resolved
+ * from `--cwd`, so the same plan had two different ideas of where it was.
+ */
+export function repoRoot(cwd: string): string {
+  try {
+    const root = git(cwd, ['rev-parse', '--show-toplevel']).trim()
+    return root.length > 0 ? root : cwd
+  } catch {
+    return cwd
+  }
+}
+
 export function isGitRepo(cwd: string): boolean {
   try {
     return git(cwd, ['rev-parse', '--is-inside-work-tree']).trim() === 'true'

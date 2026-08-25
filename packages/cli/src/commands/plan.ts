@@ -30,7 +30,7 @@ export async function planCommand(ctx: CommandContext): Promise<CommandResult> {
     assertions: [{ id: 'a1', kind: 'http-status', afterStep: 1, expect: { status: 200 } }],
   }
 
-  const dir = paths.plans(ctx.cwd)
+  const dir = paths.plans(ctx.repoRoot)
   mkdirSync(dir, { recursive: true })
   const file = join(dir, `${id}.plan.json`)
   if (existsSync(file) && !ctx.args.bool('force')) {

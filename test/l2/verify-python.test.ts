@@ -189,6 +189,24 @@ describe('verify — refusing rather than degrading (NFR-12)', () => {
     expect(result.stderr).toMatch(/SWE_VERIFY_JAVA_DEBUG|java-debug/)
   })
 
+  it('works the same run from a subdirectory as from the repo root', async () => {
+    // `git diff` reports paths relative to the repository root wherever it is
+    // invoked. Using --cwd as the path base doubled the prefix — a probe on
+    // `app/pricing.py` went to the adapter as `app/app/pricing.py`, which it
+    // rejected as a file that does not exist, surfacing as SV011 "almost
+    // always a path-mapping problem" with no hint that --cwd caused it. Scope
+    // globs matched the root-relative path while fixture paths resolved from
+    // --cwd, so one plan had two ideas of where it was.
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    const fromRoot = await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const fromSubdir = await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json', '--cwd', join(repo.dir, 'app')], { env: PY_ENV })
+
+    expect(fromSubdir.code).toBe(fromRoot.code)
+    expect(fromSubdir.json<{ verdict: string }>().verdict).toBe(fromRoot.json<{ verdict: string }>().verdict)
+    expect(fromSubdir.json<{ findings: Array<{ code: string }> }>().findings.map((f) => f.code))
+      .toEqual(fromRoot.json<{ findings: Array<{ code: string }> }>().findings.map((f) => f.code))
+  })
+
   it('names the missing compose file rather than failing later at spawn', async () => {
     repo.writePlan(planFor('composed', ['app/**'], {
       fixture: { kind: 'compose' },
