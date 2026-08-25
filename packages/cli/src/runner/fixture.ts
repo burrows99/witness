@@ -84,12 +84,18 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
 
   const adapter = adapterFor(fixture.language as never)
   const availability = adapter.detect(options.repoRoot, options.env)
-  if (!availability.available) {
-    // Refuse rather than degrade (NFR-12, D3). This is a config problem the
-    // developer can fix, so it is exit 3, not a harness crash.
-    throw new UsageError(
-      `no debug adapter available for ${fixture.language}: ${availability.detail}`,
-      availability.remedy ?? 'Install the adapter for this language, or exclude these paths from the gate.',
+  // Without an adapter the app still runs, it is just not watched. Refusing to
+  // start it at all conflated two different things: swe-verify cannot *gate*
+  // this language, and swe-verify cannot *run* this app. Only the first is
+  // true, and treating them as one meant a Node app could not have its
+  // lifecycle managed by the harness at all — two agents independently ended
+  // up starting the server by hand and pointing a `kind: "none"` fixture at
+  // it, which is a worse plan for the same run. The changed lines report
+  // SV016, ungated and honest, exactly as they would have anyway.
+  const debuggable = availability.available
+  if (!debuggable) {
+    options.log(
+      `fixture: no debug adapter for ${fixture.language} (${availability.detail}) — starting the app unwatched; its changed lines will report SV016`,
     )
   }
 
@@ -100,14 +106,23 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
   const appPort = await freePort()
   const substitute = (text: string) => text.replaceAll('{port}', String(appPort))
 
-  const command = adapter.debuggee({
-    program: fixture.program,
-    cwd,
-    repoRoot: options.repoRoot,
-    port,
-    pathMapping: null,
-    env: options.env,
-  })
+  const command = debuggable
+    ? adapter.debuggee({
+        program: fixture.program,
+        cwd,
+        repoRoot: options.repoRoot,
+        port,
+        pathMapping: null,
+        env: options.env,
+      })
+    : adapter.plain?.({ program: fixture.program, cwd, args: fixture.args ?? [], env: options.env })
+
+  if (!command) {
+    throw new UsageError(
+      `no debug adapter available for ${fixture.language}: ${availability.detail}`,
+      availability.remedy ?? 'Install the adapter for this language, or use "kind": "none" and start the app yourself.',
+    )
+  }
 
   let stdout = ''
   let stderr = ''
@@ -125,11 +140,13 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
   child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
   child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
   child.on('error', (error) => { stderr += `\n${error.message}` })
-  options.log(`fixture: ${command.command} ${command.args.join(' ')} (debug port ${port}, app port ${appPort})`)
+  options.log(
+    `fixture: ${command.command} ${command.args.join(' ')} (${debuggable ? `debug port ${port}, ` : 'unwatched, '}app port ${appPort})`,
+  )
 
   return {
-    debug: { host: '127.0.0.1', port },
-    adapter,
+    debug: debuggable ? { host: '127.0.0.1', port } : null,
+    adapter: debuggable ? adapter : null,
     baseUrl: fixture.baseUrl ? substitute(fixture.baseUrl) : `http://127.0.0.1:${appPort}`,
     mode: fixture.mode,
     args: fixture.args,

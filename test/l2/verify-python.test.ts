@@ -175,18 +175,42 @@ suite('verify — a backend-only change, gated on real line coverage (M1)', () =
 })
 
 describe('verify — refusing rather than degrading (NFR-12)', () => {
-  it('exits 3 with a remedy when the language has no adapter', async () => {
-    repo.write('app/main.rb', 'def x\n  1\nend\n')
-    repo.writePlan(planFor('ruby-thing', ['app/**'], {
-      fixture: { kind: 'process', language: 'java', program: 'app/main.jar' },
+  it('starts an app whose language has no adapter, and says it is unwatched', async () => {
+    // Not having an adapter means this language cannot be *gated*. It does
+    // not mean the app cannot be *run*, and refusing to start it conflated
+    // the two: a Node app could not have its lifecycle managed by the harness
+    // at all, so two agents independently started the server by hand and
+    // pointed a `kind: "none"` fixture at it — a worse plan describing the
+    // same run, with the coverage outcome identical.
+    repo.write('app/thing.ts', 'export const bonus = 1\nexport const total = bonus\n')
+    repo.writePlan(planFor('ts-thing', ['app/**'], {
+      fixture: { kind: 'process', language: 'ts', program: 'app/thing.ts', awaitExit: true },
       steps: [],
       assertions: [],
     }))
     repo.commit('add a plan for a language with no adapter')
-    const result = await cli(repo, ['run', '--plan', 'ruby-thing', '--base', base], { env: PY_ENV })
-    expect(result.code).toBe(3)
-    expect(result.stderr).toMatch(/no debug adapter available for java/)
-    expect(result.stderr).toMatch(/SWE_VERIFY_JAVA_DEBUG|java-debug/)
+    const result = await cli(repo, ['run', '--plan', 'ts-thing', '--base', base], { env: PY_ENV })
+    expect(result.code).toBe(0)
+    // The story says so, so the reason survives past the terminal scrollback.
+    const diagnostics = storyOf().diagnostics.map((d) => `${d.code} ${d.message}`).join('\n')
+    expect(diagnostics).toMatch(/SVH001/)
+    expect(diagnostics).toMatch(/could not be instrumented|no debuggable fixture/)
+  })
+
+  it('never claims coverage for a run with no debugger attached', async () => {
+    // The property that must survive: degrading the *fixture* must not
+    // degrade the *gate*. The changed lines are reported ungated, not fired.
+    repo.write('app/thing.ts', 'export const bonus = 1\nexport const total = bonus\n')
+    repo.writePlan(planFor('ts-thing', ['app/**'], {
+      fixture: { kind: 'process', language: 'ts', program: 'app/thing.ts', awaitExit: true },
+      steps: [],
+      assertions: [],
+    }))
+    repo.commit('add a plan for a language with no adapter')
+    const result = await cli(repo, ['verify', '--plan', 'ts-thing', '--base', base, '--json'], { env: PY_ENV })
+    const gate = result.json<GateResult>()
+    expect(gate.findings.map((f) => f.code)).toContain('SV016')
+    expect(gate.metrics.fired).toBe(0)
   })
 
   it('works the same run from a subdirectory as from the repo root', async () => {

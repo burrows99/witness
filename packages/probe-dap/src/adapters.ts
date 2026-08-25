@@ -61,6 +61,24 @@ export interface AdapterSpec {
   debuggee(params: ConfigureParams): DebuggeeCommand
   configureArgs(params: ConfigureParams): Record<string, unknown>
   detect(root?: string, env?: AdapterEnv): AdapterAvailability
+  /**
+   * How to start the program with no debugger attached.
+   *
+   * Not having an adapter means this language cannot be *gated*; it does not
+   * mean the app cannot be *run*. Conflating the two meant a Node app could
+   * not have its lifecycle managed by the harness at all, and two agents
+   * independently worked around it by starting the server by hand and
+   * pointing a `kind: "none"` fixture at it — a worse plan describing the
+   * same run. The changed lines report SV016 either way.
+   */
+  plain(params: PlainParams): DebuggeeCommand
+}
+
+export interface PlainParams {
+  program: string
+  cwd: string
+  args: readonly string[]
+  env: AdapterEnv
 }
 
 function tryRun(command: string, args: string[]): string | null {
@@ -122,6 +140,7 @@ const debugpyAdapter: AdapterSpec = {
       ? { pathMappings: [{ localRoot: pathMapping.localRoot, remoteRoot: pathMapping.remoteRoot }] }
       : {}),
   }),
+  plain: ({ program, args }) => ({ command: 'python3', args: [program, ...args], env: {} }),
   detect: (root, env) => {
     const found = findPython(root, env ?? process.env)
     return found
@@ -167,6 +186,11 @@ const delveAdapter: AdapterSpec = {
         : {}),
     }
   },
+  plain: ({ program, args }) => ({
+    command: 'go',
+    args: args.includes('-test.run') ? ['test', program || './...', ...args] : ['run', program || '.', ...args],
+    env: {},
+  }),
   detect: (_root, env) => {
     const found = findDelve(env ?? process.env)
     return found
@@ -201,6 +225,7 @@ const jsDebugAdapter: AdapterSpec = {
     port,
     ...(pathMapping ? { localRoot: pathMapping.localRoot, remoteRoot: pathMapping.remoteRoot } : {}),
   }),
+  plain: ({ program, args }) => ({ command: 'node', args: [program, ...args], env: {} }),
   detect: (root, env) => {
     const bundled = (env ?? process.env).SWE_VERIFY_JS_DEBUG
       ?? (root ? join(root, 'node_modules', '@vscode', 'js-debug', 'src', 'dapDebugServer.js') : '')
@@ -226,6 +251,7 @@ const javaDebugAdapter: AdapterSpec = {
     env: {},
   }),
   configureArgs: ({ port }) => ({ hostName: '127.0.0.1', port }),
+  plain: ({ program, args }) => ({ command: 'java', args: program.endsWith('.jar') ? ['-jar', program, ...args] : [program, ...args], env: {} }),
   detect: (_root, env) => {
     const jar = (env ?? process.env).SWE_VERIFY_JAVA_DEBUG
     if (jar && existsSync(jar)) return { available: true, detail: `java-debug at ${jar}` }

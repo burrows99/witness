@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
 import type { Language, ProbeTarget } from '@swe-verify/core'
-import { adapterFor, adapterReport } from '../../src/adapters.js'
+import { ADAPTERS, adapterFor, adapterReport } from '../../src/adapters.js'
 import { runWithProbes } from '../../src/runner.js'
 
 /**
@@ -220,5 +220,33 @@ describe.skipIf(!adapterFor('go').detect(process.cwd(), process.env).available)(
   it('lets the test binary run to completion', async () => {
     const result = await run([target('p001', 'main.go', 10, 'go')])
     expect(result.timedOut).toBe(false)
+  })
+})
+
+/**
+ * Not having an adapter means a language cannot be *gated*. It does not mean
+ * the app cannot be *run* — and conflating the two meant a `kind: "process"`
+ * fixture refused to start a Node app at all, so its lifecycle could not be
+ * managed by the harness. Two agents independently worked around that by
+ * starting the server by hand and pointing a `kind: "none"` fixture at it: a
+ * worse plan describing the same run, with the coverage outcome unchanged.
+ */
+describe.each(Object.values(ADAPTERS))('plain start: $language', (adapter) => {
+  const params = { program: 'app/main', cwd: '/repo', args: [] as string[], env: {} }
+
+  it('gives a command that runs the program with no debugger', () => {
+    const command = adapter.plain(params)
+    expect(command.command.length).toBeGreaterThan(0)
+    expect(command.args.join(' ')).not.toMatch(/debugpy|dlv|--inspect|dapDebugServer|jdwp/)
+  })
+
+  it('names the program it was asked to start', () => {
+    expect(adapter.plain(params).args.join(' ')).toContain('app/main')
+  })
+
+  it('passes the plan\'s arguments through', () => {
+    expect(adapter.plain({ ...params, args: ['--flag', 'x'] }).args).toEqual(
+      expect.arrayContaining(['--flag', 'x']),
+    )
   })
 })
