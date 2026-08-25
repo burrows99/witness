@@ -254,11 +254,20 @@ const jsDebugAdapter: AdapterSpec = {
       env: {},
     }
   },
-  configureArgs: ({ program, cwd, args, pathMapping }) => ({
+  configureArgs: ({ program, cwd, repoRoot, args, pathMapping }) => ({
     type: 'pwa-node',
     request: 'launch',
     program,
     cwd,
+    // A probe goes on the source file the diff names — `pricing.ts` — while
+    // the program that runs is `dist/pricing.js`. js-debug bridges the two
+    // through source maps, but only inside `outFiles`: without this it cannot
+    // find the compiled output, so every TypeScript breakpoint is accepted,
+    // never verified, and never fires. Plain JavaScript worked and TypeScript
+    // silently did not.
+    __workspaceFolder: repoRoot ?? cwd,
+    sourceMaps: true,
+    outFiles: [`${repoRoot ?? cwd}/**/*.js`, '!**/node_modules/**'],
     // Without this the debuggee's stdout goes to a terminal nobody is
     // reading, and a transcript assertion has nothing to match on.
     console: 'internalConsole',

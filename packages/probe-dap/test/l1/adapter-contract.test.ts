@@ -289,6 +289,21 @@ describe('js-debug is multi-session, which the adapter has to declare', () => {
     expect(args).toMatchObject({ type: 'pwa-node', request: 'launch', console: 'internalConsole' })
   })
 
+  it('tells js-debug where compiled output lives, or TypeScript never fires', () => {
+    // A probe goes on the file the diff names — `pricing.ts` — while the
+    // program that runs is `dist/pricing.js`. js-debug bridges them through
+    // source maps, but only inside `outFiles`. Without it every TypeScript
+    // breakpoint is accepted, never verified and never hit: plain JavaScript
+    // worked and TypeScript silently did not, which is the worse failure.
+    const args = jsDebug.configureArgs({
+      program: 'dist/main.js', cwd: '/repo', repoRoot: '/repo', port: 1, pathMapping: null, env: {},
+    }) as { outFiles?: string[]; sourceMaps?: boolean; __workspaceFolder?: string }
+    expect(args.sourceMaps).toBe(true)
+    expect(args.__workspaceFolder).toBe('/repo')
+    expect(args.outFiles).toContain('/repo/**/*.js')
+    expect(args.outFiles).toContain('!**/node_modules/**')
+  })
+
   it('is the only adapter here that needs following', () => {
     for (const language of ['py', 'go'] as const) {
       expect(adapterFor(language).multiSession, language).not.toBe(true)
