@@ -125,6 +125,16 @@ describe('the playbook — numbered steps, each one a command', () => {
     expect(skill.toLowerCase()).toMatch(/must not end on the working state/)
   })
 
+  it('forks first, and targets the fork rather than the upstream project', () => {
+    // Four agents each had to work this out. `--remote=false` is rejected
+    // when a repo argument is given, and the fork's default branch is
+    // `master` on older projects — targeting the upstream default silently
+    // opens a pull request against someone else's repository.
+    expect(skill).toMatch(/gh repo fork/)
+    expect(skill).toMatch(/defaultBranchRef/)
+    expect(skill.toLowerCase()).toMatch(/fork's own default branch/)
+  })
+
   it('opens the PR with gh, and says the body carries placeholders', () => {
     expect(skill).toMatch(/gh pr create/)
     expect(skill).toMatch(/BEFORE_VIDEO|placeholder/)

@@ -186,8 +186,16 @@ swe-verify show --run <run-id> --json
 ## 5. Open the PR
 
 \`\`\`bash
-gh pr create --base <base> --head <branch> --title "<title>" --body-file body.md
+gh repo fork <owner>/<repo> --clone=false   # once, if you do not own the repo
+git remote add fork https://github.com/<you>/<repo>.git
+git push -u fork <branch>
+gh pr create --repo <you>/<repo> --base <the fork's default branch> --head <branch> \\
+  --title "<title>" --body-file body.md
 \`\`\`
+
+Target **the fork's own default branch**, not the upstream project's — check it with
+\`gh repo view <you>/<repo> --json defaultBranchRef\`, since it is \`master\` on older repositories.
+\`--remote=false\` is rejected when a repository argument is given, so add the remote yourself.
 
 Put a placeholder where each recording goes (\`BEFORE_VIDEO\`, \`AFTER_VIDEO\`). State what the
 evidence shows — and if the pair shows no difference, say that rather than implying one.
