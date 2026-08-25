@@ -1,0 +1,86 @@
+name: swe-verify
+description: Block a merge when the changed code was never executed.
+author: swe-verify
+branding:
+  icon: check-circle
+  color: purple
+
+inputs:
+  command:
+    description: 'gate | verify — `gate` evaluates an existing story, `verify` runs the plan first.'
+    required: false
+    default: gate
+  plan:
+    description: 'Plan id or path, required for `verify`.'
+    required: false
+  base:
+    description: 'Commit or branch the diff is taken against. Defaults to the pull request base.'
+    required: false
+  story:
+    description: 'Path to a story.json produced by an earlier job.'
+    required: false
+  working-directory:
+    description: 'Directory to run in.'
+    required: false
+    default: '.'
+  warn-only:
+    description: 'Report findings without failing the job. The rollout starts here (PRD §10).'
+    required: false
+    default: 'false'
+
+outputs:
+  verdict:
+    description: allow | block | bypass
+    value: ${{ steps.gate.outputs.verdict }}
+  exit-code:
+    description: '0 allow · 2 block · 3 usage/config · 4 harness failure · 5 bypassed'
+    value: ${{ steps.gate.outputs.exit-code }}
+  findings:
+    description: The GateResult as JSON.
+    value: ${{ steps.gate.outputs.findings }}
+
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        # The bypass label lives in the event payload, so no token and no API
+        # call are needed for the free path (NFR-4).
+        SWE_VERIFY_EVENT: ${{ toJSON(github.event) }}
+      run: |
+        set +e
+        args=("${{ inputs.command }}" --json)
+        [ -n "${{ inputs.plan }}" ] && args+=(--plan "${{ inputs.plan }}")
+        [ -n "${{ inputs.story }}" ] && args+=(--story "${{ inputs.story }}")
+        if [ -n "${{ inputs.base }}" ]; then
+          args+=(--base "${{ inputs.base }}")
+        elif [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+          args+=(--base "${{ github.event.pull_request.base.sha }}")
+        fi
+
+        output=$(swe-verify "${args[@]}")
+        code=$?
+        echo "$output"
+
+        verdict=$(printf '%s' "$output" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).verdict??"unknown")}catch{process.stdout.write("unknown")}})')
+        {
+          echo "exit-code=$code"
+          echo "verdict=$verdict"
+          echo "findings<<SWEVEOF"
+          echo "$output"
+          echo "SWEVEOF"
+        } >> "$GITHUB_OUTPUT"
+
+        # Exit 4 is a harness failure — our bug, not the developer's. It still
+        # fails the job, but it is reported as ours (FR-8, M5).
+        if [ "$code" = "4" ]; then
+          echo "::error title=swe-verify harness failure::The harness could not observe this run (exit 4). This is a swe-verify problem, not a problem with your change."
+        fi
+
+        if [ "${{ inputs.warn-only }}" = "true" ]; then
+          echo "::notice title=swe-verify (warn only)::verdict=$verdict exit=$code"
+          exit 0
+        fi
+        exit $code

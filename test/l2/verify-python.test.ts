@@ -1,0 +1,234 @@
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { verifySeal, type GateResult, type Story } from '@swe-verify/core'
+import { adapterFor } from '@swe-verify/probe-dap'
+import { TestRepo, cli, planFor } from '../helpers/repo.js'
+
+/**
+ * The fixture repo is a throwaway directory with no toolchain of its own, so
+ * the interpreter is pointed at explicitly — the same override a project
+ * whose venv lives somewhere unusual would use.
+ */
+const PY_ENV = { SWE_VERIFY_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') }
+
+/**
+ * L2 — `verify` end to end against a real Python application, with real
+ * debugpy logpoints. This is the M1 release criterion: a backend-only change
+ * is gated on line coverage, with no browser involved.
+ */
+
+const adapterAvailable = adapterFor('py').detect(process.cwd()).available
+const suite = adapterAvailable ? describe : describe.skip
+
+const BASE_APP = `def apply_tiered(total, tier):
+    base = total
+    return base
+
+
+def main():
+    print("result", apply_tiered(100, 2))
+
+
+if __name__ == "__main__":
+    main()
+`
+
+/** A change whose lines all execute for the input the plan drives. */
+const EXERCISED_CHANGE = `def apply_tiered(total, tier):
+    base = total
+    if tier >= 2:
+        bonus = tier * 0.05
+        return base * (1 - bonus)
+    return base
+
+
+def main():
+    print("result", apply_tiered(100, 2))
+
+
+if __name__ == "__main__":
+    main()
+`
+
+/** The same change, but the driven input never reaches the new branch. */
+const UNEXERCISED_CHANGE = `def apply_tiered(total, tier):
+    base = total
+    if tier >= 9:
+        bonus = tier * 0.05
+        return base * (1 - bonus)
+    return base
+
+
+def main():
+    print("result", apply_tiered(100, 2))
+
+
+if __name__ == "__main__":
+    main()
+`
+
+let repo: TestRepo
+let base: string
+
+beforeEach(() => {
+  repo = new TestRepo()
+  repo.write('app/pricing.py', BASE_APP)
+  repo.write('.swe-verify/config.json', JSON.stringify({ schema: 'swe-verify/config@1', vcs: 'local' }))
+  repo.writePlan(planFor('pricing', ['app/**'], {
+    fixture: { kind: 'process', language: 'py', program: 'app/pricing.py', awaitExit: true },
+    steps: [],
+    assertions: [],
+  }))
+  base = repo.commit('base')
+})
+afterEach(() => repo.dispose())
+
+const storyOf = (): Story => {
+  const runs = join(repo.dir, '.swe-verify', 'runs')
+  const { readdirSync } = require('node:fs') as typeof import('node:fs')
+  const id = readdirSync(runs).sort().at(-1)!
+  return JSON.parse(readFileSync(join(runs, id, 'story.json'), 'utf8')) as Story
+}
+
+suite('verify — a backend-only change, gated on real line coverage (M1)', () => {
+  it('passes when every changed line actually executed', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    const result = await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    expect(result.json<GateResult>().findings.filter((f) => f.severity === 'error')).toEqual([])
+    expect(result.code).toBe(0)
+  })
+
+  it('blocks with SV010 on the line the run never reached', async () => {
+    repo.write('app/pricing.py', UNEXERCISED_CHANGE)
+    const result = await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    expect(result.code).toBe(2)
+    const findings = result.json<GateResult>().findings.filter((f) => f.code === 'SV010')
+    expect(findings.length).toBeGreaterThan(0)
+    // Lines 4 and 5 are the body of the branch that was never taken.
+    expect(findings.map((f) => f.locus!.line)).toEqual(expect.arrayContaining([4, 5]))
+  })
+
+  it('verifies every probe it installed — accepted is not bound (R2)', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const story = storyOf()
+    const probed = story.coverage.lines.filter((l) => l.probe_id)
+    expect(probed.length).toBeGreaterThan(0)
+    expect(probed.every((l) => l.verified === true)).toBe(true)
+  })
+
+  it('captures variable state at the changed line, in the story', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const logpoints = storyOf().events.filter((e) => e.type === 'logpoint')
+    expect(logpoints.length).toBeGreaterThan(0)
+    const captured = logpoints.flatMap((e) => Object.entries((e as { vars: Record<string, unknown> }).vars))
+    expect(captured).toContainEqual(['tier', 2])
+  })
+
+  it('lets the application run to completion — logpoints never suspend it', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const log = readFileSync(join(repo.dir, '.swe-verify', 'runs', storyOf().run_id, 'logs', 'harness.log'), 'utf8')
+    expect(log).toMatch(/result 90/)
+  })
+
+  it('seals the story so a third party can recompute the verdict', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const story = storyOf()
+    expect(story.seal).toBeDefined()
+    expect(verifySeal(story)).toBe(true)
+  })
+
+  it('binds the story to the diff it verified', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    expect(storyOf().diff.hash).toBe(repo.diffHash(base))
+  })
+
+  it('writes a harness log that says what the probes did (M5)', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const log = readFileSync(join(repo.dir, '.swe-verify', 'runs', storyOf().run_id, 'logs', 'harness.log'), 'utf8')
+    expect(log).toMatch(/probes: \d+ installed, \d+ verified/)
+    expect(log).toMatch(/sealed story/)
+  })
+
+  it('goes stale the moment the code changes again (FR-2)', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    repo.write('app/pricing.py', EXERCISED_CHANGE.replace('0.05', '0.07'))
+    const result = await cli(repo, ['gate', '--base', base, '--json'], { env: PY_ENV })
+    expect(result.code).toBe(2)
+    expect(result.json<GateResult>().findings.map((f) => f.code)).toEqual(['SV003'])
+  })
+
+  it('reports a run as JSON the agent can read without parsing prose (US-2 AC3)', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    const result = await cli(repo, ['run', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const payload = result.json<{ command: string; run_id: string; summary: { fired: number } }>()
+    expect(payload.command).toBe('run')
+    expect(payload.run_id).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/)
+    expect(payload.summary.fired).toBeGreaterThan(0)
+  })
+})
+
+describe('verify — refusing rather than degrading (NFR-12)', () => {
+  it('exits 3 with a remedy when the language has no adapter', async () => {
+    repo.write('app/main.rb', 'def x\n  1\nend\n')
+    repo.writePlan(planFor('ruby-thing', ['app/**'], {
+      fixture: { kind: 'process', language: 'java', program: 'app/main.jar' },
+      steps: [],
+      assertions: [],
+    }))
+    repo.commit('add a plan for a language with no adapter')
+    const result = await cli(repo, ['run', '--plan', 'ruby-thing', '--base', base], { env: PY_ENV })
+    expect(result.code).toBe(3)
+    expect(result.stderr).toMatch(/no debug adapter available for java/)
+    expect(result.stderr).toMatch(/SWE_VERIFY_JAVA_DEBUG|java-debug/)
+  })
+
+  it('exits 3 for a compose fixture, which this build does not implement', async () => {
+    repo.writePlan(planFor('composed', ['app/**'], {
+      fixture: { kind: 'compose', file: 'docker-compose.yml' },
+      steps: [],
+      assertions: [],
+    }))
+    repo.commit('add a compose plan')
+    const result = await cli(repo, ['run', '--plan', 'composed', '--base', base], { env: PY_ENV })
+    expect(result.code).toBe(3)
+    expect(result.stderr).toMatch(/compose fixtures are not implemented/)
+  })
+})
+
+suite('show — the viewer (FR-16, M3)', () => {
+  it('renders one self-contained page next to the artefacts it links', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    const result = await cli(repo, ['show', '--base', base, '--json'], { env: PY_ENV })
+    expect(result.code).toBe(0)
+
+    const viewerPath = join(repo.dir, result.json<{ viewer: string }>().viewer)
+    const html = readFileSync(viewerPath, 'utf8')
+    expect(html.startsWith('<!doctype html>')).toBe(true)
+    expect(html).not.toMatch(/src="https?:/)
+    expect(viewerPath).toContain(storyOf().run_id)
+  })
+
+  it('shows the verdict the current diff produces, not the one the run recorded', async () => {
+    repo.write('app/pricing.py', EXERCISED_CHANGE)
+    await cli(repo, ['verify', '--plan', 'pricing', '--base', base, '--json'], { env: PY_ENV })
+    repo.write('app/pricing.py', EXERCISED_CHANGE.replace('0.05', '0.07'))
+    const result = await cli(repo, ['show', '--base', base, '--json'], { env: PY_ENV })
+    expect(result.json<{ verdict: string }>().verdict).toBe('block')
+    expect(readFileSync(join(repo.dir, result.json<{ viewer: string }>().viewer), 'utf8')).toMatch(/SV003/)
+  })
+
+  it('says so, rather than crashing, when there is no run to show', async () => {
+    const result = await cli(repo, ['show'], { env: PY_ENV })
+    expect(result.code).toBe(3)
+    expect(result.stderr).toMatch(/no run to show/)
+  })
+})

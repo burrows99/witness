@@ -1,0 +1,2 @@
+# swe-verify run artefacts are per-run and large; the plan is what gets committed.
+runs/

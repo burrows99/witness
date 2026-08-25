@@ -1,0 +1,72 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # The tiers run in the order the design puts them in: cheap logic first,
+  # then adapters, then real apps, then the mutation harness that proves the
+  # gate would have caught anything at all.
+  unit:
+    name: L0 unit + architecture rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test:l0
+      - run: pnpm test:arch
+
+  adapters:
+    name: L1 adapter contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.22' }
+      - run: pnpm install --frozen-lockfile
+      - run: python -m venv .venv && .venv/bin/pip install debugpy
+      - run: go install github.com/go-delve/delve/cmd/dlv@latest
+      - run: npx playwright install --with-deps chromium
+      - run: pnpm test:l1
+
+  fleet:
+    name: L2 conformance + L3 mutation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pnpm install --frozen-lockfile
+      - run: python -m venv .venv && .venv/bin/pip install debugpy
+      - run: npx playwright install --with-deps chromium
+      - run: pnpm test:l2
+      # M1 and M2 are published from this job's log every run (PRD §6).
+      - run: pnpm test:l3
+
+  dogfood:
+    name: L4 — swe-verify gates its own change
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:l4

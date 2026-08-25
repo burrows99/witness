@@ -1,0 +1,15 @@
+{
+  "schema": "swe-verify/config@1",
+  "domain": "fullstack",
+  "vcs": "auto",
+  "runner": "local",
+  "artifactStore": "fs",
+  "telemetry": "off",
+  "scope": {
+    "include": ["fixtures/**"],
+    "exclude": ["**/*.md", "**/*.test.*", "**/dist/**", "**/node_modules/**"],
+    "languages": ["py", "go"]
+  },
+  "coverage": { "policy": "all-executable", "defensive": "warn", "waiverCapPct": 10 },
+  "bypass": { "allowed": true, "requiresReason": true, "label": "swe-verify:bypass" }
+}

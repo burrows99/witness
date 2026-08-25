@@ -1,0 +1,22 @@
+# The workspace definition. pnpm reads this file, not the `workspaces` field in
+# package.json — that field is npm/yarn's spelling and pnpm ignores it, so it is
+# deliberately absent from the root manifest rather than sitting there as dead
+# configuration.
+packages:
+  - packages/*
+
+# Catalogs: one place to pin every external version, referenced from package
+# manifests as `catalog:`. Upgrading is a one-line change here instead of an
+# edit to every package that depends on it, and two packages cannot drift onto
+# different versions of the same library.
+#
+# `catalog:` is rewritten to the real range on publish, exactly like
+# `workspace:`, so published packages work for consumers on any package manager.
+catalog:
+  '@modelcontextprotocol/sdk': ^1.30.0
+  '@types/node': ^22.10.2
+  ajv: ^8.17.1
+  playwright: ^1.62.1
+  tsx: ^4.19.2
+  typescript: ^5.7.2
+  vitest: ^2.1.8

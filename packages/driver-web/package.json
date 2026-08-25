@@ -1,0 +1,41 @@
+{
+  "name": "@swe-verify/driver-web",
+  "version": "0.1.0",
+  "description": "Playwright driver: accessible-role actions, a11y snapshots, per-request trace spans.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@swe-verify/core": "workspace:*",
+    "@swe-verify/driver-api": "workspace:*",
+    "@swe-verify/recorders": "workspace:*"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40"
+  },
+  "peerDependenciesMeta": {
+    "playwright": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "playwright": "catalog:"
+  }
+}

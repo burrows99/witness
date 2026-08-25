@@ -1,0 +1,32 @@
+{
+  "name": "@swe-verify/mcp",
+  "version": "0.1.0",
+  "description": "MCP adapter over the CLI. No logic of its own.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "swe-verify-mcp": "./dist/bin.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "catalog:",
+    "@swe-verify/cli": "workspace:*",
+    "@swe-verify/core": "workspace:*"
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "swe-verify",
+  "version": "0.1.0",
+  "description": "Block a merge when the changed code was never executed.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "clean": "tsc --build --clean && pnpm -r exec rm -rf dist",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:l0": "vitest run --project l0",
+    "test:l1": "vitest run --project l1",
+    "test:l2": "vitest run --project l2",
+    "test:l3": "vitest run --project l3",
+    "test:l4": "vitest run --project l4",
+    "test:arch": "vitest run --project arch",
+    "swe-verify": "node packages/cli/dist/bin.js"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "playwright": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

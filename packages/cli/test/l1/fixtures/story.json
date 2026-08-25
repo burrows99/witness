@@ -1,0 +1,41 @@
+{
+  "schema": "swe-verify/story@1",
+  "run_id": "01JB7QK3M9X2VYD8N4T6ZQWERT",
+  "plan_id": "p",
+  "plan_sha256": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "diff": {
+    "hash": "sha256:9999999999999999999999999999999999999999999999999999999999999999",
+    "algo": "normalised-v1",
+    "base_sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "head_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "files": 0,
+    "changed_lines": 0
+  },
+  "vcs": {
+    "provider": "local"
+  },
+  "env": {
+    "cli": "0.1.0",
+    "os": "x",
+    "runner": "local",
+    "domain": "fullstack"
+  },
+  "started_at": "2026-08-24T10:11:02.401Z",
+  "sealed_at": "2026-08-24T10:11:19.883Z",
+  "events": [],
+  "coverage": {
+    "policy": "all-executable",
+    "lines": [],
+    "summary": {
+      "executable": 0,
+      "fired": 0,
+      "unverified": 0,
+      "waived": 0,
+      "excluded": 0,
+      "defensive": 0
+    }
+  },
+  "assertions": [],
+  "artifacts": [],
+  "diagnostics": []
+}

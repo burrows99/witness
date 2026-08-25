@@ -1,0 +1,39 @@
+{
+  "name": "@swe-verify/cli",
+  "version": "0.1.0",
+  "description": "The swe-verify binary \u2014 the only package that composes everything.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "bin": {
+    "swe-verify": "./dist/bin.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@swe-verify/core": "workspace:*",
+    "@swe-verify/driver-api": "workspace:*",
+    "@swe-verify/driver-web": "workspace:*",
+    "@swe-verify/probe-dap": "workspace:*",
+    "@swe-verify/recorders": "workspace:*",
+    "@swe-verify/vcs": "workspace:*",
+    "@swe-verify/viewer": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

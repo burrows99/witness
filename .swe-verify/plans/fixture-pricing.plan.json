@@ -1,0 +1,16 @@
+{
+  "schema": "swe-verify/plan@1",
+  "id": "fixture-pricing",
+  "intent": "the tiered discount fixture computes a discounted total for a tier-2 customer",
+  "domain": "fullstack",
+  "scope": { "include": ["fixtures/l1/py/**"] },
+  "fixture": {
+    "kind": "process",
+    "language": "py",
+    "program": "pricing.py",
+    "file": "fixtures/l1/py/pricing.py",
+    "awaitExit": true
+  },
+  "steps": [],
+  "assertions": []
+}
