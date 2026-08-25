@@ -214,21 +214,30 @@ suite('recording — evidence a reviewer can watch', () => {
     expect(statSync(file).size).toBeGreaterThan(10_000)
   })
 
-  it('names the recording after the plan and the checkout it filmed', async () => {
+  it('carries the recording in the story, with a declared reader (FR-15)', async () => {
     repo.write('app/server.py', CHANGED_APP)
-    const result = await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
-    // The tree is dirty here (the change is uncommitted), and the name says so
-    // — that recording cannot be reproduced from the commit alone.
-    expect(result.json<{ recording: string }>().recording).toMatch(/checkout-.*-dirty\.mp4$/)
+    await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+
+    // A recording the driver keeps to itself is invisible to the gate, the
+    // viewer and the agent alike. It has to be an artefact.
+    const video = storyOf().artifacts.find((a) => a.kind === 'video')
+    expect(video, 'the recording must appear in story.artifacts').toBeTruthy()
+    expect(video!.readableBy).toEqual(['human'])
+    expect(video!.path).toMatch(/^artifacts\/video\//)
+    expect(video!.bytes).toBeGreaterThan(10_000)
+    expect(video!.sha256).toMatch(/^sha256:[0-9a-f]{64}$/)
   })
 
-  it('writes a title card saying which branch and commit it filmed', async () => {
+  it('still leaves an agent-readable artefact per step, so a video alone cannot satisfy the gate', async () => {
     repo.write('app/server.py', CHANGED_APP)
-    const result = await cli(repo, ['run', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
-    const card = join(repo.dir, result.json<{ recording: string }>().recording.replace(/\.mp4$/, '.slide.html'))
-    const html = readFileSync(card, 'utf8')
-    expect(html).toMatch(/placing an order/)
-    expect(html).toMatch(/uncommitted/i)
+    const result = await cli(repo, ['verify', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    expect(result.json<GateResult>().findings.map((f) => f.code)).not.toContain('SV030')
+
+    const story = storyOf()
+    for (const step of story.events.filter((e) => e.type === 'step' && e.driver === 'web')) {
+      const forStep = story.artifacts.filter((a) => a.step_seq === step.step_seq)
+      expect(forStep.some((a) => a.readableBy.includes('agent')), `step ${step.step_seq}`).toBe(true)
+    }
   })
 
   it('produces a real H.264 mp4, not a renamed webm', async () => {

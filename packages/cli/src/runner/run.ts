@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   compileRedactionPolicy,
@@ -18,12 +18,13 @@ import {
   type StoryArtifact,
   type StoryAssertion,
   type StoryDiagnostic,
+  type Recorder,
   type UnsequencedEvent,
   type StoryView,
 } from '@swe-verify/core'
 import { DapSession, type InstalledProbe } from '@swe-verify/probe-dap'
 import { ApiDriver, assertionKinds, newTraceId } from '@swe-verify/driver-api'
-import { ArtifactStore, hasFfmpeg, slideDocument, transcodeToMp4, type Slide } from '@swe-verify/recorders'
+import { ArtifactStore, BrowserRecorder, slideDocument, type Slide } from '@swe-verify/recorders'
 import { HarnessError, UsageError } from '../errors.js'
 import { runDir as runDirFor } from '../workspace.js'
 import { startFixture, waitForReady } from './fixture.js'
@@ -115,6 +116,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
   let session: DapSession | null = null
   let installed: InstalledProbe[] = []
   const driversToClose: Driver[] = []
+  const recorders: Recorder[] = []
 
   try {
     // Attach whenever the fixture is debuggable, even with nothing to
@@ -155,8 +157,30 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       log,
     )
 
-    const drivers = await loadDrivers(store, options.plan, log, options.record ? join(dir, 'artifacts', 'video') : undefined)
+    const drivers = await loadDrivers(store, options.plan, log, options.record ? join(dir, 'raw-video') : undefined)
     driversToClose.push(...drivers.values())
+
+    // Recording is a recorder's job, not a driver's. Registering it here is
+    // what puts the finished file into `story.artifacts` with a declared
+    // reader, where the gate, the viewer and the agent can all find it.
+    if (options.record) {
+      const web = drivers.get('web') as unknown as BrowserSourceCapable | undefined
+      if (web?.recordedVideo) {
+        recorders.push(new BrowserRecorder({
+          source: {
+            videoDir: () => join(dir, 'raw-video'),
+            recordedVideo: () => web.recordedVideo(),
+            finish: async () => { await (web as unknown as Driver).close?.() },
+          },
+          store,
+          card: options.record.slide,
+          renderCard: renderSlidePng,
+          width: 1280,
+          height: 720,
+        }))
+      }
+    }
+    for (const recorder of recorders) await recorder.start(ctx)
     for (const step of [...options.plan.steps].sort((a, b) => a.seq - b.seq)) {
       const driver = drivers.get(step.driver)
       if (!driver) {
@@ -166,6 +190,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
         )
       }
       log(`step ${step.seq}: ${step.driver} ${step.action} ${JSON.stringify(step.args ?? {})}`)
+      for (const recorder of recorders) await recorder.mark({ seq: step.seq, driver: step.driver, action: step.action })
       const result = await driver.execute(step, ctx)
       stepResults.set(step.seq, result)
       events.push({
@@ -229,6 +254,20 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       })
     }
 
+    // Recorders are stopped before the story is assembled: a recording that
+    // arrives after sealing is not in the artefact list, which is the same as
+    // not existing as far as every consumer is concerned.
+    let videoPath: string | undefined
+    for (const recorder of recorders) {
+      const produced = await recorder.stop()
+      artifacts.push(...produced)
+      const video = produced.find((a: StoryArtifact) => a.kind === 'video')
+      if (video) {
+        videoPath = join(dir, video.path)
+        log(`recording: ${video.path} (${video.bytes} bytes, readable by ${video.readableBy.join(', ')})`)
+      }
+    }
+
     const assertions = await evaluateAssertions(options.plan, drivers, stepResults, events, artifacts)
     for (const assertion of assertions) {
       events.push({
@@ -276,13 +315,6 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     const storyPath = writeSealedStory(dir, redacted)
     log(`sealed story ${storyPath}`)
 
-    // The recording is only finalised when the browser context closes, so the
-    // drivers are shut here rather than in `finally` — a file that is still
-    // being written cannot be transcoded.
-    const videoPath = options.record
-      ? await finishRecording({ drivers: driversToClose, dir, record: options.record, log })
-      : undefined
-
     return { story: redacted, runId, storyPath, logPath, ...(videoPath ? { videoPath } : {}) }
   } catch (error) {
     if (error instanceof UsageError || error instanceof HarnessError) throw error
@@ -300,47 +332,6 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     const stderr = fixture.stderr()
     if (stderr.trim()) log(`fixture stderr:\n${stderr.trim()}`)
   }
-}
-
-/**
- * Close the browser so its recording is flushed, then encode it to something a
- * reviewer can actually open. Playwright writes `.webm`; a pull request gets
- * read on a phone.
- */
-async function finishRecording(params: {
-  drivers: Driver[]
-  dir: string
-  record: { label: string; slide: Slide }
-  log: (line: string) => void
-}): Promise<string | undefined> {
-  for (const driver of params.drivers) {
-    try { await driver.close?.() } catch { /* teardown is best-effort */ }
-  }
-
-  const web = params.drivers.find((driver) => driver.name === 'web') as
-    | { recordedVideo?: () => string | null }
-    | undefined
-  const raw = web?.recordedVideo?.() ?? null
-  if (!raw || !existsSync(raw)) {
-    params.log('recording: the run produced no video file')
-    return undefined
-  }
-
-  const videoDir = join(params.dir, 'artifacts', 'video')
-  mkdirSync(videoDir, { recursive: true })
-  writeFileSync(join(videoDir, `${params.record.label}.slide.html`), slideDocument(params.record.slide, 1280, 720))
-
-  if (!hasFfmpeg()) {
-    // Degrade rather than lose the take: the webm is still evidence, it is
-    // just less portable.
-    params.log('recording: ffmpeg not found, leaving the raw webm in place')
-    return raw
-  }
-
-  const mp4 = join(videoDir, `${params.record.label}.mp4`)
-  await transcodeToMp4({ input: raw, output: mp4, holdLastFrameMs: 1200 })
-  params.log(`recording: ${mp4}`)
-  return mp4
 }
 
 /**
@@ -391,6 +382,27 @@ function pushHits(
       vars: hit.vars,
       hit: 1,
     })
+  }
+}
+
+/** What the runner needs from whichever driver holds the browser. */
+interface BrowserSourceCapable {
+  recordedVideo(): string | null
+}
+
+/** Renders a title card to a still, using the browser the driver already has. */
+async function renderSlidePng(card: Slide, png: string, width: number, height: number): Promise<void> {
+  const { writeFileSync } = await import('node:fs')
+  const html = png.replace(/\.png$/, '.html')
+  writeFileSync(html, slideDocument(card, width, height))
+  const { chromium } = await import('playwright')
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage({ viewport: { width, height } })
+    await page.goto(`file://${html}`)
+    await page.screenshot({ path: png })
+  } finally {
+    await browser.close()
   }
 }
 

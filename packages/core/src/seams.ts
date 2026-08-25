@@ -94,9 +94,39 @@ export interface AssertionKind {
   evaluate(spec: Record<string, unknown>, view: StoryView, step: number): Promise<AssertionResult> | AssertionResult
 }
 
-/** A recorder *captures evidence*. */
+/**
+ * What a recorder can emit. `video` and `cast` are first-class: a recording is
+ * evidence like any other artefact, not a driver's private business.
+ */
+export const ARTIFACT_KINDS = ['frame', 'video', 'transcript', 'snapshot', 'cast', 'log'] as const
+export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
+
+export function isArtifactKind(value: string): value is ArtifactKind {
+  return (ARTIFACT_KINDS as readonly string[]).includes(value)
+}
+
+/** Where in the story an artefact belongs. */
+export interface StepRef {
+  seq: number
+  driver: string
+  action: string
+}
+
+/**
+ * A recorder *captures evidence*, across a whole run.
+ *
+ * It is a session — `start`, then `mark` at each step boundary, then `stop` —
+ * rather than a per-step callback. A video is one continuous artefact
+ * spanning the run, and only `mark` can tie a moment inside it back to a
+ * step. A per-step `capture()` cannot express that, so recording would have
+ * to live inside a driver, where no other consumer can reach it.
+ */
 export interface Recorder {
   readonly name: string
-  readonly readableBy: ReadonlyArray<'agent' | 'human'>
-  capture(step: PlanStep, result: StepResult, ctx: RunContext): Promise<StoryArtifact[]>
+  readonly produces: readonly ArtifactKind[]
+  start(ctx: RunContext): Promise<void>
+  /** Called as each step begins, so artefacts can carry a `step_seq`. */
+  mark(step: StepRef): Promise<void>
+  /** Everything captured, declared with its readers. */
+  stop(): Promise<StoryArtifact[]>
 }

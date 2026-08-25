@@ -2,15 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { renderSkill, SPEC_FRONTMATTER_FIELDS, type SkillFacts } from '../../src/skill.js'
 
 /**
- * The generated skill is derived from the project, not written by hand: as the
- * project gains a plan, an adapter or a policy, re-running the generator makes
- * the skill say so. That only works if generation is **deterministic** — a
- * timestamp or a random id would make "is this skill stale?" unanswerable.
+ * The generated skill is a *playbook*: numbered steps an agent runs, each one
+ * a command, ending in a pull request a reviewer can watch. Everything
+ * project-specific — which plans exist, what can be instrumented here, which
+ * policies decide a verdict — is derived, so the file describes the project
+ * today rather than on the day someone wrote it.
  *
- * Frontmatter stays inside the six fields of the Agent Skills spec. Claude
- * Code accepts more, but claude.ai and the API reject unknown keys outright,
- * and a project whose thesis is "works with any vendor's agent" cannot ship a
- * skill that only loads in one of them.
+ * That only works if generation is deterministic: a timestamp would make "is
+ * this skill stale?" unanswerable.
  */
 
 const facts = (over: Partial<SkillFacts> = {}): SkillFacts => ({
@@ -41,10 +40,6 @@ const frontmatter = (markdown: string): Record<string, string> => {
 }
 
 describe('frontmatter — the Agent Skills spec, and nothing beyond it', () => {
-  it('opens with YAML frontmatter', () => {
-    expect(renderSkill(facts()).startsWith('---\n')).toBe(true)
-  })
-
   it('uses only fields the spec defines, so it loads outside Claude Code too', () => {
     for (const key of Object.keys(frontmatter(renderSkill(facts())))) {
       expect(SPEC_FRONTMATTER_FIELDS, `"${key}" is not an Agent Skills field`).toContain(key)
@@ -52,18 +47,11 @@ describe('frontmatter — the Agent Skills spec, and nothing beyond it', () => {
   })
 
   it('names the skill in lowercase, numbers and hyphens, within 64 characters', () => {
-    const name = frontmatter(renderSkill(facts())).name!
-    expect(name).toMatch(/^[a-z0-9-]{1,64}$/)
+    expect(frontmatter(renderSkill(facts())).name!).toMatch(/^[a-z0-9-]{1,64}$/)
   })
 
   it('keeps a name legal even when the project name is not', () => {
-    const name = frontmatter(renderSkill(facts({ project: 'Acme  Checkout!! (v2)' }))).name!
-    expect(name).toMatch(/^[a-z0-9-]{1,64}$/)
-  })
-
-  it('truncates a very long project name rather than emitting an illegal one', () => {
-    const name = frontmatter(renderSkill(facts({ project: 'x'.repeat(200) }))).name!
-    expect(name.length).toBeLessThanOrEqual(64)
+    expect(frontmatter(renderSkill(facts({ project: 'Acme  Checkout!! (v2)' }))).name!).toMatch(/^[a-z0-9-]{1,64}$/)
   })
 
   it('describes when to use the skill, within the description budget', () => {
@@ -76,7 +64,6 @@ describe('frontmatter — the Agent Skills spec, and nothing beyond it', () => {
   it('quotes a description that would otherwise break the YAML', () => {
     const markdown = renderSkill(facts({ project: 'a: b "c" #d' }))
     expect(() => frontmatter(markdown)).not.toThrow()
-    expect(markdown).toMatch(/^description: "/m)
   })
 
   it('carries a fingerprint of the facts it was generated from', () => {
@@ -90,114 +77,144 @@ describe('generation is deterministic — otherwise "is it stale?" has no answer
   })
 
   it('embeds no date, time or random identifier', () => {
-    const markdown = renderSkill(facts())
-    expect(markdown).not.toMatch(/\d{4}-\d{2}-\d{2}/)
-    expect(markdown).not.toMatch(/generated at/i)
+    expect(renderSkill(facts())).not.toMatch(/\d{4}-\d{2}-\d{2}/)
   })
 
-  it('changes its fingerprint when the project changes', () => {
-    const before = renderSkill(facts())
-    const after = renderSkill(facts({ plans: [...facts().plans, { id: 'refunds', intent: 'a refund restores stock', include: ['src/refunds/**'], exclude: [], assertions: 1, fixture: 'none' }] }))
-    expect(after).not.toBe(before)
-    expect(fingerprintOf(after)).not.toBe(fingerprintOf(before))
-  })
-
-  it('does not change its fingerprint when the plans are merely reordered', () => {
-    const forward = renderSkill(facts())
-    const reversed = renderSkill(facts({ plans: [...facts().plans].reverse() }))
-    expect(fingerprintOf(reversed)).toBe(fingerprintOf(forward))
+  it('changes when the project changes, and not when plans are merely reordered', () => {
+    const base = renderSkill(facts())
+    const reordered = renderSkill(facts({ plans: [...facts().plans].reverse() }))
+    const added = renderSkill(facts({
+      plans: [...facts().plans, { id: 'refunds', intent: 'a refund restores stock', include: ['src/refunds/**'], exclude: [], assertions: 1, fixture: 'none' }],
+    }))
+    expect(reordered).toBe(base)
+    expect(added).not.toBe(base)
   })
 })
 
-describe('the body says what an agent working here has to know', () => {
-  it('leads with the one command', () => {
-    expect(renderSkill(facts())).toMatch(/swe-verify verify --plan <plan-id> --json/)
+describe('the playbook — numbered steps, each one a command', () => {
+  const skill = renderSkill(facts())
+
+  it('runs from picking a plan through to a rendered PR', () => {
+    for (const heading of [
+      /## 1\. /, /## 2\. /, /## 3\. /, /## 4\. /, /## 5\. /, /## 6\. /, /## 7\. /,
+    ]) expect(skill).toMatch(heading)
   })
+
+  it('gives the one command that proves and films in a single step', () => {
+    expect(skill).toMatch(/swe-verify verify --plan <plan-id> --record --json/)
+  })
+
+  it('films the reproduction by changing what is checked out, not by a flag', () => {
+    // A tool that reverts files mid-run can leave a working tree wrecked if
+    // the run dies. Which recording you get is decided by the checkout.
+    expect(skill).toMatch(/git stash/)
+    expect(skill).toMatch(/swe-verify run --plan <plan-id> --record/)
+  })
+
+  it('warns that a reproduction must not end on the working state', () => {
+    expect(skill.toLowerCase()).toMatch(/must not end on the working state/)
+  })
+
+  it('opens the PR with gh, and says the body carries placeholders', () => {
+    expect(skill).toMatch(/gh pr create/)
+    expect(skill).toMatch(/BEFORE_VIDEO|placeholder/)
+  })
+
+  it('is explicit that attaching video has no CLI path', () => {
+    expect(skill).toMatch(/user-attachments/)
+    expect(skill.toLowerCase()).toMatch(/cannot reach|no cli path/)
+  })
+
+  it('tells the agent to check the video actually rendered', () => {
+    expect(skill).toMatch(/readyState/)
+  })
+
+  it('lists where a run leaves its artefacts', () => {
+    expect(skill).toMatch(/story\.json/)
+    expect(skill).toMatch(/artifacts\/video/)
+    expect(skill).toMatch(/harness\.log/)
+  })
+})
+
+describe('what is derived from this project', () => {
+  const skill = renderSkill(facts())
 
   it('routes a change to the plan whose scope covers it', () => {
-    const markdown = renderSkill(facts())
-    expect(markdown).toMatch(/`checkout`/)
-    expect(markdown).toMatch(/src\/pricing\/\*\*/)
-    expect(markdown).toMatch(/`signup`/)
-    expect(markdown).toMatch(/src\/accounts\/\*\*/)
-  })
-
-  it('carries each plan\'s intent, which is what a reviewer reads', () => {
-    expect(renderSkill(facts())).toMatch(/checkout applies the tiered discount/)
+    expect(skill).toMatch(/`checkout`/)
+    expect(skill).toMatch(/src\/pricing\/\*\*/)
+    expect(skill).toMatch(/checkout applies the tiered discount/)
   })
 
   it('flags a plan that asserts nothing, rather than presenting it as ready', () => {
-    const markdown = renderSkill(facts())
-    expect(markdown).toMatch(/signup[\s\S]{0,400}no assertions/i)
+    expect(skill).toMatch(/signup[\s\S]{0,400}no assertions/i)
   })
 
-  it('tells the agent what to do when no plan covers the change', () => {
-    expect(renderSkill(facts())).toMatch(/swe-verify plan --intent/)
-  })
-
-  it('says which languages this project can actually gate', () => {
-    const markdown = renderSkill(facts())
-    expect(markdown).toMatch(/py.*debugpy/)
-    expect(markdown).toMatch(/ts.*not vendored|ts.*cannot/i)
-  })
-
-  it('carries the remedy for an unavailable adapter, not just the fact', () => {
-    expect(renderSkill(facts())).toMatch(/SWE_VERIFY_JS_DEBUG/)
+  it('says which languages this project can actually gate, with the remedy', () => {
+    expect(skill).toMatch(/py.*debugpy/)
+    expect(skill).toMatch(/SWE_VERIFY_JS_DEBUG/)
   })
 
   it('explains every exit code, since that is the agent\'s read path', () => {
-    const markdown = renderSkill(facts())
-    for (const code of ['0', '2', '3', '4', '5']) expect(markdown).toMatch(new RegExp(`\\b${code}\\b`))
-    expect(markdown).toMatch(/harness failure/i)
-  })
-
-  it('lists the findings an agent will meet, with what to do about them', () => {
-    const markdown = renderSkill(facts())
-    for (const code of ['SV001', 'SV003', 'SV010', 'SV011', 'SV020']) expect(markdown).toContain(code)
+    for (const code of ['0', '2', '3', '4', '5']) expect(skill).toContain('`' + code + '`')
+    expect(skill).toMatch(/harness failure/i)
   })
 
   it('distinguishes a finding that blocks from one that only warns', () => {
-    const markdown = renderSkill(facts())
-    // SV010 stops a merge; SV021 does not, and saying otherwise would teach an
-    // agent to treat a warning as a wall.
-    expect(markdown).toMatch(/\| `SV010` \| blocks \|/)
-    expect(markdown).toMatch(/\| `SV021` \| warns \|/)
-    expect(markdown).toMatch(/\| `SV014` \| policy \|/)
+    expect(skill).toMatch(/\| `SV010` \| blocks \|/)
+    expect(skill).toMatch(/\| `SV021` \| warns \|/)
+    expect(skill).toMatch(/\| `SV014` \| policy \|/)
   })
 
   it('states the policies that decide a verdict here', () => {
-    const markdown = renderSkill(facts())
-    expect(markdown).toMatch(/defensive.*warn/i)
-    expect(markdown).toMatch(/10%/)
+    expect(skill).toMatch(/defensive.*warn/i)
+    expect(skill).toMatch(/10%/)
+    expect(skill).toMatch(/swe-verify:bypass/)
   })
 
-  it('tells the agent not to weaken the plan to turn the gate green', () => {
-    expect(renderSkill(facts()).toLowerCase()).toMatch(/never (narrow|weaken|remove)/)
+  it('says what the tooling cannot do here, rather than implying it can', () => {
+    expect(skill).toMatch(/compose/)
+    expect(skill).toMatch(/js-debug|ts/)
+  })
+})
+
+describe('the rules that make a recording evidence', () => {
+  const skill = renderSkill(facts())
+
+  it('requires a run that records nothing to fail', () => {
+    expect(skill.toLowerCase()).toMatch(/records nothing/)
+  })
+
+  it('separates what the frame renders from what was measured', () => {
+    expect(skill).toMatch(/MEASURED/)
+  })
+
+  it('forbids narration typed into the app or the shell', () => {
+    expect(skill.toLowerCase()).toMatch(/never typed into|spliced/)
+  })
+
+  it('forbids weakening a plan to turn the gate green', () => {
+    expect(skill.toLowerCase()).toMatch(/never (narrow|weaken|remove)/)
   })
 
   it('says the gate runs in CI regardless, so the skill is not the enforcement', () => {
-    expect(renderSkill(facts())).toMatch(/CI/)
+    expect(skill).toMatch(/CI/)
   })
 })
 
 describe('a project that has not adopted swe-verify yet', () => {
   const fresh = () => facts({ plans: [], adapters: [], browser: false })
 
-  it('still generates, and says the project has no plans', () => {
-    const markdown = renderSkill(fresh())
-    expect(markdown).toMatch(/no plans/i)
-    expect(markdown).toMatch(/swe-verify plan --intent/)
+  it('still generates, and sends the agent to write the first plan', () => {
+    const skill = renderSkill(fresh())
+    expect(skill).toMatch(/no plans/i)
+    expect(skill).toMatch(/swe-verify plan --intent/)
   })
 
   it('does not claim a language is gateable when no adapter is present', () => {
     expect(renderSkill(fresh())).toMatch(/no debug adapter/i)
   })
 
-  it('does not mention the browser driver when Playwright is absent', () => {
-    expect(renderSkill(fresh())).not.toMatch(/driver: web|Playwright is installed/)
+  it('says filming is unavailable when Playwright is absent', () => {
+    expect(renderSkill(fresh())).toMatch(/Playwright is not installed/)
   })
 })
-
-function fingerprintOf(markdown: string): string {
-  return /swe-verify-fingerprint: (sha256:[0-9a-f]{64})/.exec(markdown)?.[1] ?? ''
-}

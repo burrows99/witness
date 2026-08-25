@@ -362,15 +362,26 @@ describe('gate — harness policy findings', () => {
     expect(codes(evaluate(input({ diff, story })))).toContain('SV041')
   })
 
-  it('requires an agent-readable artefact per step only when configured (FR-15)', () => {
+  it('requires an agent-readable artefact for every step (FR-15)', () => {
     const diff = diffOf()
     const story = storyFor(diff, {
       artifacts: [{ kind: 'video', path: 'v.webm', sha256: `sha256:${'1'.repeat(64)}`, bytes: 10, readableBy: ['human'], step_seq: 1 }],
       events: [{ seq: 1, tier: 'browser', trace_id: 't', wall: 'w', mono_ns: 1, type: 'step', driver: 'web', action: 'click', args: {}, status: 'ok', step_seq: 1 }],
     })
-    expect(codes(evaluate(input({ diff, story })))).not.toContain('SV030')
-    const policy = policyOf({ artifacts: { requireAgentReadable: true } })
-    expect(codes(evaluate(input({ diff, story, policy })))).toContain('SV030')
+    // A video the agent cannot watch does not satisfy the gate.
+    expect(codes(evaluate(input({ diff, story })))).toContain('SV030')
+
+    const withSnapshot = storyFor(diff, {
+      artifacts: [
+        { kind: 'video', path: 'v.webm', sha256: `sha256:${'1'.repeat(64)}`, bytes: 10, readableBy: ['human'], step_seq: 1 },
+        { kind: 'snapshot', path: 'a.yaml', sha256: `sha256:${'2'.repeat(64)}`, bytes: 10, readableBy: ['agent'], step_seq: 1 },
+      ],
+      events: story.events,
+    })
+    expect(codes(evaluate(input({ diff, story: withSnapshot })))).not.toContain('SV030')
+
+    const off = policyOf({ artifacts: { requireAgentReadable: false } })
+    expect(codes(evaluate(input({ diff, story, policy: off })))).not.toContain('SV030')
   })
 })
 

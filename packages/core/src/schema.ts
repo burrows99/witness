@@ -154,7 +154,11 @@ export const DEFAULT_CONFIG: ResolvedConfig = {
   coverage: { policy: 'all-executable', defensive: 'warn', waiverCapPct: 10 },
   budgets: { runMs: 600_000, breakpointMs: 30_000, artifactBytes: 524_288_000, probeLines: 500, launchMs: 300_000 },
   bypass: { allowed: true, requiresReason: true, label: 'swe-verify:bypass' },
-  artifacts: { requireAgentReadable: false },
+  // "the gate requires at least one agent-readable artefact per step" — the
+  // rule the design calls the one that keeps recorders honest. Off by
+  // default, it never fires, and a recorder can satisfy the gate with a video
+  // the agent cannot watch.
+  artifacts: { requireAgentReadable: true },
   redact: {
     keys: ['password', 'token', 'secret', 'authorization', 'cookie', 'ssn', 'api_key', 'apikey', 'private_key'],
     patterns: ['(?i)bearer\\s+[a-z0-9._-]+'],

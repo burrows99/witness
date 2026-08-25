@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { redact, sha256, sha256Bytes, type RedactionPolicy, type Reader, type StoryArtifact } from '@swe-verify/core'
 
@@ -54,6 +54,20 @@ export class ArtifactStore {
       this.dropped.push(`${spec.name} (binary, redaction policy onUnknownBinary=drop)`)
       return null
     }
+    if (!this.admit(spec, data.byteLength)) return null
+    const relative = this.persist(spec.name, data)
+    return this.describe(spec, relative, sha256Bytes(data), data.byteLength)
+  }
+
+  /**
+   * Take a file that already exists — a recording ffmpeg just wrote — and
+   * declare it as an artefact. Binary produced by the harness itself carries
+   * no captured application state, so it needs no redaction pass; what it
+   * does need is a declared reader, or the gate cannot reason about it.
+   */
+  adopt(spec: ArtifactSpec, absolutePath: string): StoryArtifact | null {
+    if (!existsSync(absolutePath)) return null
+    const data = readFileSync(absolutePath)
     if (!this.admit(spec, data.byteLength)) return null
     const relative = this.persist(spec.name, data)
     return this.describe(spec, relative, sha256Bytes(data), data.byteLength)
