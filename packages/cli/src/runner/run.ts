@@ -166,7 +166,11 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       log,
     )
 
-    const drivers = await loadDrivers(store, options.plan, log, options.record ? join(dir, 'raw-video') : undefined)
+    const drivers = await loadDrivers(
+      store, options.plan, log,
+      options.record ? join(dir, 'raw-video') : undefined,
+      options.record ? join(dir, 'raw-network', 'run.har') : undefined,
+    )
     driversToClose.push(...drivers.values())
 
     // Recording is a recorder's job, not a driver's, and *which* recorders
@@ -184,6 +188,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
               browser: {
                 videoDir: () => join(dir, 'raw-video'),
                 recordedVideo: () => web.recordedVideo(),
+                recordedHar: () => web.recordedHar?.() ?? null,
                 finish: async () => { await (web as unknown as Driver).close?.() },
               },
             }
@@ -403,6 +408,7 @@ async function loadDrivers(
   plan: Plan,
   log: (line: string) => void,
   videoDir?: string,
+  harPath?: string,
 ): Promise<Map<string, Driver>> {
   const drivers = new Map<string, Driver>([['api', new ApiDriver({ store })]])
   if (!plan.steps.some((step) => step.driver === 'web')) return drivers
@@ -414,8 +420,8 @@ async function loadDrivers(
       'Install playwright and its browsers (npx playwright install chromium), or rewrite the plan to drive the API.',
     )
   }
-  log(`drivers: web (playwright)${videoDir ? ', recording' : ''}`)
-  drivers.set('web', new web.WebDriver({ store, ...(videoDir ? { videoDir } : {}) }))
+  log(`drivers: web (playwright)${videoDir ? ', recording' : ''}${harPath ? ', capturing network' : ''}`)
+  drivers.set('web', new web.WebDriver({ store, ...(videoDir ? { videoDir } : {}), ...(harPath ? { harPath } : {}) }))
   return drivers
 }
 
@@ -447,6 +453,7 @@ function pushHits(
 /** What the runner needs from whichever driver holds the browser. */
 interface BrowserSourceCapable {
   recordedVideo(): string | null
+  recordedHar?(): string | null
 }
 
 /** Renders a title card to a still, using the browser the driver already has. */

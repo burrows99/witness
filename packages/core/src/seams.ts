@@ -102,9 +102,12 @@ export interface AssertionKind {
 
 /**
  * What a recorder can emit. `video` and `cast` are first-class: a recording is
- * evidence like any other artefact, not a driver's private business.
+ * evidence like any other artefact, not a driver's private business. So is
+ * `har` — a video of a network failure shows a spinner, and the HAR shows the
+ * cause, which is the difference between evidence a human can watch and
+ * evidence an agent can diagnose from.
  */
-export const ARTIFACT_KINDS = ['frame', 'video', 'transcript', 'snapshot', 'cast', 'log'] as const
+export const ARTIFACT_KINDS = ['frame', 'video', 'transcript', 'snapshot', 'cast', 'log', 'har'] as const
 export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
 
 export function isArtifactKind(value: string): value is ArtifactKind {

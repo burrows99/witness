@@ -29,6 +29,11 @@ export interface WebDriverOptions {
    * there is no way to start filming halfway through a run.
    */
   videoDir?: string
+  /**
+   * Where Playwright writes the HAR. Same constraint as the video: recording
+   * is a property of the context, decided before the first page opens.
+   */
+  harPath?: string
 }
 
 interface RequestRecord {
@@ -158,6 +163,14 @@ export class WebDriver implements Driver {
   /** The finished recording, available after `close()`. */
   recordedVideo(): string | null {
     return this.pendingVideo
+  }
+
+  /**
+   * Where Playwright wrote the HAR, available after `close()` — it is flushed
+   * with the context, exactly like the video.
+   */
+  recordedHar(): string | null {
+    return this.options.harPath ?? null
   }
 
   private async perform(
@@ -294,9 +307,15 @@ export class WebDriver implements Driver {
     const videoDir = this.options.videoDir
     if (videoDir) mkdirSync(videoDir, { recursive: true })
     const viewport = this.options.viewport ?? { width: 1280, height: 720 }
+    // Playwright writes both of these itself, and flushes them when the
+    // context closes. Building a HAR from route interception instead would
+    // see no timing phases and no failed transports — the two things a
+    // network bug is usually made of.
+    const harPath = this.options.harPath
     this.context = await this.browser.newContext({
       viewport,
       ...(videoDir ? { recordVideo: { dir: videoDir, size: viewport } } : {}),
+      ...(harPath ? { recordHar: { path: harPath, mode: 'full', content: 'embed' } } : {}),
     })
 
     // One traceparent per request, not one per session: the point is to link

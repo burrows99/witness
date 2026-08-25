@@ -118,9 +118,13 @@ beforeEach(() => {
 afterEach(() => repo.dispose())
 
 const storyOf = (): Story => {
+  return JSON.parse(readFileSync(join(latestRunDir(), 'story.json'), 'utf8')) as Story
+}
+
+/** Artefact paths in a story are relative to the run directory. */
+const latestRunDir = (): string => {
   const runs = join(repo.dir, '.swe-verify', 'runs')
-  const id = readdirSync(runs).sort().at(-1)!
-  return JSON.parse(readFileSync(join(runs, id, 'story.json'), 'utf8')) as Story
+  return join(runs, readdirSync(runs).sort().at(-1)!)
 }
 
 const suite = available ? describe : describe.skip
@@ -198,6 +202,39 @@ suite('verify — one story across browser, server and HTTP (M2)', () => {
     const result = await cli(repo, ['verify', '--plan', 'checkout', '--base', base, '--json'], { env: PY_ENV })
     expect(result.code).toBe(2)
     expect(result.json<GateResult>().findings.map((f) => f.code)).toContain('SV010')
+  })
+})
+
+suite('network evidence — what a video of a spinner cannot show', () => {
+  /**
+   * A recording shows a failing request as a spinner that never resolves.
+   * The HAR shows which request it was, what the server answered and how
+   * long it took — and it is the artefact the *agent* reads, since it cannot
+   * watch the film.
+   *
+   * Playwright writes the HAR itself, flushed when the context closes. What
+   * this checks is that it reaches the story: an artefact the driver keeps to
+   * itself is invisible to the gate, the viewer and the agent alike.
+   */
+  it('seals a HAR alongside the recording, readable by the agent', async () => {
+    repo.write('app/server.py', CHANGED_APP)
+    repo.commit('apply the change')
+    const result = await cli(repo, ['verify', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    expect(result.code).toBe(0)
+
+    const story = storyOf()
+    const har = story.artifacts.find((a) => a.kind === 'har')
+    expect(har, 'the run produced no HAR').toBeDefined()
+    expect(har!.readableBy).toContain('agent')
+
+    const parsed = JSON.parse(readFileSync(join(latestRunDir(), har!.path), 'utf8')) as {
+      log: { entries: Array<{ request: { method: string; url: string }; response: { status: number } }> }
+    }
+    expect(parsed.log.entries.length).toBeGreaterThan(0)
+    // The click that placed the order is in there, with what the server said.
+    const post = parsed.log.entries.find((e) => e.request.method === 'POST')
+    expect(post, 'the order POST is missing from the HAR').toBeDefined()
+    expect(post!.response.status).toBe(201)
   })
 })
 

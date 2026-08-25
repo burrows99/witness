@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { join } from 'node:path'
@@ -6,6 +6,7 @@ import type { ArtifactKind, Recorder, RunContext, StepRef, StoryArtifact } from 
 import type { ArtifactStore } from './store.js'
 import { hasFfmpeg, transcodeToMp4 } from './video.js'
 import { concatArgs, concatList, slideClipArgs } from './splice.js'
+import { harSummary, trimHar, type Har } from './har.js'
 import type { Slide } from './video.js'
 
 /**
@@ -24,6 +25,8 @@ export interface BrowserSource {
   videoDir(): string
   /** The finished recording, available once the context has closed. */
   recordedVideo(): string | null
+  /** Where Playwright wrote the HAR, flushed with the same context close. */
+  recordedHar?(): string | null
   /** Close the context so the recording is flushed. */
   finish(): Promise<void>
 }
@@ -31,6 +34,8 @@ export interface BrowserSource {
 export interface BrowserRecorderOptions {
   source: BrowserSource
   store: ArtifactStore
+  /** Bodies are dropped past this to keep the HAR worth storing. */
+  maxHarBytes?: number
   /** Rendered to a still and spliced in front of the clip. */
   card?: Slide | undefined
   /** Renders a card to a PNG at the given geometry. */
@@ -42,7 +47,7 @@ export interface BrowserRecorderOptions {
 
 export class BrowserRecorder implements Recorder {
   readonly name = 'browser'
-  readonly produces: readonly ArtifactKind[] = ['video']
+  readonly produces: readonly ArtifactKind[] = ['video', 'har']
 
   private marks: StepRef[] = []
   private ctx: RunContext | null = null
@@ -60,10 +65,11 @@ export class BrowserRecorder implements Recorder {
 
   async stop(): Promise<StoryArtifact[]> {
     await this.options.source.finish()
+    const harArtifacts = this.collectHar()
     const raw = this.options.source.recordedVideo()
     if (!raw || !existsSync(raw)) {
       this.ctx?.log('browser recorder: the run produced no video file')
-      return []
+      return harArtifacts
     }
 
     const width = this.options.width ?? 1280
@@ -77,7 +83,7 @@ export class BrowserRecorder implements Recorder {
       // just less portable than the mp4 a reviewer can open on a phone.
       this.ctx?.log('browser recorder: ffmpeg not found, keeping the raw webm')
       const asIs = this.options.store.adopt({ kind: 'video', name: 'video/run.webm', readableBy: ['human'] }, raw)
-      return asIs ? [asIs] : []
+      return [...harArtifacts, ...(asIs ? [asIs] : [])]
     }
 
     await transcodeToMp4({ input: raw, output: clip, holdLastFrameMs: 1200 })
@@ -100,7 +106,33 @@ export class BrowserRecorder implements Recorder {
       { kind: 'video', name: 'video/run.mp4', readableBy: ['human'] },
       finished,
     )
-    return artifact ? [artifact] : []
+    return [...harArtifacts, ...(artifact ? [artifact] : [])]
+  }
+
+  /**
+   * The HAR goes through `writeJson`, not `adopt`, because that is the path
+   * redaction runs on. Playwright's own documentation warns that a HAR holds
+   * auth tokens and session cookies; copying the file verbatim would put them
+   * straight into a CI artefact, where a leak has already happened by the
+   * time anyone notices.
+   */
+  private collectHar(): StoryArtifact[] {
+    const path = this.options.source.recordedHar?.() ?? null
+    if (!path || !existsSync(path)) return []
+    let har: Har
+    try {
+      har = JSON.parse(readFileSync(path, 'utf8')) as Har
+    } catch (error) {
+      this.ctx?.log(`browser recorder: the HAR could not be read: ${(error as Error).message}`)
+      return []
+    }
+    const trimmed = trimHar(har, this.options.maxHarBytes ?? 8 * 1024 * 1024)
+    this.ctx?.log(`network: ${harSummary(trimmed)}`)
+    const written = this.options.store.writeJson(
+      { kind: 'har', name: 'network/run.har', readableBy: ['agent'] },
+      trimmed,
+    )
+    return written ? [written] : []
   }
 
   /** Which steps this recording covers, for the story to reference. */
