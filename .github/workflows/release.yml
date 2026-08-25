@@ -63,9 +63,11 @@ jobs:
       # The browser tiers need a real Chromium, exactly as ci.yml installs one.
       # Publishing without running them would mean shipping on a narrower proof
       # than a pull request has to clear.
-      - name: Install Chromium
+      - name: Install Chromium and ffmpeg
         if: steps.gate.outputs.skip != 'true'
-        run: npx playwright install --with-deps chromium
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Test
         if: steps.gate.outputs.skip != 'true'
