@@ -253,7 +253,20 @@ export interface Story {
     changed_lines: number
   }
   vcs: { provider: string; change_id?: string; actor?: string }
-  env: { cli: string; os: string; runner: string; domain: string; breakpoints?: number }
+  env: {
+    cli: string
+    os: string
+    runner: string
+    domain: string
+    breakpoints?: number
+    /**
+     * Languages the machine that produced this story could actually
+     * instrument. The gate reads it from here rather than from wherever it
+     * happens to be running: a CI box with no adapters installed must not
+     * silently decide that nothing needs gating.
+     */
+    instrumentable?: string[]
+  }
   started_at: string
   sealed_at?: string
   events: StoryEvent[]

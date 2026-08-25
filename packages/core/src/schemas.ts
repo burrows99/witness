@@ -196,7 +196,7 @@ export const storySchema = {
     env: {
       type: 'object',
       required: ['cli', 'runner'],
-      properties: { cli: { type: 'string' }, os: { type: 'string' }, runner: { type: 'string' }, domain: { type: 'string' }, breakpoints: { type: 'integer', minimum: 0 } },
+      properties: { cli: { type: 'string' }, os: { type: 'string' }, runner: { type: 'string' }, domain: { type: 'string' }, breakpoints: { type: 'integer', minimum: 0 }, instrumentable: { type: 'array', items: { type: 'string' } } },
     },
     started_at: { type: 'string' },
     sealed_at: { type: 'string' },

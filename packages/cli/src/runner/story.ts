@@ -46,6 +46,8 @@ export interface AssembleParams {
   artifacts: StoryArtifact[]
   diagnostics: StoryDiagnostic[]
   breakpoints?: number
+  /** Languages this machine could actually probe, so the gate need not guess. */
+  instrumentable?: string[]
 }
 
 /**
@@ -111,6 +113,7 @@ export function assembleStory(params: AssembleParams): Story {
       runner: params.config.runner,
       domain: params.config.domain,
       ...(params.breakpoints ? { breakpoints: params.breakpoints } : {}),
+      ...(params.instrumentable ? { instrumentable: params.instrumentable } : {}),
     },
     started_at: params.startedAt.toISOString(),
     sealed_at: params.sealedAt.toISOString(),

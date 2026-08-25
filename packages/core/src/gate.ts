@@ -34,6 +34,15 @@ export interface GateInput {
   bypass: Bypass | null
   now?: Date
   ci?: boolean
+  /**
+   * Languages this build can actually instrument. `SUPPORTED_LANGUAGES` is a
+   * static list of what the design covers; it says nothing about whether the
+   * adapter is present. Without this distinction a `.js` change is treated as
+   * gateable, no probe can ever verify, and every line reports SV011 — so a
+   * TypeScript repository could not pass the gate at all, and the finding it
+   * got sent the reader off chasing a path-mapping problem that did not exist.
+   */
+  instrumentable?: readonly string[]
 }
 
 export interface GateMetrics {
@@ -83,12 +92,25 @@ export function evaluate(input: GateInput): GateResult {
   // Q7: a diff touching a language with no trustworthy DAP adapter is
   // partially gated, and the ungated part is announced. Refusing silently is
   // the version of this that gets quietly abused.
+  // A file is ungated either because its language is outside the design, or
+  // because this build has no adapter for it. Both are honest warnings; only
+  // the remedy differs.
+  const ungated = (file: (typeof diff.files)[number]): string | null => {
+    if (file.unsupportedLanguage) return file.unsupportedLanguage
+    if (input.instrumentable && file.language && !input.instrumentable.includes(file.language)) return file.language
+    return null
+  }
+
   for (const file of diff.files) {
-    if (!file.unsupportedLanguage) continue
+    const language = ungated(file)
+    if (!language) continue
+    const missingAdapter = !file.unsupportedLanguage
     add(
       'SV016', 'warn',
-      `${file.path} is ${file.unsupportedLanguage}, which has no trustworthy debug adapter: ${file.lines.length} changed line(s) are not gated`,
-      'Nothing to do here. Support is declared explicitly rather than degraded to log-scraping; cover this file with tests instead.',
+      `${file.path} is ${language}, which has no trustworthy debug adapter: ${file.lines.length} changed line(s) are not gated`,
+      missingAdapter
+        ? `No debug adapter for ${language} is installed in this build, so these lines cannot be watched. Run \`swe-verify doctor\` for what is missing, and cover this file with tests meanwhile.`
+        : 'Nothing to do here. Support is declared explicitly rather than degraded to log-scraping; cover this file with tests instead.',
       { file: file.path },
     )
   }
@@ -96,7 +118,7 @@ export function evaluate(input: GateInput): GateResult {
   // Nothing gateable changed: a comment-only or formatting-only PR normalises
   // to an empty diff and needs no evidence at all (US-1 AC4), and neither
   // does a change confined to languages we refuse to gate.
-  const gateableLines = diff.files.reduce((n, f) => n + (f.unsupportedLanguage ? 0 : f.lines.length), 0)
+  const gateableLines = diff.files.reduce((n, f) => n + (ungated(f) ? 0 : f.lines.length), 0)
   if (gateableLines === 0) {
     // ...but a failed assertion is a fact about the system, not about the
     // diff. Evidence that was gathered and did not hold cannot be waved
@@ -167,7 +189,7 @@ export function evaluate(input: GateInput): GateResult {
   //    execute", and gets its own code.
   const inScope = new Set<string>()
   for (const file of diff.files) {
-    if (file.unsupportedLanguage) continue
+    if (ungated(file)) continue
     if (input.plans.some((p) => matchesScope(file.path, p.scope))) inScope.add(file.path)
     else {
       add(

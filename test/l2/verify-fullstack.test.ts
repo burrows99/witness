@@ -205,6 +205,43 @@ suite('verify — one story across browser, server and HTTP (M2)', () => {
   })
 })
 
+suite('assertions survive recording', () => {
+  /**
+   * Found by an agent driving a real app: with `--record`, every `ui-text`
+   * assertion came back `skipped` — "no browser page is open". Flushing the
+   * video closes the context the page lived in, and that happens before
+   * assertions are evaluated, so a plan that looked like it checked two
+   * things checked neither and the gate still said allow.
+   *
+   * The deeper problem was that the assertion read the *live* page at all. A
+   * story is meant to be re-gateable offline; an assertion that needs a
+   * browser still running can never be checked from the sealed evidence.
+   */
+  it('evaluates ui-text while recording, instead of skipping it', async () => {
+    repo.write('app/server.py', CHANGED_APP)
+    repo.commit('apply the change')
+    const result = await cli(repo, ['verify', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    expect(result.code).toBe(0)
+
+    const assertions = storyOf().assertions
+    expect(assertions.length).toBeGreaterThan(0)
+    for (const assertion of assertions) {
+      expect(assertion.status, `${assertion.id} was ${assertion.status}: ${assertion.diff ?? ''}`).toBe('pass')
+    }
+  })
+
+  it('re-gates the sealed story to the same verdict, with no browser running', async () => {
+    // The proof that the assertion reads evidence rather than live state.
+    repo.write('app/server.py', CHANGED_APP)
+    repo.commit('apply the change')
+    await cli(repo, ['verify', '--plan', 'checkout', '--base', base, '--record', '--json'], { env: PY_ENV })
+    const again = await cli(repo, ['gate', '--base', base, '--json'], { env: PY_ENV })
+    expect(again.code).toBe(0)
+    expect(again.json<{ metrics: { assertionsPassed: number; assertionsTotal: number } }>().metrics.assertionsPassed)
+      .toBe(again.json<{ metrics: { assertionsTotal: number } }>().metrics.assertionsTotal)
+  })
+})
+
 suite('network evidence — what a video of a spinner cannot show', () => {
   /**
    * A recording shows a failing request as a spinner that never resolves.

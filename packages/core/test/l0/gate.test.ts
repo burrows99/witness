@@ -14,6 +14,7 @@ const input = (over: Partial<GateInput> = {}): GateInput => {
     bypass: over.bypass ?? null,
     now: over.now ?? NOW,
     ci: over.ci ?? false,
+    ...(over.instrumentable ? { instrumentable: over.instrumentable } : {}),
   }
 }
 const codes = (r: { findings: Array<{ code: string }> }) => r.findings.map((f) => f.code)
@@ -485,5 +486,50 @@ describe('an empty diff still reports a failed assertion', () => {
 
   it('still allows an empty diff with no story at all', () => {
     expect(evaluate(input({ diff: commentOnly(), story: null })).verdict).toBe('allow')
+  })
+})
+
+describe('a language with no installed adapter is ungated, not blocked', () => {
+  /**
+   * `.js` and `.ts` both map to the `ts` bucket, so they were treated as
+   * gateable — but no adapter for them ships in this build, so no probe could
+   * ever verify and every changed line reported SV011: "accepted but never
+   * verified". A TypeScript repository could not pass the gate at all, and
+   * the finding told the reader to go and fix a path mapping that was fine.
+   *
+   * Ungated and honest beats blocked and wrong. SUPPORTED_LANGUAGES says what
+   * the design covers; only the caller knows what is installed.
+   */
+  const tsDiff = () => diffOf('src/app.ts', ['const bonus = 1', 'return bonus'])
+
+  it('warns rather than blocking when the adapter is absent', () => {
+    const diff = tsDiff()
+    const r = evaluate(input({ diff, story: null, instrumentable: ['py', 'go'] }))
+    expect(codes(r)).toContain('SV016')
+    expect(codes(r)).not.toContain('SV011')
+    expect(codes(r)).not.toContain('SV001')
+    expect(r.verdict).toBe('allow')
+  })
+
+  it('names the missing adapter instead of blaming a path mapping', () => {
+    const diff = tsDiff()
+    const r = evaluate(input({ diff, story: null, instrumentable: ['py'] }))
+    const finding = r.findings.find((f) => f.code === 'SV016')!
+    expect(finding.remedy).toMatch(/doctor/)
+    expect(finding.remedy).not.toMatch(/path.mapping/i)
+  })
+
+  it('still gates a language whose adapter is installed', () => {
+    const diff = diffOf('src/pricing.py', ['bonus = 1', 'return bonus'])
+    const r = evaluate(input({ diff, story: null, instrumentable: ['py'] }))
+    expect(codes(r)).toContain('SV001')
+    expect(r.verdict).toBe('block')
+  })
+
+  it('gates everything when the caller does not say what is installed', () => {
+    // Absent means "assume the design's list", so existing callers are
+    // unaffected rather than silently loosened.
+    const r = evaluate(input({ diff: tsDiff(), story: null }))
+    expect(r.verdict).toBe('block')
   })
 })

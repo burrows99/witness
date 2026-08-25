@@ -40,6 +40,10 @@ export async function gateCommand(ctx: CommandContext, options: { checkArgs?: bo
     bypass: await provider.resolveBypass(),
     now: ctx.now,
     ci: ctx.ci,
+    // What the *run* could watch, recorded in its own story — never what this
+    // machine happens to have. A CI box with no adapters installed must not
+    // decide that nothing needs gating.
+    ...(story?.env.instrumentable ? { instrumentable: story.env.instrumentable } : {}),
   })
 
   // Publishing is reporting, not deciding: it runs after the verdict and

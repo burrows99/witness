@@ -134,7 +134,7 @@ export class WebDriver implements Driver {
       ...(error ? { error } : {}),
       events,
       artifacts,
-      data: { ...data, url: page.url(), startedMono },
+      data: { ...data, url: page.url(), startedMono, visibleText: await visibleTextOf(page) },
     }
   }
 
@@ -368,6 +368,19 @@ function readState(args: PlanArgs): WaitState {
     throw new TypeError(`plan argument "state" must be one of ${WAIT_STATES.join(', ')}, got "${state}"`)
   }
   return state as WaitState
+}
+
+/**
+ * What a user would see, captured with the step rather than read back later.
+ *
+ * An assertion that reads the live page cannot be re-evaluated from a sealed
+ * story, which is what stories exist for — and it breaks outright the moment
+ * recording is on, because flushing the video closes the context the page
+ * lived in. Capturing here costs one call per step and makes the assertion
+ * answerable offline.
+ */
+async function visibleTextOf(page: Page): Promise<string> {
+  return (await page.locator('body').innerText({ timeout: 5_000 }).catch(() => '')) || ''
 }
 
 function safePath(url: string): string {

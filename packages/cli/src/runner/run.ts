@@ -31,6 +31,7 @@ import { HarnessError, UsageError } from '../errors.js'
 import { runDir as runDirFor } from '../workspace.js'
 import { startFixture, waitForReady } from './fixture.js'
 import { assembleStory, type ProbeOutcome } from './story.js'
+import { instrumentableLanguages } from '../adapters.js'
 
 /**
  * The runner: instrument the diff, drive the plan, seal one story.
@@ -371,6 +372,10 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       assertions,
       artifacts,
       diagnostics,
+      // Recorded by the run, read by the gate. A language with no adapter
+      // here can never have a verified probe, and the gate has to know that
+      // was a missing tool rather than a line nobody exercised.
+      instrumentable: instrumentableLanguages(options.cwd, options.env),
     })
 
     // Redaction runs before the story reaches disk, not before it is
