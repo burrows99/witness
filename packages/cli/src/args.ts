@@ -7,7 +7,7 @@ export { UsageError } from './errors.js'
  * message rather than a stack trace.
  */
 
-export const COMMANDS = ['init', 'plan', 'run', 'gate', 'verify', 'show', 'doctor', 'help'] as const
+export const COMMANDS = ['init', 'plan', 'run', 'gate', 'verify', 'show', 'skill', 'doctor', 'help'] as const
 export type Command = (typeof COMMANDS)[number]
 
 export interface FlagOptions {

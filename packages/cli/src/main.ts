@@ -10,6 +10,7 @@ import { doctorCommand } from './commands/doctor.js'
 import { runCommand } from './commands/run.js'
 import { verifyCommand } from './commands/verify.js'
 import { showCommand } from './commands/show.js'
+import { skillCommand } from './commands/skill.js'
 export { VERSION } from './version.js'
 
 import { VERSION } from './version.js'
@@ -22,6 +23,7 @@ const HELP = `swe-verify ${VERSION} — prove a change was actually executed
   swe-verify gate   --run <id> | --story <path>      evaluate, publish
   swe-verify verify --plan <path>                    run + gate (one command)
   swe-verify show   --run <id> [--open]              render viewer
+  swe-verify skill  [--out <path>] [--check]         generate this project's agent skill
   swe-verify doctor                                  adapters, ports, path mappings
 
 Common flags
@@ -79,12 +81,14 @@ export async function run(options: RunOptions): Promise<number> {
       case 'run': result = await runCommand(ctx); break
       case 'verify': result = await verifyCommand(ctx); break
       case 'show': result = await showCommand(ctx); break
+      case 'skill': result = await skillCommand(ctx); break
       default:
         throw new UsageError(`unhandled command ${args.command}`)
     }
 
     if (json) stdout.write(`${JSON.stringify(result.json)}\n`)
     else for (const line of result.text) stdout.write(`${line}\n`)
+    for (const line of result.stderrText ?? []) stderr.write(`${line}\n`)
 
     // A host job summary is a side channel, never stdout: --json must stay
     // parseable.

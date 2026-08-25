@@ -25,6 +25,11 @@ export interface CommandResult {
   exitCode: number
   /** Human-readable lines; suppressed entirely under --json. */
   text: string[]
+  /**
+   * Lines that belong on stderr: a non-zero outcome a human needs to see,
+   * while stdout stays parseable for the agent reading --json.
+   */
+  stderrText?: string[]
   /** The machine read path. Never mixed with human output. */
   json: unknown
   /** What was published to the host, when a command publishes. */

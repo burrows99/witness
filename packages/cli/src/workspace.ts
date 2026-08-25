@@ -100,6 +100,20 @@ export function loadPlans(cwd: string): PlanRef[] {
   return refs
 }
 
+/**
+ * Every committed plan, in full. `loadPlans` returns only what the gate needs
+ * (scope, waivers, a hash); the generator needs the intent and the fixture
+ * too, and both must read the same directory by the same rules.
+ */
+export function loadFullPlans(cwd: string): Plan[] {
+  const dir = paths.plans(cwd)
+  if (!existsSync(dir)) return []
+  return readdirSync(dir)
+    .filter((entry) => entry.endsWith('.plan.json'))
+    .sort()
+    .map((entry) => loadPlan(join(dir, entry)))
+}
+
 export function loadPlan(file: string): Plan {
   const parsed = readJson(file, 'plan')
   const result = validatePlan(parsed)

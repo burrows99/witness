@@ -1,0 +1,10 @@
+{
+  "schema": "swe-verify/plan@1",
+  "id": "fixture-go-pricing",
+  "intent": "the Go tiered discount fixture returns a discounted total for a tier-2 customer",
+  "domain": "fullstack",
+  "scope": { "include": ["fixtures/l1/go/**"] },
+  "fixture": { "kind": "process", "language": "go", "program": "main.go", "file": "fixtures/l1/go/main.go", "awaitExit": true },
+  "steps": [],
+  "assertions": []
+}

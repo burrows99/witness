@@ -19,6 +19,7 @@ export * from './redact.js'
 export * from './ulid.js'
 export * from './seams.js'
 export * from './instrument.js'
+export * from './findings.js'
 export * from './gate.js'
 
 export const SCHEMA_VERSIONS = {

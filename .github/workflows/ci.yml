@@ -70,3 +70,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test:l4
+      # The generated skill describes this project's plans, adapters and
+      # policies. Steering that nobody enforces drifts, so its freshness is
+      # checked where the gate is: in CI.
+      - run: node packages/cli/dist/bin.js skill --check

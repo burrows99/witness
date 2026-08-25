@@ -146,6 +146,36 @@ log-scraping is flaky, and flaky gates get bypassed.
 Drivers: `api` (HTTP) and `web` (Playwright). Fixtures: `process` (swe-verify starts the app under
 the debugger, on randomised ports) and `none` (attach to something already listening).
 
+## Telling an agent how to work here
+
+`swe-verify skill` writes an [Agent Skills](https://agentskills.io) `SKILL.md` for the project it is
+run in, derived from that project rather than written by hand:
+
+```console
+$ swe-verify skill
+wrote .claude/skills/verify-acme-checkout/SKILL.md
+describes 3 plan(s): checkout, refunds, signup
+regenerate whenever the project changes; `swe-verify skill --check` fails in CI when it is stale
+```
+
+The generated file tells an agent which plan covers which paths and what each one intends to prove,
+which languages this environment can actually instrument and what would fix the ones it cannot, the
+findings it will meet and whether each blocks or only warns, and the coverage and bypass policies in
+force. All of it comes from the config, the committed plans and the installed adapters, so adding a
+plan or installing an adapter changes the skill the next time it is generated.
+
+Two properties make that hold:
+
+- **Generation is deterministic** — no timestamp, no random id — so "is this skill stale?" has an
+  answer. The frontmatter carries a `swe-verify-fingerprint` over the facts it was built from.
+- **`swe-verify skill --check` regenerates in memory and compares**, exiting 3 without writing
+  anything if the file no longer matches the project. Run it in CI: steering that nobody enforces
+  drifts, which is the same argument that puts the gate there.
+
+Frontmatter stays inside the six fields the Agent Skills spec defines, so the file loads in
+claude.ai and through the API as well as in Claude Code, which reject unknown keys. `--out` writes
+it anywhere else you keep skills.
+
 ## Free by default
 
 - No host, no token, no network. `--vcs local` passes the full suite, and the GitHub, GitLab and
