@@ -166,7 +166,7 @@ describe('assertion kinds', () => {
   const view = (response: unknown) => ({
     stepResult: () => ({ status: 'ok' as const, events: [], artifacts: [], data: { response } }),
     events: () => [],
-    artifacts: () => [],
+    artifacts: () => [], readText: () => null,
   })
 
   it('registers every kind it implements', () => {
@@ -184,7 +184,7 @@ describe('assertion kinds', () => {
   })
 
   it('http-status skips, rather than passing, when the step produced nothing', async () => {
-    const empty = { stepResult: () => undefined, events: () => [], artifacts: () => [] }
+    const empty = { stepResult: () => undefined, events: () => [], artifacts: () => [], readText: () => null }
     expect((await httpStatus.evaluate({ status: 200 }, empty, 9)).status).toBe('skipped')
   })
 

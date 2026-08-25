@@ -87,6 +87,12 @@ export interface StoryView {
   stepResult(seq: number): StepResult | undefined
   events(): readonly UnsequencedEvent[]
   artifacts(): readonly StoryArtifact[]
+  /**
+   * The text of an artefact this run wrote, by its story-relative path, or
+   * `null` when there is none. An assertion that reads what a recorder
+   * produced is asserting on the same evidence the reviewer watches.
+   */
+  readText(path: string): string | null
 }
 
 export interface AssertionKind {

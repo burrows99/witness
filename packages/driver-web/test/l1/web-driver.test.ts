@@ -225,7 +225,7 @@ suite('ui-text assertion', () => {
       await driver.execute(step({ action: 'goto', args: { path: '/' } }), c)
       const result = await driver.execute(step({ seq: 2, action: 'click', args: { role: 'button', name: 'Place order' } }), c)
       await driver.execute(step({ seq: 3, action: 'waitFor', args: { text: 'Order confirmed' } }), c)
-      const view = { stepResult: () => result, events: () => [], artifacts: () => [] }
+      const view = { stepResult: () => result, events: () => [], artifacts: () => [], readText: () => null }
       expect((await uiText(driver).evaluate({ visible: 'Order confirmed' }, view, 2)).status).toBe('pass')
     } finally { await driver.close() }
   })
@@ -235,7 +235,7 @@ suite('ui-text assertion', () => {
     const driver = new WebDriver({ store: store(c) })
     try {
       const result = await driver.execute(step({ action: 'goto', args: { path: '/' } }), c)
-      const view = { stepResult: () => result, events: () => [], artifacts: () => [] }
+      const view = { stepResult: () => result, events: () => [], artifacts: () => [], readText: () => null }
       const outcome = await uiText(driver).evaluate({ visible: 'Order confirmed' }, view, 1)
       expect(outcome.status).toBe('fail')
       expect(outcome.diff).toMatch(/Ready|Cart/)

@@ -3,6 +3,10 @@ import { join, resolve } from 'node:path'
 import type { PlanFixture, PlanReadyCheck } from '@swe-verify/core'
 import { adapterFor, freePort, type AdapterSpec } from '@swe-verify/probe-dap'
 import { HarnessError, UsageError } from '../errors.js'
+import {
+  composeCommand, composeDown, composeLogs, composeUp, publishedPort, resolveComposeUrl,
+  type ComposeTarget,
+} from './compose.js'
 
 /**
  * Fixture lifecycle.
@@ -37,6 +41,10 @@ export interface FixtureOptions {
   repoRoot: string
   env: Record<string, string | undefined>
   log(line: string): void
+  /** Namespaces a compose project so concurrent runs cannot collide. */
+  runId?: string
+  /** How long a stack may take to come up; images may need building. */
+  composeTimeoutMs?: number
 }
 
 export async function startFixture(options: FixtureOptions): Promise<FixtureHandle> {
@@ -44,10 +52,7 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
   const cwd = fixture.file ? resolve(options.cwd, join(fixture.file, '..')) : options.cwd
 
   if (fixture.kind === 'compose') {
-    throw new UsageError(
-      'compose fixtures are not implemented in this build',
-      'Use "kind": "process" to have swe-verify start the app under the debugger, or "kind": "none" with fixture.attach pointing at an already-listening debug port.',
-    )
+    return await startCompose(fixture, options, cwd)
   }
 
   if (fixture.kind === 'none') {
@@ -170,5 +175,93 @@ export async function waitForReady(checks: PlanReadyCheck[] | undefined, log: (l
       }
       await new Promise((r) => setTimeout(r, 250))
     }
+  }
+}
+
+
+/**
+ * A compose stack: several services, a database, and an application that is
+ * only usable once all of them are serving.
+ *
+ * The project name carries the run id so two runs cannot collide on a
+ * container or network name, and teardown removes volumes — a database that
+ * survives a run is how the next one passes for the wrong reason.
+ */
+async function startCompose(
+  fixture: PlanFixture,
+  options: FixtureOptions,
+  cwd: string,
+): Promise<FixtureHandle> {
+  if (!fixture.file) {
+    throw new UsageError(
+      'a "compose" fixture needs "file" pointing at a compose file',
+      'Set fixture.file to the docker-compose.yml that brings this app up.',
+    )
+  }
+  const command = composeCommand()
+  if (!command) {
+    // A harness failure, not the change's fault: nothing about the diff can
+    // fix a machine with no Docker on it.
+    throw new HarnessError(
+      'this plan needs Docker Compose, and neither `docker compose` nor `docker-compose` is available',
+      'Install Docker Desktop or the compose plugin, or rewrite the plan to use "kind": "process".',
+    )
+  }
+
+  const target: ComposeTarget = {
+    file: fixture.file,
+    project: `swe-verify-${(options.runId ?? 'local').slice(-10).toLowerCase()}`,
+    ...(fixture.build ? { build: true } : {}),
+  }
+  options.log(`fixture: compose up -p ${target.project} -f ${target.file}`)
+
+  let stopped = false
+  const stop = async () => {
+    if (stopped) return
+    stopped = true
+    // Teardown runs even when bring-up failed: a partially-created stack
+    // still holds a network and containers that would break the next run.
+    try {
+      await composeDown(command, target, options.cwd)
+      options.log(`fixture: compose down -p ${target.project}`)
+    } catch (error) {
+      options.log(`fixture: compose down failed, containers may be left behind: ${(error as Error).message}`)
+    }
+  }
+
+  try {
+    await composeUp(command, target, options.cwd, options.composeTimeoutMs ?? 600_000)
+  } catch (error) {
+    const logs = await composeLogs(command, target, options.cwd)
+    await stop()
+    if (logs) options.log(`fixture: compose logs (last 40 lines)\n${logs.split('\n').slice(-40).join('\n')}`)
+    throw new HarnessError(
+      `the compose stack never came up: ${(error as Error).message}`,
+      'Check the compose file and the service logs in the harness log; this is a fixture problem, not a coverage one.',
+    )
+  }
+
+  // Compose may map the container port onto an ephemeral host port, which
+  // the plan cannot know in advance.
+  let port: number | null = null
+  if (fixture.service && fixture.port) {
+    port = await publishedPort(command, target, fixture.service, fixture.port, options.cwd)
+    if (port !== null) options.log(`fixture: ${fixture.service}:${fixture.port} published on ${port}`)
+  }
+
+  const attach = fixture.attach
+  return {
+    debug: attach?.port ? { host: attach.host ?? '127.0.0.1', port: attach.port } : null,
+    adapter: fixture.language ? adapterFor(fixture.language as never) : null,
+    baseUrl: resolveComposeUrl(fixture.baseUrl, port),
+    mode: fixture.mode,
+    args: fixture.args,
+    appPort: port,
+    substitute: (text: string) => (port === null ? text : text.replace(/\{port\}/g, String(port))),
+    program: fixture.program ?? '',
+    cwd,
+    stdout: () => '',
+    stderr: () => '',
+    stop,
   }
 }

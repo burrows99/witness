@@ -437,3 +437,53 @@ describe('gate — unsupported languages (Q7: partial gate, loudly)', () => {
     expect(codes(r)).not.toContain('SV012')
   })
 })
+
+describe('an empty diff still reports a failed assertion', () => {
+  /**
+   * A comment-only change normalises to an empty diff and needs no coverage
+   * evidence, so the gate returns early. It used to return early *before*
+   * reading the story's assertions — so a plan that ran, asserted something
+   * about behaviour and failed came back `allow` with `assertionsTotal: 0`.
+   * The gate reported "merge" on a run that had just proved the behaviour
+   * was broken.
+   *
+   * Coverage is a claim about the diff. An assertion is a claim about the
+   * system, and its failure survives the diff being empty.
+   */
+  const commentOnly = () => normaliseDiff([
+    'diff --git a/src/a.ts b/src/a.ts',
+    '--- a/src/a.ts',
+    '+++ b/src/a.ts',
+    '@@ -1,1 +1,2 @@',
+    ' const a = 1',
+    '+// explain why',
+  ].join('\n'))
+
+  const withAssertions = (assertions: Array<{ id: string; status: 'pass' | 'fail'; diff?: string }>) => {
+    const diff = commentOnly()
+    return storyFor(diff, {}, [], assertions)
+  }
+
+  it('blocks when the story carries a failed assertion', () => {
+    const diff = commentOnly()
+    const result = evaluate(input({ diff, story: withAssertions([{ id: 'a1', status: 'fail', diff: 'expected "PASS"' }]) }))
+    expect(result.verdict).toBe('block')
+    expect(codes(result)).toContain('SV020')
+  })
+
+  it('counts the assertions it read, rather than reporting none', () => {
+    const diff = commentOnly()
+    const result = evaluate(input({ diff, story: withAssertions([{ id: 'a1', status: 'pass' }, { id: 'a2', status: 'fail' }]) }))
+    expect(result.metrics.assertionsTotal).toBe(2)
+    expect(result.metrics.assertionsPassed).toBe(1)
+  })
+
+  it('still allows an empty diff whose assertions all passed', () => {
+    const diff = commentOnly()
+    expect(evaluate(input({ diff, story: withAssertions([{ id: 'a1', status: 'pass' }]) })).verdict).toBe('allow')
+  })
+
+  it('still allows an empty diff with no story at all', () => {
+    expect(evaluate(input({ diff: commentOnly(), story: null })).verdict).toBe('allow')
+  })
+})

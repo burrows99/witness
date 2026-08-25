@@ -16,7 +16,17 @@
     "awaitExit": true
   },
   "steps": [],
-  "assertions": [],
+  "assertions": [
+    {
+      "id": "prices-tier-2",
+      "kind": "terminal-match",
+      "afterStep": 0,
+      "expect": {
+        "contains": "result 90",
+        "matches": "^result 90$"
+      }
+    }
+  ],
   "record": {
     "terminal": {
       "steps": [

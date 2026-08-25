@@ -91,10 +91,15 @@ export function validatePlan(input: unknown): ValidationResult<Plan> {
     seqs.add(step.seq)
   }
   for (const assertion of plan.assertions) {
+    // 0 anchors to the run rather than to a step. A process fixture drives
+    // itself and produces no steps, so it has nothing else to point at — and
+    // requiring a step there would mean inventing one that does nothing, just
+    // to give an assertion somewhere to hang.
+    if (assertion.afterStep === 0) continue
     if (!seqs.has(assertion.afterStep)) {
       return fail(
         `assertion "${assertion.id}" has afterStep ${assertion.afterStep}, which is not a step in this plan`,
-        'Point afterStep at an existing step seq.',
+        'Point afterStep at an existing step seq, or use 0 to assert on the run as a whole.',
       )
     }
   }

@@ -35,6 +35,12 @@ export interface PlanFixture {
   args?: string[]
   /** An already-listening debug port, for a fixture brought up elsewhere. */
   attach?: { host?: string; port?: number }
+  /** Compose: rebuild images before starting, for a stack built from this repo. */
+  build?: boolean
+  /** Compose: the service whose published port `{port}` should resolve to. */
+  service?: string
+  /** Compose: the container port to look up on that service. */
+  port?: number
   ready?: PlanReadyCheck[]
   seed?: string[]
   env?: Record<string, string>

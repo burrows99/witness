@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   compileRedactionPolicy,
@@ -20,6 +20,7 @@ import {
   type StoryDiagnostic,
   type Recorder,
   validateRecording,
+  builtinAssertionKinds,
   type UnsequencedEvent,
   type StoryView,
 } from '@swe-verify/core'
@@ -116,6 +117,8 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     repoRoot: options.cwd,
     env: options.env,
     log,
+    runId,
+    composeTimeoutMs: options.config.budgets.launchMs,
   })
   if (fixture.baseUrl) ctx.baseUrl = fixture.baseUrl
 
@@ -324,7 +327,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       )
     }
 
-    const assertions = await evaluateAssertions(options.plan, drivers, stepResults, events, artifacts)
+    const assertions = await evaluateAssertions(options.plan, drivers, stepResults, events, artifacts, dir)
     for (const assertion of assertions) {
       events.push({
         tier: 'harness',
@@ -507,8 +510,9 @@ async function evaluateAssertions(
   stepResults: Map<number, StepResult>,
   events: UnsequencedEvent[],
   artifacts: StoryArtifact[],
+  runDir: string,
 ): Promise<StoryAssertion[]> {
-  const kinds = new Map(assertionKinds().map((kind) => [kind.kind, kind]))
+  const kinds = new Map([...builtinAssertionKinds(), ...assertionKinds()].map((kind) => [kind.kind, kind]))
 
   // `ui-text` reads the live page, so it only exists when a browser does.
   const web = drivers.get('web')
@@ -521,6 +525,15 @@ async function evaluateAssertions(
     stepResult: (seq) => stepResults.get(seq),
     events: () => events,
     artifacts: () => artifacts,
+    // Artefact paths in a story are relative to the run directory, so an
+    // assertion reads exactly the file a reviewer would open.
+    readText: (path) => {
+      try {
+        return readFileSync(join(runDir, path), 'utf8')
+      } catch {
+        return null
+      }
+    },
   }
 
   const results: StoryAssertion[] = []

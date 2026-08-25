@@ -189,16 +189,34 @@ describe('verify — refusing rather than degrading (NFR-12)', () => {
     expect(result.stderr).toMatch(/SWE_VERIFY_JAVA_DEBUG|java-debug/)
   })
 
-  it('exits 3 for a compose fixture, which this build does not implement', async () => {
+  it('names the missing compose file rather than failing later at spawn', async () => {
     repo.writePlan(planFor('composed', ['app/**'], {
+      fixture: { kind: 'compose' },
+      steps: [],
+      assertions: [],
+    }))
+    repo.commit('add a compose plan with no file')
+    const result = await cli(repo, ['run', '--plan', 'composed', '--base', base], { env: PY_ENV })
+    expect(result.code).toBe(3)
+    expect(result.stderr).toMatch(/needs "file"/)
+  })
+
+  it('reports a missing Docker as a harness failure, not the change\'s fault', async () => {
+    // Exit 4, not 2 or 3: nothing about the diff can fix a machine with no
+    // Docker on it, and blaming the change would send someone editing code
+    // that is fine.
+    repo.writePlan(planFor('composed2', ['app/**'], {
       fixture: { kind: 'compose', file: 'docker-compose.yml' },
       steps: [],
       assertions: [],
     }))
     repo.commit('add a compose plan')
-    const result = await cli(repo, ['run', '--plan', 'composed', '--base', base], { env: PY_ENV })
-    expect(result.code).toBe(3)
-    expect(result.stderr).toMatch(/compose fixtures are not implemented/)
+    const result = await cli(repo, ['run', '--plan', 'composed2', '--base', base], {
+      // An empty PATH is the portable way to make both compose forms absent.
+      env: { ...PY_ENV, PATH: '/nonexistent' },
+    })
+    expect(result.code).toBe(4)
+    expect(result.stderr).toMatch(/docker.compose|Docker Compose/i)
   })
 })
 

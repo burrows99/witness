@@ -47,6 +47,12 @@ export const planSchema = {
           type: 'object',
           properties: { host: { type: 'string' }, port: { type: 'integer' } },
         },
+        // Compose only: which service publishes the app, and on which
+        // container port, so `{port}` can resolve to the host port compose
+        // actually chose.
+        build: { type: 'boolean' },
+        service: { type: 'string' },
+        port: { type: 'integer', minimum: 1, maximum: 65535 },
         ready: {
           type: 'array',
           items: {
@@ -110,7 +116,10 @@ export const planSchema = {
         properties: {
           id: { type: 'string', minLength: 1 },
           kind: { type: 'string', minLength: 1 },
-          afterStep: { type: 'integer', minimum: 1 },
+          // 0 means "after the run" rather than after a step, which is the
+          // only anchor a plan with no steps has — a process fixture drives
+          // itself and produces no step to hang an assertion on.
+          afterStep: { type: 'integer', minimum: 0 },
           query: { type: 'string' },
           expect: { type: 'object' },
         },

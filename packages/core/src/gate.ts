@@ -97,7 +97,26 @@ export function evaluate(input: GateInput): GateResult {
   // to an empty diff and needs no evidence at all (US-1 AC4), and neither
   // does a change confined to languages we refuse to gate.
   const gateableLines = diff.files.reduce((n, f) => n + (f.unsupportedLanguage ? 0 : f.lines.length), 0)
-  if (gateableLines === 0) return finish('allow', findings, EMPTY_METRICS, input, policy)
+  if (gateableLines === 0) {
+    // ...but a failed assertion is a fact about the system, not about the
+    // diff. Evidence that was gathered and did not hold cannot be waved
+    // through just because the change that prompted it touched no gateable
+    // line — that would report "merge" on a run that just proved the
+    // behaviour is broken.
+    const failed = input.story?.assertions.filter((a) => a.status === 'fail') ?? []
+    for (const assertion of failed) {
+      add('SV020', 'error',
+        `assertion "${assertion.id}" failed${assertion.diff ? `: ${assertion.diff}` : ''}`,
+        'Fix the behaviour, or correct the assertion if the expectation was wrong.',
+        { assertion_id: assertion.id })
+    }
+    const metrics = input.story
+      ? { ...EMPTY_METRICS,
+          assertionsTotal: input.story.assertions.length,
+          assertionsPassed: input.story.assertions.filter((a) => a.status === 'pass').length }
+      : EMPTY_METRICS
+    return finish(failed.length > 0 ? 'block' : 'allow', findings, metrics, input, policy)
+  }
 
   // 1. A story exists.
   const story = input.story

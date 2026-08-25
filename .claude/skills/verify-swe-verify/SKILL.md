@@ -3,7 +3,7 @@ name: verify-swe-verify
 description: "Verify a change in swe-verify by proving the changed code actually ran. Use whenever you edit code here, before saying a change is done, or when a swe-verify gate reports a finding (SV001, SV003, SV010, SV011, SV020) and you need to know what to do about it. Covers fixture-go-pricing, fixture-pricing."
 license: Apache-2.0
 metadata:
-  swe-verify-fingerprint: sha256:a60f8b313c712de41b4255fb1bfe8a3112cb3586794ce2506ef18309150a3139
+  swe-verify-fingerprint: sha256:9e973e740e8ab5d11789663d4adcd563165ae3faa242d8dfa0f00f074c6eee1c
   swe-verify-project: swe-verify
 ---
 
@@ -19,7 +19,7 @@ Every step is a command. Pass `--json` and read the JSON; never parse prose.
 Pass the id of the plan whose scope covers the files you changed:
 
 - **`fixture-go-pricing`** — the Go tiered discount fixture returns a discounted total for a tier-2 customer
-  - covers `fixtures/l1/go/**` — **no assertions**: it proves the code ran, not that it behaved. Add one before relying on it.
+  - covers `fixtures/l1/go/**` — 1 assertion(s)
 - **`fixture-pricing`** — the tiered discount fixture computes a discounted total for a tier-2 customer
   - covers `fixtures/l1/py/**` — **no assertions**: it proves the code ran, not that it behaved. Add one before relying on it.
 
