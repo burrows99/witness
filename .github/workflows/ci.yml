@@ -56,6 +56,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: python -m venv .venv && .venv/bin/pip install debugpy
       - run: go install github.com/go-delve/delve/cmd/dlv@latest
+      # Warm the Go build cache, so delve is not compiling the standard library
+      # inside the first probe's launch window.
+      - run: go build ./... || true
+        working-directory: fixtures/l1/go
       - run: npx playwright install --with-deps chromium
       - run: pnpm test:l1
 
