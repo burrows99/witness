@@ -101,9 +101,9 @@ describe('the skill is generated from the project, so it evolves with it', () =>
     expect(skill).toMatch(/require/)
   })
 
-  it('reports the adapters actually present in this environment', async () => {
+  it('names the adapter each gated language needs, without asserting it is installed', async () => {
     await cli(repo, ['skill'], { env: { PATH: process.env.PATH, WITNESS_PYTHON: join(process.cwd(), '.venv', 'bin', 'python') } })
-    expect(read()).toMatch(/\*\*py\*\* \(debugpy\)/)
+    expect(read()).toMatch(/\*\*py\*\* — debugpy/)
   })
 
   it('names what it cannot gate, with the remedy', async () => {

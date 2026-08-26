@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { validateConfig, validatePlan, type GateResult } from '@macquery-labs/core'
-import { adapterFor } from '@macquery-labs/probe-dap'
+import { validateConfig, validatePlan, type GateResult } from '../../src/core/index.js'
+import { adapterFor } from '../../src/probe-dap/index.js'
 
 /**
  * L4 — witness gates its own change.
@@ -19,7 +19,7 @@ import { adapterFor } from '@macquery-labs/probe-dap'
  */
 
 const ROOT = join(import.meta.dirname, '..', '..')
-const BIN = join(ROOT, 'packages', 'cli', 'dist', 'bin.js')
+const BIN = join(ROOT, 'dist', 'cli', 'bin.js')
 
 interface CliRun { code: number; stdout: string; stderr: string }
 
@@ -35,6 +35,15 @@ function swe(args: string[]): CliRun {
 
 const built = existsSync(BIN)
 const suite = built ? describe : describe.skip
+
+describe('the tier can run at all', () => {
+  it('finds the built binary where the manifest says it is', () => {
+    // Guarding the tier on `existsSync(BIN)` means a wrong path makes the
+    // whole tier vanish quietly rather than fail. It did exactly that when the
+    // binary moved: eleven checks stopped running and nothing said so.
+    expect(built, `no binary at ${BIN.slice(ROOT.length + 1)} — run \`pnpm build\``).toBe(true)
+  })
+})
 
 suite('the binary works, as a binary (NFR-6)', () => {
   it('runs from dist with no build step and no package install', () => {

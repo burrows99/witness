@@ -4,188 +4,44 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-catalogs:
-  default:
-    '@eslint/js':
-      specifier: ^10.0.1
-      version: 10.0.1
-    '@modelcontextprotocol/sdk':
-      specifier: ^1.30.0
-      version: 1.30.0
-    '@types/node':
-      specifier: ^22.10.2
-      version: 22.20.1
-    ajv:
-      specifier: ^8.17.1
-      version: 8.20.0
-    eslint:
-      specifier: ^10.9.1
-      version: 10.9.1
-    knip:
-      specifier: ^6.32.2
-      version: 6.32.2
-    playwright:
-      specifier: ^1.62.1
-      version: 1.62.1
-    typescript:
-      specifier: ^5.7.2
-      version: 5.9.3
-    typescript-eslint:
-      specifier: ^8.68.0
-      version: 8.68.0
-    vite:
-      specifier: ^8.2.2
-      version: 8.2.2
-    vitest:
-      specifier: ^4.1.11
-      version: 4.1.11
-
 importers:
 
   .:
-    devDependencies:
-      '@eslint/js':
-        specifier: 'catalog:'
-        version: 10.0.1(eslint@10.9.1(jiti@2.7.0))
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.20.1
-      eslint:
-        specifier: 'catalog:'
-        version: 10.9.1(jiti@2.7.0)
-      knip:
-        specifier: 'catalog:'
-        version: 6.32.2
-      playwright:
-        specifier: 'catalog:'
-        version: 1.62.1
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      typescript-eslint:
-        specifier: 'catalog:'
-        version: 8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@5.9.3)
-      vite:
-        specifier: 'catalog:'
-        version: 8.2.2(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0)
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0))
-
-  packages/cli:
     dependencies:
-      '@macquery-labs/core':
-        specifier: workspace:*
-        version: link:../core
-      '@macquery-labs/driver-api':
-        specifier: workspace:*
-        version: link:../driver-api
-      '@macquery-labs/driver-web':
-        specifier: workspace:*
-        version: link:../driver-web
-      '@macquery-labs/probe-dap':
-        specifier: workspace:*
-        version: link:../probe-dap
-      '@macquery-labs/recorders':
-        specifier: workspace:*
-        version: link:../recorders
-      '@macquery-labs/vcs':
-        specifier: workspace:*
-        version: link:../vcs
-      '@macquery-labs/viewer':
-        specifier: workspace:*
-        version: link:../viewer
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.20.1
-
-  packages/core:
-    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.30.0
+        version: 1.30.0(zod@4.4.3)
       ajv:
-        specifier: 'catalog:'
+        specifier: ^8.17.1
         version: 8.20.0
     devDependencies:
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.9.1(jiti@2.7.0))
       '@types/node':
-        specifier: 'catalog:'
+        specifier: ^22.10.2
         version: 22.20.1
-
-  packages/driver-api:
-    dependencies:
-      '@macquery-labs/core':
-        specifier: workspace:*
-        version: link:../core
-      '@macquery-labs/recorders':
-        specifier: workspace:*
-        version: link:../recorders
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.20.1
-
-  packages/driver-web:
-    dependencies:
-      '@macquery-labs/core':
-        specifier: workspace:*
-        version: link:../core
-      '@macquery-labs/driver-api':
-        specifier: workspace:*
-        version: link:../driver-api
-      '@macquery-labs/recorders':
-        specifier: workspace:*
-        version: link:../recorders
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.20.1
+      eslint:
+        specifier: ^10.9.1
+        version: 10.9.1(jiti@2.7.0)
+      knip:
+        specifier: ^6.32.2
+        version: 6.32.2
       playwright:
-        specifier: 'catalog:'
+        specifier: ^1.62.1
         version: 1.62.1
-
-  packages/mcp:
-    dependencies:
-      '@macquery-labs/cli':
-        specifier: workspace:*
-        version: link:../cli
-      '@modelcontextprotocol/sdk':
-        specifier: 'catalog:'
-        version: 1.30.0(zod@4.4.3)
-
-  packages/probe-dap:
-    dependencies:
-      '@macquery-labs/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.20.1
-
-  packages/recorders:
-    dependencies:
-      '@macquery-labs/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.20.1
-
-  packages/vcs:
-    dependencies:
-      '@macquery-labs/core':
-        specifier: workspace:*
-        version: link:../core
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.20.1
-
-  packages/viewer:
-    dependencies:
-      '@macquery-labs/core':
-        specifier: workspace:*
-        version: link:../core
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      typescript-eslint:
+        specifier: ^8.68.0
+        version: 8.68.0(eslint@10.9.1(jiti@2.7.0))(typescript@5.9.3)
+      vite:
+        specifier: ^8.2.2
+        version: 8.2.2(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0)
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(jiti@2.7.0)(yaml@2.9.0))
 
 packages:
 

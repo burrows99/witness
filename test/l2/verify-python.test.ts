@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { verifySeal, type GateResult, type Story } from '@macquery-labs/core'
-import { adapterFor } from '@macquery-labs/probe-dap'
+import { verifySeal, type GateResult, type Story } from '../../src/core/index.js'
+import { adapterFor } from '../../src/probe-dap/index.js'
 import { TestRepo, cli, planFor } from '../helpers/repo.js'
 
 /**

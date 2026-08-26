@@ -9,7 +9,7 @@ import { join } from 'node:path'
  */
 
 const ROOT = join(import.meta.dirname, '..', '..')
-const PACKAGES = join(ROOT, 'packages')
+const SRC = join(ROOT, 'src')
 
 function sourceFiles(dir: string): string[] {
   if (!existsSync(dir)) return []
@@ -32,25 +32,33 @@ function importsOf(file: string): string[] {
   return out
 }
 
+/**
+ * One package now, so these boundaries are directory rules rather than
+ * dependency rules. That makes them easier to break by accident — nothing in
+ * npm stops `src/core` importing `src/driver-web` any more — and therefore
+ * more important to assert here.
+ */
 function packageSources(pkg: string): Array<{ file: string; imports: string[] }> {
-  return sourceFiles(join(PACKAGES, pkg, 'src')).map((file) => ({ file: file.slice(ROOT.length + 1), imports: importsOf(file) }))
+  return sourceFiles(join(SRC, pkg)).map((file) => ({ file: file.slice(ROOT.length + 1), imports: importsOf(file) }))
 }
 
 const packages = () =>
-  existsSync(PACKAGES) ? readdirSync(PACKAGES).filter((p) => existsSync(join(PACKAGES, p, 'package.json'))) : []
+  existsSync(SRC) ? readdirSync(SRC).filter((p) => existsSync(join(SRC, p, 'index.ts'))) : []
 
 describe('core is pure (NFR-7)', () => {
-  const FORBIDDEN = [
-    'playwright', '@playwright/test', 'testcontainers',
-    '@macquery-labs/driver-web', '@macquery-labs/driver-api',
-    '@macquery-labs/probe-dap', '@macquery-labs/probe-otel',
-    '@macquery-labs/recorders', '@macquery-labs/vcs', '@macquery-labs/cli',
-  ]
+  const FORBIDDEN_PACKAGES = ['playwright', '@playwright/test', 'testcontainers']
+  const FORBIDDEN_MODULES = ['driver-web', 'driver-api', 'probe-dap', 'recorders', 'vcs', 'cli', 'mcp']
+  const reaches = (specifier: string, module: string) =>
+    new RegExp(`(^|/)\\.\\./${module}(/|$)`).test(specifier)
+  const FORBIDDEN = FORBIDDEN_PACKAGES
 
   it('does not import drivers, probes or recorders — the gate runs with no browser and no debugger', () => {
     for (const { file, imports } of packageSources('core')) {
       for (const imported of imports) {
         expect(FORBIDDEN, `${file} imports ${imported}`).not.toContain(imported)
+        for (const module of FORBIDDEN_MODULES) {
+          expect(reaches(imported, module), `${file} imports ${imported}`).toBe(false)
+        }
       }
     }
   })
@@ -84,17 +92,29 @@ describe('the open core is not a demo (NFR-10)', () => {
     }
   })
 
-  it('every Apache-2.0 package declares that licence', () => {
-    for (const pkg of packages()) {
-      const manifest = JSON.parse(readFileSync(join(PACKAGES, pkg, 'package.json'), 'utf8')) as { license?: string }
-      expect(manifest.license, `packages/${pkg} has no licence`).toBe('Apache-2.0')
+  it('declares its licence, and publishes to the right registry', () => {
+    // One manifest now. A missing publishConfig is how a scoped package
+    // silently goes to npmjs.org instead of the registry that owns the scope.
+    const manifest = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+      license?: string
+      publishConfig?: { registry?: string }
     }
+    expect(manifest.license).toBe('Apache-2.0')
+    expect(manifest.publishConfig?.registry).toBe('https://npm.pkg.github.com')
+  })
+
+  it('every module is reachable through an index', () => {
+    // The directory boundaries only mean something if each module has one door.
+    for (const pkg of packages()) {
+      expect(existsSync(join(SRC, pkg, 'index.ts')), `src/${pkg} has no index.ts`).toBe(true)
+    }
+    expect(packages().length).toBeGreaterThan(1)
   })
 })
 
 describe('redaction lives in core (NFR-5)', () => {
   it('core owns the redaction implementation', () => {
-    expect(existsSync(join(PACKAGES, 'core', 'src', 'redact.ts'))).toBe(true)
+    expect(existsSync(join(SRC, 'core', 'redact.ts'))).toBe(true)
   })
 
   it('no other package reimplements it — redaction must happen before disk, in one place', () => {

@@ -1,7 +1,7 @@
 name: Auto Release
 
 # Every merge to main cuts a version: tests, build, a tag, a GitHub Release with generated notes, and
-# the nine workspace packages on this repository's own npm registry. Releases surface in followers'
+# the package on this repository's own npm registry. Releases surface in followers'
 # feeds and notify watchers; the registry is what makes the README's install line true.
 #
 # Nothing here writes to main. The version is bumped in the checkout, read by `npm publish`, and
@@ -97,11 +97,8 @@ jobs:
             next="$(echo "${latest#v}" | awk -F. '{print $1"."$2"."$3 + 1}')"
           fi
 
-          # Every package moves together. They depend on each other by exact version, so a workspace
-          # that half-publishes is worse than one that does not publish at all: an installed
-          # @macquery-labs/cli would resolve a @macquery-labs/core that was never pushed.
+          # One package now, so one version to set.
           npm version "$next" --no-git-tag-version --allow-same-version
-          pnpm -r exec npm version "$next" --no-git-tag-version --allow-same-version
 
           git tag -a "v$next" -m "Release v$next"
           git push origin "v$next"
@@ -121,7 +118,6 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ github.token }}
-        # `workspace:*` is a pnpm protocol npm cannot resolve, so publishing goes through pnpm,
-        # which rewrites those to the version just set. --no-git-checks because the working tree is
-        # deliberately dirty: the bump is never committed.
-        run: pnpm -r publish --access public --no-git-checks
+        # --no-git-checks because the working tree is deliberately dirty: the
+        # version bump is never committed.
+        run: pnpm publish --access public --no-git-checks

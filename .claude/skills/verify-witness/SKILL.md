@@ -3,7 +3,7 @@ name: verify-witness
 description: "Verify a change in witness by proving the changed code actually ran. Use whenever you edit code here, before saying a change is done, or when a witness gate reports a finding (SV001, SV003, SV010, SV011, SV020) and you need to know what to do about it. Covers fixture-go-pricing, fixture-js-pricing, fixture-pricing."
 license: Apache-2.0
 metadata:
-  witness-fingerprint: sha256:0074c178d4d036b076c5cb3b1a5b28e12d3e36f58a6c36182e5c5757adb63865
+  witness-fingerprint: sha256:682163a16de47c45c29ea0e2819f5b4ed943a6362a9742ae0263a2587922b8e6
   witness-project: witness
 ---
 
@@ -259,13 +259,16 @@ placeholders in it.
 
 ## What this project can gate
 
-Instrumentable here: **py** (debugpy), **go** (delve).
+This project gates these languages, each through the adapter named:
 
-Not instrumentable here — changes in these languages are reported as ungated (`SV016`) rather than silently passed:
-- **ts** (js-debug): js-debug (the DAP server for Node/TypeScript) was not found → Install it once: gh release download --repo microsoft/vscode-js-debug --pattern 'js-debug-dap-*.tar.gz' -O - | tar xz -C ~/.witness/adapters. It is not published to npm, and Node's own --inspect speaks CDP rather than DAP, so it cannot be used directly.
-- **java** (java-debug): java-debug (com.microsoft.java.debug.plugin) is not vendored in this build → Point WITNESS_JAVA_DEBUG at a java-debug plugin jar.
+- **py** — debugpy
+- **go** — delve
 
-Drivers: `api` (HTTP), `web` (Playwright is installed).
+Run `witness doctor` for whether *this* machine has them. A language whose adapter is
+missing reports ungated (`SV016`) rather than passing silently, so a run says what it
+could not watch instead of implying it watched everything.
+
+Drivers: `api` (HTTP) and `web` (needs Playwright — `doctor` says whether it is here).
 Gate scope: `fixtures/**`, excluding `**/*.md`, `**/*.test.*`, `**/dist/**`, `**/node_modules/**`.
 
 ## Policy here
@@ -316,5 +319,5 @@ Each one comes from a recording that misled somebody.
 - `docker compose down` has no `--rmi`, so a `build: true` fixture leaves one image per run.
 - Attaching video to a PR (step 6) has no CLI path.
 - Each filmed beat is a fresh shell, so a beat cannot depend on state a previous one set up.
-- No adapter for **ts**, **java**: changed lines there are
-  reported as ungated (`SV016`) rather than silently passed.
+- A language whose adapter is absent is ungated (`SV016`), never silently passed —
+  run `witness doctor` to see which are absent here.

@@ -1,14 +1,25 @@
 {
-  "files": [],
-  "references": [
-    { "path": "packages/core" },
-    { "path": "packages/vcs" },
-    { "path": "packages/probe-dap" },
-    { "path": "packages/driver-api" },
-    { "path": "packages/recorders" },
-    { "path": "packages/driver-web" },
-    { "path": "packages/viewer" },
-    { "path": "packages/cli" },
-    { "path": "packages/mcp" }
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2022"
+    ],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "verbatimModuleSyntax": false,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": [
+    "src/**/*.ts"
   ]
 }
