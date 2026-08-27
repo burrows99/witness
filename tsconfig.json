@@ -18,6 +18,14 @@
     "declarationMap": true,
     "sourceMap": true,
     "skipLibCheck": true,
+    // Explicit, because TypeScript 7 stops discovering @types by ambient scan:
+    // without this the whole build fails with "Cannot find name 'process'" on
+    // every file. tsconfig.eslint.json has always named it; this is the same
+    // statement for the build, and it is the half of the TS 7 upgrade that
+    // lives in this repository rather than in typescript-eslint.
+    "types": [
+      "node"
+    ],
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "verbatimModuleSyntax": true,
