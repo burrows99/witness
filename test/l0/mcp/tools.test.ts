@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { TOOLS, INSTRUCTIONS, argvFor } from '../../../src/mcp/tools.js'
+import type { z } from 'zod'
+import { TOOLS, INSTRUCTIONS, argvFor, type ToolSpec } from '../../../src/mcp/tools.js'
+
+/** Required means the shape refuses `undefined`, now that there is no `required` array. */
+const isRequired = (tool: ToolSpec, key: string): boolean =>
+  !(tool.inputSchema[key] as z.ZodType | undefined)?.safeParse(undefined).success
+
+/** `.describe()` is where a tool's prose lives once the schema owns it. */
+const describedAs = (tool: ToolSpec, key: string): string =>
+  (tool.inputSchema[key] as z.ZodType | undefined)?.description ?? ''
 import { COMMANDS } from '../../../src/cli/args.js'
 
 /**
@@ -68,14 +77,14 @@ describe('the MCP surface covers the CLI surface', () => {
       const exposed = new Set(tool.flags.map((f) => f.name))
       expect(exposed.has('cwd'), `${tool.name} cannot take --cwd`).toBe(true)
       expect(exposed.has('vcs'), `${tool.name} cannot take --vcs`).toBe(true)
-      expect(tool.inputSchema.properties).toHaveProperty('cwd')
+      expect(tool.inputSchema).toHaveProperty('cwd')
     }
   })
 
   it('documents every argument it declares', () => {
     for (const tool of TOOLS) {
       for (const flag of tool.flags) {
-        expect(tool.inputSchema.properties[flag.name], `${tool.name}.${flag.name} is undocumented`).toBeDefined()
+        expect(describedAs(tool, flag.name), `${tool.name}.${flag.name} is undocumented`).not.toBe('')
       }
     }
   })
@@ -85,21 +94,26 @@ describe('tool surface', () => {
   it('describes each tool for a reader who has never seen this project', () => {
     for (const tool of TOOLS) {
       expect(tool.description.length).toBeGreaterThan(40)
-      expect(tool.inputSchema.type).toBe('object')
+      expect(typeof tool.inputSchema).toBe('object')
     }
   })
 
   it('tells an agent that recording costs minutes, on both tools that offer it', () => {
     for (const name of ['run', 'verify']) {
-      const record = toolsByName.get(name)!.inputSchema.properties.record as { description: string }
-      expect(record.description, `${name}.record does not mention the cost`).toMatch(/[Mm]inutes/)
-      expect(record.description, `${name}.record does not mention the timeout`).toMatch(/60/)
+      const record = describedAs(toolsByName.get(name)!, 'record')
+      expect(record, `${name}.record does not mention the cost`).toMatch(/[Mm]inutes/)
+      expect(record, `${name}.record does not mention the timeout`).toMatch(/60/)
     }
   })
 
-  it('marks the arguments an agent must supply', () => {
-    expect(toolsByName.get('plan')!.inputSchema.required).toEqual(expect.arrayContaining(['intent', 'scope']))
-    expect(toolsByName.get('verify')!.inputSchema.required).toEqual(expect.arrayContaining(['plan']))
+  it('marks the arguments an agent must supply, and only those', () => {
+    const plan = toolsByName.get('plan')!
+    expect(isRequired(plan, 'intent')).toBe(true)
+    expect(isRequired(plan, 'scope')).toBe(true)
+    expect(isRequired(plan, 'id')).toBe(false)
+    expect(isRequired(toolsByName.get('verify')!, 'plan')).toBe(true)
+    // Universal on every tool, and never demanded.
+    for (const tool of TOOLS) expect(isRequired(tool, 'cwd'), `${tool.name}.cwd is required`).toBe(false)
   })
 })
 

@@ -75,7 +75,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "ajv": "^8.17.1"
+    "ajv": "^8.17.1",
+    "zod": "^4.4.3"
   },
   "peerDependencies": {
     "playwright": ">=1.40"

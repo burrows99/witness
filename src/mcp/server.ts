@@ -1,6 +1,5 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
 import { run, type ProgressSink } from '../cli/index.js'
 import { INSTRUCTIONS, TOOLS, argvFor } from './tools.js'
 
@@ -39,69 +38,55 @@ export async function invoke(argv: string[], options: McpServerOptions = {}, onP
   return { exitCode, stdout, stderr }
 }
 
-// The SDK deprecates `Server` in favour of the high-level `McpServer`, whose
-// `registerTool` takes a zod shape. This adapter forwards raw JSON Schema
-// straight from `TOOLS` and owns no logic of its own, which is the pass-through
-// case the SDK still points `Server` at. Migrating would mean translating JSON
-// Schema to zod — a change to the MCP surface, not to its strictness.
-// eslint-disable-next-line @typescript-eslint/no-deprecated
-export function createServer(options: McpServerOptions = {}): Server {
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
-  const server = new Server(
+export function createServer(options: McpServerOptions = {}): McpServer {
+  const server = new McpServer(
     { name: 'witness', version: options.version ?? '0.1.0' },
     { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
   )
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: TOOLS.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-    })),
-  }))
+  for (const tool of TOOLS) {
+    server.registerTool(
+      tool.name,
+      { description: tool.description, inputSchema: tool.inputSchema },
+      async (args, extra) => {
+        // `argvFor` still owns the mapping. zod has already checked the types
+        // it can see; what it cannot see is that a tool forwards only the
+        // flags it declares, which is the property that keeps an unexpected
+        // argument out of a shell-adjacent surface.
+        const argv = argvFor(tool.name, args)
 
-  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-    const args = (request.params.arguments ?? {})
-    let argv: string[]
-    try {
-      argv = argvFor(request.params.name, args)
-    } catch (error) {
-      return {
-        isError: true,
-        content: [{ type: 'text' as const, text: (error as Error).message }],
-      }
-    }
+        // Only when the client asked. The spec forbids notifying against a
+        // token that was not in the request, so a client that did not opt in
+        // gets nothing rather than notifications it has no way to route.
+        const token = extra._meta?.progressToken
+        const onProgress: ProgressSink | undefined = token === undefined
+          ? undefined
+          : (event) => {
+              void extra.sendNotification({
+                method: 'notifications/progress',
+                params: {
+                  progressToken: token,
+                  progress: event.progress,
+                  ...(event.total === undefined ? {} : { total: event.total }),
+                  message: event.message,
+                },
+              })
+            }
 
-    // Only when the client asked. The spec forbids notifying against a token
-    // that was not in the request, so a client that did not opt in gets
-    // nothing rather than notifications it has no way to route.
-    const token = extra._meta?.progressToken
-    const onProgress: ProgressSink | undefined = token === undefined
-      ? undefined
-      : (event) => {
-          void extra.sendNotification({
-            method: 'notifications/progress',
-            params: {
-              progressToken: token,
-              progress: event.progress,
-              ...(event.total === undefined ? {} : { total: event.total }),
-              message: event.message,
-            },
-          })
+        const outcome = await invoke(argv, options, onProgress)
+        const payload = outcome.stdout.trim() || outcome.stderr.trim()
+
+        return {
+          // A blocked gate is a *result*, not a protocol error: the agent has
+          // to read the findings and act on the remedies.
+          isError: outcome.exitCode === 3 || outcome.exitCode === 4,
+          content: [{ type: 'text' as const, text: payload }],
+          structuredContent: parseJson(payload),
+          _meta: { exitCode: outcome.exitCode },
         }
-
-    const outcome = await invoke(argv, options, onProgress)
-    const payload = outcome.stdout.trim() || outcome.stderr.trim()
-
-    return {
-      // A blocked gate is a *result*, not a protocol error: the agent has to
-      // read the findings and act on the remedies.
-      isError: outcome.exitCode === 3 || outcome.exitCode === 4,
-      content: [{ type: 'text' as const, text: payload }],
-      structuredContent: parseJson(payload),
-      _meta: { exitCode: outcome.exitCode },
-    }
-  })
+      },
+    )
+  }
 
   return server
 }

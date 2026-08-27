@@ -19,6 +19,8 @@
  * and the gate still holds.
  */
 
+import { z } from 'zod'
+
 interface ToolFlag {
   /** Argument name as the agent supplies it. */
   name: string
@@ -35,11 +37,15 @@ export interface ToolSpec {
   description: string
   command: string
   flags: ToolFlag[]
-  inputSchema: {
-    type: 'object'
-    properties: Record<string, unknown>
-    required?: string[]
-  }
+  /**
+   * A zod shape, not hand-written JSON Schema.
+   *
+   * `McpServer.registerTool` validates arguments against this before the
+   * handler runs, and converts it to JSON Schema for `tools/list` itself — so
+   * the wire format is derived from the thing that does the checking, rather
+   * than maintained beside it and free to disagree with it.
+   */
+  inputSchema: z.ZodRawShape
 }
 
 /**
@@ -57,17 +63,13 @@ const UNIVERSAL_FLAGS: ToolFlag[] = [
   { name: 'vcs', flag: '--vcs' },
 ]
 
-const UNIVERSAL_PROPERTIES: Record<string, unknown> = {
-  cwd: {
-    type: 'string',
-    description:
-      'Directory to run in. Defaults to where the server was launched. Set this to the repository being verified — the config, the plans and the diff are all read from there.',
-  },
-  vcs: {
-    type: 'string',
-    enum: ['auto', 'github', 'gitlab', 'bitbucket', 'local'],
-    description: 'Host provider. "local" needs no token and no network.',
-  },
+const UNIVERSAL_PROPERTIES: z.ZodRawShape = {
+  cwd: z.string().optional().describe(
+    'Directory to run in. Defaults to where the server was launched. Set this to the repository being verified — the config, the plans and the diff are all read from there.',
+  ),
+  vcs: z.enum(['auto', 'github', 'gitlab', 'bitbucket', 'local']).optional().describe(
+    'Host provider. "local" needs no token and no network.',
+  ),
 }
 
 function tool(spec: {
@@ -75,19 +77,14 @@ function tool(spec: {
   command: string
   description: string
   flags: ToolFlag[]
-  properties: Record<string, unknown>
-  required?: string[]
+  properties: z.ZodRawShape
 }): ToolSpec {
   return {
     name: spec.name,
     command: spec.command,
     description: spec.description,
     flags: [...spec.flags, ...UNIVERSAL_FLAGS],
-    inputSchema: {
-      type: 'object',
-      properties: { ...spec.properties, ...UNIVERSAL_PROPERTIES },
-      ...(spec.required ? { required: spec.required } : {}),
-    },
+    inputSchema: { ...spec.properties, ...UNIVERSAL_PROPERTIES },
   }
 }
 
@@ -112,9 +109,9 @@ export const TOOLS: ToolSpec[] = [
       { name: 'vendor', flag: '--vendor' },
     ],
     properties: {
-      agents: { type: 'boolean', description: 'Also write an AGENTS.md describing how to work in this repository.' },
-      hooks: { type: 'boolean', description: 'Also install git hooks.' },
-      vendor: { type: 'string', description: 'Vendor a debug adapter while initialising.' },
+      agents: z.boolean().optional().describe('Also write an AGENTS.md describing how to work in this repository.'),
+      hooks: z.boolean().optional().describe('Also install git hooks.'),
+      vendor: z.string().optional().describe('Vendor a debug adapter while initialising.'),
     },
   }),
 
@@ -132,14 +129,13 @@ export const TOOLS: ToolSpec[] = [
       { name: 'force', flag: '--force', boolean: true },
     ],
     properties: {
-      intent: { type: 'string', description: 'What this change proves, in one sentence.' },
-      scope: { type: 'array', items: { type: 'string' }, description: 'Path globs the plan covers, e.g. ["src/pricing/**"].' },
-      exclude: { type: 'array', items: { type: 'string' }, description: 'Path globs to carve back out of the scope.' },
-      id: { type: 'string', description: 'Optional plan id; derived from the intent otherwise.' },
-      domain: { type: 'string', description: 'Domain pack the plan is written against, e.g. "fullstack".' },
-      force: { type: 'boolean', description: 'Overwrite an existing plan with this id.' },
+      intent: z.string().describe('What this change proves, in one sentence.'),
+      scope: z.array(z.string()).describe('Path globs the plan covers, e.g. ["src/pricing/**"].'),
+      exclude: z.array(z.string()).optional().describe('Path globs to carve back out of the scope.'),
+      id: z.string().optional().describe('Optional plan id; derived from the intent otherwise.'),
+      domain: z.string().optional().describe('Domain pack the plan is written against, e.g. "fullstack".'),
+      force: z.boolean().optional().describe('Overwrite an existing plan with this id.'),
     },
-    required: ['intent', 'scope'],
   }),
 
   tool({
@@ -153,15 +149,12 @@ export const TOOLS: ToolSpec[] = [
       { name: 'record', flag: '--record', boolean: true },
     ],
     properties: {
-      plan: { type: 'string', description: 'Plan id or path to a .plan.json.' },
-      base: { type: 'string', description: 'Commit or branch the diff is taken against.' },
-      record: {
-        type: 'boolean',
-        description:
-          'Film the run. Produces the video and terminal artefacts a person can watch, alongside the story an agent reads. Minutes, not seconds — one recorded run of this project took 7m15s. Many MCP clients time a tool call out after 60 seconds unless they opt into resetting that clock on progress, so ask for this only when the evidence is the point, and prefer it over a client you know will wait.',
-      },
+      plan: z.string().describe('Plan id or path to a .plan.json.'),
+      base: z.string().optional().describe('Commit or branch the diff is taken against.'),
+      record: z.boolean().optional().describe(
+        'Film the run. Produces the video and terminal artefacts a person can watch, alongside the story an agent reads. Minutes, not seconds — one recorded run of this project took 7m15s. Many MCP clients time a tool call out after 60 seconds unless they opt into resetting that clock on progress, so ask for this only when the evidence is the point, and prefer it over a client you know will wait.',
+      ),
     },
-    required: ['plan'],
   }),
 
   tool({
@@ -179,19 +172,16 @@ export const TOOLS: ToolSpec[] = [
       { name: 'quiet', flag: '--quiet', boolean: true },
     ],
     properties: {
-      plan: { type: 'string', description: 'Plan id or path to a .plan.json.' },
-      base: { type: 'string', description: 'Commit or branch the diff is taken against.' },
-      record: {
-        type: 'boolean',
-        description:
-          'Film the run, so the verdict arrives with evidence a person can watch rather than only a story an agent can read. Minutes, not seconds, and subject to the same 60-second client timeout as "run" — if the call may not survive that, use "run" with record and then "gate" on the run id it returns.',
-      },
-      story: { type: 'string', description: 'Gate an existing story.json instead of producing one.' },
-      run: { type: 'string', description: 'Gate an existing run id instead of producing one.' },
-      bypass: { type: 'string', description: 'Reason for an explicit, recorded bypass. Amber, never green.' },
-      quiet: { type: 'boolean', description: 'Suppress the human-readable report.' },
+      plan: z.string().describe('Plan id or path to a .plan.json.'),
+      base: z.string().optional().describe('Commit or branch the diff is taken against.'),
+      record: z.boolean().optional().describe(
+        'Film the run, so the verdict arrives with evidence a person can watch rather than only a story an agent can read. Minutes, not seconds, and subject to the same 60-second client timeout as "run" — if the call may not survive that, use "run" with record and then "gate" on the run id it returns.',
+      ),
+      story: z.string().optional().describe('Gate an existing story.json instead of producing one.'),
+      run: z.string().optional().describe('Gate an existing run id instead of producing one.'),
+      bypass: z.string().optional().describe('Reason for an explicit, recorded bypass. Amber, never green.'),
+      quiet: z.boolean().optional().describe('Suppress the human-readable report.'),
     },
-    required: ['plan'],
   }),
 
   tool({
@@ -207,11 +197,11 @@ export const TOOLS: ToolSpec[] = [
       { name: 'quiet', flag: '--quiet', boolean: true },
     ],
     properties: {
-      story: { type: 'string', description: 'Path to a story.json.' },
-      run: { type: 'string', description: 'Run id to evaluate.' },
-      base: { type: 'string', description: 'Commit or branch the diff is taken against.' },
-      bypass: { type: 'string', description: 'Reason for an explicit, recorded bypass. Amber, never green.' },
-      quiet: { type: 'boolean', description: 'Suppress the human-readable report.' },
+      story: z.string().optional().describe('Path to a story.json.'),
+      run: z.string().optional().describe('Run id to evaluate.'),
+      base: z.string().optional().describe('Commit or branch the diff is taken against.'),
+      bypass: z.string().optional().describe('Reason for an explicit, recorded bypass. Amber, never green.'),
+      quiet: z.boolean().optional().describe('Suppress the human-readable report.'),
     },
   }),
 
@@ -227,13 +217,12 @@ export const TOOLS: ToolSpec[] = [
       { name: 'open', flag: '--open', boolean: true },
     ],
     properties: {
-      run: { type: 'string', description: 'Run id to render.' },
-      story: { type: 'string', description: 'Path to a story.json to render.' },
-      base: { type: 'string', description: 'Commit or branch the diff is taken against.' },
-      open: {
-        type: 'boolean',
-        description: 'Also open it in a browser. This acts on the machine the server runs on — return the path instead unless a person asked to see it.',
-      },
+      run: z.string().optional().describe('Run id to render.'),
+      story: z.string().optional().describe('Path to a story.json to render.'),
+      base: z.string().optional().describe('Commit or branch the diff is taken against.'),
+      open: z.boolean().optional().describe(
+        'Also open it in a browser. This acts on the machine the server runs on — return the path instead unless a person asked to see it.',
+      ),
     },
   }),
 
@@ -249,10 +238,10 @@ export const TOOLS: ToolSpec[] = [
       { name: 'force', flag: '--force', boolean: true },
     ],
     properties: {
-      out: { type: 'string', description: 'Where to write the SKILL.md.' },
-      name: { type: 'string', description: 'Skill name; derived from the project otherwise.' },
-      check: { type: 'boolean', description: 'Report staleness without writing. Exits 3 when stale.' },
-      force: { type: 'boolean', description: 'Overwrite an existing skill file.' },
+      out: z.string().optional().describe('Where to write the SKILL.md.'),
+      name: z.string().optional().describe('Skill name; derived from the project otherwise.'),
+      check: z.boolean().optional().describe('Report staleness without writing. Exits 3 when stale.'),
+      force: z.boolean().optional().describe('Overwrite an existing skill file.'),
     },
   }),
 ]
