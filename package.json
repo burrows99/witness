@@ -30,7 +30,7 @@
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.5",
     "@eslint/js": "^10.0.1",
-    "@types/node": "^22.10.2",
+    "@types/node": "^26.3.0",
     "eslint": "^10.9.1",
     "knip": "^6.32.2",
     "playwright": "^1.62.1",
