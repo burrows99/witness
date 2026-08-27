@@ -1,5 +1,6 @@
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { ProgressReporter, type ProgressSink } from '../progress.js'
 import {
   compileRedactionPolicy,
   diffHash,
@@ -61,6 +62,11 @@ export interface RunOptions {
     /** Commands to film alongside the browser, for work with no screen. */
     terminal?: TerminalSource
   } | undefined
+  /**
+   * Where to report progress. Defaults to discarding it, so a caller that does
+   * not want it pays nothing and the harness log stays the record either way.
+   */
+  progress?: ProgressSink
 }
 
 export interface RunOutcome {
@@ -85,11 +91,21 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     try { appendFileSync(logPath, `${new Date().toISOString()} ${line}\n`) } catch { /* logging must not fail a run */ }
   }
 
+  // Every phase below already knew what it was doing and only ever told the
+  // log file. `report` is the same information, said out loud.
+  const report = new ProgressReporter(options.progress)
+  // The four phases that always advance — instrument, probes, fixture, story —
+  // plus one per step, plus the transcode when the run is filmed. Attach and
+  // "waiting for ready" are notes: they say the run is alive without claiming
+  // a unit finished, so the count stays honest.
+  report.expect(4 + options.plan.steps.length + (options.record ? 1 : 0))
+
   const scoped = gatedDiff(options.diff, options.config)
   const targets = planProbes(scoped, options.config, {
     onTruncate: (dropped) => { log(`instrumentation truncated: ${dropped} line(s) over the ${options.config.budgets.probeLines}-probe budget`); },
   })
   log(`run ${runId}: ${scoped.changedLines} changed line(s), ${targets.length} probe target(s)`)
+  report.advance('instrument', `${scoped.changedLines} changed line(s), ${targets.length} probe target(s)`)
 
   const ctx: RunContext = {
     runId,
@@ -112,6 +128,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
   const diagnostics: StoryDiagnostic[] = []
   const stepResults = new Map<number, StepResult>()
 
+  report.note('fixture', 'bringing the application up')
   const fixture = await startFixture({
     fixture: options.plan.fixture,
     cwd: options.cwd,
@@ -134,6 +151,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     // client connects, so skipping the attach would hang a run whose diff
     // simply had no gateable lines.
     if (fixture.debug && fixture.adapter) {
+      report.note('attach', 'attaching the debugger')
       session = await attachProbes({
         fixture,
         targets,
@@ -145,6 +163,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       installed = [...session.probes]
       const unverified = installed.filter((p) => !p.verified)
       log(`probes: ${installed.length} installed, ${installed.length - unverified.length} verified`)
+      report.advance('probes', `${installed.length} installed, ${installed.length - unverified.length} verified`)
       for (const probe of unverified) {
         // Recorded here as well as in coverage: when a run goes wrong, the
         // log is where the answer has to be.
@@ -157,6 +176,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
         message: `no debuggable fixture: ${targets.length} changed line(s) could not be instrumented`,
       })
       log('no debuggable fixture declared; the run will produce no coverage')
+      report.note('probes', 'no debuggable fixture; this run produces no coverage')
     }
 
     await waitForReady(
@@ -214,6 +234,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       }
     }
     for (const recorder of recorders) await recorder.start(ctx)
+    report.advance('fixture', 'application up, driving the plan')
     for (const step of [...options.plan.steps].sort((a, b) => a.seq - b.seq)) {
       const driver = drivers.get(step.driver)
       if (!driver) {
@@ -223,6 +244,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
         )
       }
       log(`step ${step.seq}: ${step.driver} ${step.action} ${JSON.stringify(step.args ?? {})}`)
+      report.advance('steps', `step ${step.seq}/${options.plan.steps.length}: ${step.driver} ${step.action}`)
       for (const recorder of recorders) await recorder.mark({ seq: step.seq, driver: step.driver, action: step.action })
       const result = await driver.execute(step, ctx)
       stepResults.set(step.seq, result)
@@ -303,6 +325,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
     let videoPath: string | undefined
     const empty: string[] = []
     for (const recorder of recorders) {
+      report.advance('record', 'transcoding the recording')
       const produced = await recorder.stop()
       // The same check the conformance suite applies, applied to the real
       // output: a recorder that emits a kind it never declared, or an
@@ -367,6 +390,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
       }
     })
 
+    report.advance('story', 'assembling the story')
     const story = assembleStory({
       runId,
       planId: options.plan.id,

@@ -1,6 +1,7 @@
 import { appendFileSync } from 'node:fs'
 import { parseArgs, type Args } from './args.js'
 import { EXIT, HarnessError, UsageError } from './errors.js'
+import { NO_PROGRESS, clearProgress, progressStyle, renderProgress, type ProgressSink } from './progress.js'
 import { loadConfig } from './workspace.js'
 import { makeContext, type CommandResult } from './context.js'
 import { initCommand } from './commands/init.js'
@@ -42,6 +43,12 @@ export interface RunOptions {
   stdout?: NodeJS.WritableStream
   stderr?: NodeJS.WritableStream
   now?: Date
+  /**
+   * Receive progress instead of having it drawn. An embedder that has its own
+   * channel for it — MCP forwards it as notifications/progress — takes the
+   * events rather than the terminal drawing, which would land in a string.
+   */
+  onProgress?: ProgressSink
 }
 
 /**
@@ -69,7 +76,14 @@ export async function run(options: RunOptions): Promise<number> {
   try {
     const cwd = args.flag('cwd') ?? options.cwd ?? process.cwd()
     const config = loadConfig(cwd)
-    const ctx = makeContext(args, config, cwd, env, options.now)
+
+    // Progress goes to stderr or to the embedder, never to stdout: `--json` is
+    // only trustworthy because nothing else is allowed on that stream. Under
+    // `--quiet` it is dropped, which is what quiet asks for.
+    const style = progressStyle(stderr, env)
+    const progress: ProgressSink = options.onProgress
+      ?? (args.bool('quiet') ? NO_PROGRESS : renderProgress({ stderr, ...style }))
+    const ctx = makeContext(args, config, cwd, env, options.now, progress)
 
     let result: CommandResult
     switch (args.command) {
@@ -89,6 +103,8 @@ export async function run(options: RunOptions): Promise<number> {
       }
     }
 
+    // The last redraw is still on the line; the verdict must not print onto it.
+    if (!options.onProgress) clearProgress({ stderr, tty: style.tty })
     if (json) stdout.write(`${JSON.stringify(result.json)}\n`)
     else for (const line of result.text) stdout.write(`${line}\n`)
     for (const line of result.stderrText ?? []) stderr.write(`${line}\n`)

@@ -1,4 +1,5 @@
 export { run, type RunOptions } from './main.js'
+export { NO_PROGRESS, ProgressReporter, renderProgress, clearProgress, progressStyle, type ProgressEvent, type ProgressSink } from './progress.js'
 export { VERSION } from './version.js'
 export { runPlan } from './runner/run.js'
 export { assembleStory, assembleCoverage } from './runner/story.js'
