@@ -36,6 +36,7 @@ export async function runCommand(ctx: CommandContext, options: { checkArgs?: boo
   const git = gitState(ctx.repoRoot)
 
   const outcome = await runPlan({
+    progress: ctx.progress,
     plan: record ? narratePlan(plan) : plan,
     planSha256: planSha(plan),
     config: ctx.config,

@@ -89,6 +89,14 @@ describe('tool surface', () => {
     }
   })
 
+  it('tells an agent that recording costs minutes, on both tools that offer it', () => {
+    for (const name of ['run', 'verify']) {
+      const record = toolsByName.get(name)!.inputSchema.properties.record as { description: string }
+      expect(record.description, `${name}.record does not mention the cost`).toMatch(/[Mm]inutes/)
+      expect(record.description, `${name}.record does not mention the timeout`).toMatch(/60/)
+    }
+  })
+
   it('marks the arguments an agent must supply', () => {
     expect(toolsByName.get('plan')!.inputSchema.required).toEqual(expect.arrayContaining(['intent', 'scope']))
     expect(toolsByName.get('verify')!.inputSchema.required).toEqual(expect.arrayContaining(['plan']))
@@ -167,5 +175,13 @@ describe('instructions — steering, not enforcement', () => {
   it('says how to point the server at another repository, and how to ask for evidence', () => {
     expect(INSTRUCTIONS).toMatch(/cwd/)
     expect(INSTRUCTIONS).toMatch(/record/)
+  })
+
+  it('warns that a recorded run can outlive the client, and names the way round it', () => {
+    // A progress notification only holds off a timeout if the client chose to
+    // reset its clock on one, and the usual default is sixty seconds. An agent
+    // that is not told this discovers it as a dead call.
+    expect(INSTRUCTIONS).toMatch(/sixty seconds|60 seconds/)
+    expect(INSTRUCTIONS).toMatch(/run id/)
   })
 })

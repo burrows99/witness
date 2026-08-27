@@ -1,9 +1,9 @@
 ---
 name: verify-witness
-description: "Verify a change in witness by proving the changed code actually ran. Use whenever you edit code here, before saying a change is done, or when a witness gate reports a finding (SV001, SV003, SV010, SV011, SV020) and you need to know what to do about it. Covers fixture-go-pricing, fixture-js-pricing, fixture-pricing."
+description: "Verify a change in witness by proving the changed code actually ran. Use whenever you edit code here, before saying a change is done, or when a witness gate reports a finding (SV001, SV003, SV010, SV011, SV020) and you need to know what to do about it. Covers fixture-go-pricing, fixture-js-pricing, fixture-pricing, progress-channel."
 license: Apache-2.0
 metadata:
-  witness-fingerprint: sha256:682163a16de47c45c29ea0e2819f5b4ed943a6362a9742ae0263a2587922b8e6
+  witness-fingerprint: sha256:3f8d0da644fe9a89eebdd2237d65561a646fbdf11d5ebf074ff2ce911fe626cd
   witness-project: witness
 ---
 
@@ -24,6 +24,8 @@ Pass the id of the plan whose scope covers the files you changed:
   - covers `fixtures/l1/js/**` — 1 assertion(s)
 - **`fixture-pricing`** — the tiered discount fixture computes a discounted total for a tier-2 customer
   - covers `fixtures/l1/py/**` — **no assertions**: it proves the code ran, not that it behaved. Add one before relying on it.
+- **`progress-channel`** — a long run reports what it is doing, on stderr for a person and as notifications/progress for MCP, without touching the JSON on stdout
+  - covers `src/cli/progress.ts`, `src/cli/main.ts`, `src/cli/runner/run.ts`, `src/mcp/server.ts` — **no assertions**: it proves the code ran, not that it behaved. Add one before relying on it.
 
 If nothing covers what you changed, the gate reports `SV012`. Write a plan rather than widening an
 existing one past what it claims to prove, then commit it with the change — a reviewer reads what

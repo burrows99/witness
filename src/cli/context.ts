@@ -2,6 +2,7 @@ import { relative } from 'node:path'
 import type { ResolvedConfig } from '../core/index.js'
 import type { Args } from './args.js'
 import { resolveBrand, type Brand } from '../core/index.js'
+import { NO_PROGRESS, type ProgressSink } from './progress.js'
 import { repoRoot as repoRootOf } from './git.js'
 
 export interface DoctorCheck {
@@ -35,6 +36,12 @@ export interface CommandContext {
   relative(path: string): string
   /** Environment checks contributed by optional packages (probes, drivers). */
   extraChecks?: DoctorCheck[]
+  /**
+   * Where a long command reports what it is doing. The CLI draws it on stderr,
+   * MCP forwards it as notifications/progress, and a caller that wants neither
+   * gets the default that discards it.
+   */
+  progress: ProgressSink
 }
 
 export interface CommandResult {
@@ -52,7 +59,7 @@ export interface CommandResult {
   publish?: { lines: string[]; summaries: string[] }
 }
 
-export function makeContext(args: Args, config: ResolvedConfig, cwd: string, env: Record<string, string | undefined>, now = new Date()): CommandContext {
+export function makeContext(args: Args, config: ResolvedConfig, cwd: string, env: Record<string, string | undefined>, now = new Date(), progress: ProgressSink = NO_PROGRESS): CommandContext {
   // Resolved once: it shells out to git, and every path in the run leans on it.
   const root = repoRootOf(cwd)
   return {
@@ -65,5 +72,6 @@ export function makeContext(args: Args, config: ResolvedConfig, cwd: string, env
     now,
     ci: Boolean(env.CI || env.GITHUB_ACTIONS || env.GITLAB_CI || env.BITBUCKET_BUILD_NUMBER),
     relative: (path: string) => relative(root, path) || path,
+    progress,
   }
 }

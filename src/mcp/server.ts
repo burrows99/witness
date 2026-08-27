@@ -1,7 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js'
-import { run } from '../cli/index.js'
+import { run, type ProgressSink } from '../cli/index.js'
 import { INSTRUCTIONS, TOOLS, argvFor } from './tools.js'
 
 /**
@@ -23,13 +23,16 @@ export interface ToolOutcome {
 }
 
 /** Invoke the CLI in-process and hand back exactly what it printed. */
-export async function invoke(argv: string[], options: McpServerOptions = {}): Promise<ToolOutcome> {
+export async function invoke(argv: string[], options: McpServerOptions = {}, onProgress?: ProgressSink): Promise<ToolOutcome> {
   let stdout = ''
   let stderr = ''
   const exitCode = await run({
     argv,
     ...(options.cwd ? { cwd: options.cwd } : {}),
     ...(options.env ? { env: options.env } : {}),
+    // Taken as events rather than drawn: the terminal rendering would land in
+    // the captured string, and a redrawn line is not a notification.
+    ...(onProgress ? { onProgress } : {}),
     stdout: { write: (chunk: string) => { stdout += chunk; return true } } as unknown as NodeJS.WritableStream,
     stderr: { write: (chunk: string) => { stderr += chunk; return true } } as unknown as NodeJS.WritableStream,
   })
@@ -57,7 +60,7 @@ export function createServer(options: McpServerOptions = {}): Server {
     })),
   }))
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const args = (request.params.arguments ?? {})
     let argv: string[]
     try {
@@ -69,7 +72,25 @@ export function createServer(options: McpServerOptions = {}): Server {
       }
     }
 
-    const outcome = await invoke(argv, options)
+    // Only when the client asked. The spec forbids notifying against a token
+    // that was not in the request, so a client that did not opt in gets
+    // nothing rather than notifications it has no way to route.
+    const token = extra._meta?.progressToken
+    const onProgress: ProgressSink | undefined = token === undefined
+      ? undefined
+      : (event) => {
+          void extra.sendNotification({
+            method: 'notifications/progress',
+            params: {
+              progressToken: token,
+              progress: event.progress,
+              ...(event.total === undefined ? {} : { total: event.total }),
+              message: event.message,
+            },
+          })
+        }
+
+    const outcome = await invoke(argv, options, onProgress)
     const payload = outcome.stdout.trim() || outcome.stderr.trim()
 
     return {

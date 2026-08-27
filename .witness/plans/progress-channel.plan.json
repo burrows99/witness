@@ -1,0 +1,55 @@
+{
+  "schema": "witness/plan@1",
+  "id": "progress-channel",
+  "intent": "a long run reports what it is doing, on stderr for a person and as notifications/progress for MCP, without touching the JSON on stdout",
+  "domain": "fullstack",
+  "scope": {
+    "include": [
+      "src/cli/progress.ts",
+      "src/cli/main.ts",
+      "src/cli/runner/run.ts",
+      "src/mcp/server.ts"
+    ]
+  },
+  "fixture": {
+    "kind": "none"
+  },
+  "steps": [],
+  "assertions": [],
+  "record": {
+    "terminal": {
+      "steps": [
+        {
+          "caption": "BEFORE — the run always knew, and only ever told a log file",
+          "command": "find .witness/runs -name harness.log | head -1 | xargs head -5",
+          "waitMs": 10000
+        },
+        {
+          "caption": "NOW — the same phases, on stderr, as they happen",
+          "command": "node dist/cli/bin.js verify --plan fixture-pricing --vcs local --json 2>/tmp/w-progress.txt >/dev/null; cat /tmp/w-progress.txt",
+          "waitMs": 90000
+        },
+        {
+          "caption": "stdout is untouched — still the JSON verdict an agent parses",
+          "command": "node dist/cli/bin.js verify --plan fixture-pricing --vcs local --json 2>/dev/null",
+          "waitMs": 90000
+        },
+        {
+          "caption": "--quiet asks for silence, and gets it: zero bytes on stderr",
+          "command": "node dist/cli/bin.js verify --plan fixture-pricing --vcs local --json --quiet 2>/tmp/w-quiet.txt >/dev/null; wc -c < /tmp/w-quiet.txt",
+          "waitMs": 90000
+        },
+        {
+          "caption": "MCP forwards the same events as notifications/progress",
+          "command": "bash scripts/demo-mcp-progress.sh",
+          "waitMs": 120000
+        },
+        {
+          "caption": "and the tests that hold it there",
+          "command": "npx vitest run --project l0 test/l0/cli/progress.test.ts",
+          "waitMs": 90000
+        }
+      ]
+    }
+  }
+}

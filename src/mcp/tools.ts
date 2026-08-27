@@ -158,7 +158,7 @@ export const TOOLS: ToolSpec[] = [
       record: {
         type: 'boolean',
         description:
-          'Film the run. Produces the video and terminal artefacts a person can watch, alongside the story an agent reads. Costs real time — ask for it when the evidence is the point.',
+          'Film the run. Produces the video and terminal artefacts a person can watch, alongside the story an agent reads. Minutes, not seconds — one recorded run of this project took 7m15s. Many MCP clients time a tool call out after 60 seconds unless they opt into resetting that clock on progress, so ask for this only when the evidence is the point, and prefer it over a client you know will wait.',
       },
     },
     required: ['plan'],
@@ -184,7 +184,7 @@ export const TOOLS: ToolSpec[] = [
       record: {
         type: 'boolean',
         description:
-          'Film the run, so the verdict arrives with evidence a person can watch rather than only a story an agent can read.',
+          'Film the run, so the verdict arrives with evidence a person can watch rather than only a story an agent can read. Minutes, not seconds, and subject to the same 60-second client timeout as "run" — if the call may not survive that, use "run" with record and then "gate" on the run id it returns.',
       },
       story: { type: 'string', description: 'Gate an existing story.json instead of producing one.' },
       run: { type: 'string', description: 'Gate an existing run id instead of producing one.' },
@@ -272,8 +272,16 @@ instrument and what would fix the rest.
 
 Pass "record" to "verify" or "run" when the evidence itself is the point. It
 films the run, so the verdict arrives with something a person can watch instead
-of only a story a machine can read. It costs real time; do not ask for it on
-every call.
+of only a story a machine can read. It costs minutes, not seconds; do not ask
+for it on every call.
+
+A long call can outlive the client's patience rather than the run. Progress is
+reported for every call that supplies a progressToken, but a notification only
+holds off a timeout if the client chose to reset its clock on one, and the usual
+default is sixty seconds. When a call may not survive that, split it: "run"
+returns a run id as soon as the story is sealed, and "gate" evaluates that id
+afterwards in a call that returns immediately. Same verdict, two short calls
+instead of one long one.
 
 The same gate runs in CI whether or not you use these tools, and it blocks a
 merge when a changed line was never exercised, when the evidence is stale, or
