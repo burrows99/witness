@@ -49,7 +49,7 @@ export function brandFrom(name: string): Brand {
     name: trimmed,
     cli: trimmed,
     dir: `.${trimmed}`,
-    // `WITNESS_JS_DEBUG`, not `WITNESS_JS_DEBUG`, which no shell exports.
+    // `SWE_VERIFY_JS_DEBUG`, not `SWE-VERIFY_JS_DEBUG`, which no shell exports.
     envPrefix: trimmed.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, ''),
     schemaNs: trimmed,
     bypassLabel: `${trimmed}:bypass`,
