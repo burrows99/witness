@@ -7,7 +7,7 @@ import { compileRedactionPolicy, DEFAULT_CONFIG } from '../../../src/core/index.
 
 let dir: string
 beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'witness-store-')) })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+afterEach(() => { rmSync(dir, { recursive: true, force: true }); })
 
 const store = (over = {}) => new ArtifactStore({
   runDir: dir,

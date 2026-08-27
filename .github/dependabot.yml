@@ -1,0 +1,23 @@
+# Actions are pinned to commit SHAs, which removes the "a tag moved under us"
+# class of supply-chain attack and replaces it with a maintenance problem: a
+# pinned action is a frozen action. This is the half that unfreezes them.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    # Security fixes arrive one PR per advisory; everything else arrives as one
+    # PR a week, because thirty separate patch bumps is how a review queue stops
+    # being read.
+    groups:
+      dev-dependencies:
+        dependency-type: development
+      production:
+        dependency-type: production

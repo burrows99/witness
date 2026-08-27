@@ -82,7 +82,7 @@ function redactString(value: string, policy: RedactionPolicy): string {
  * in memory (to evaluate an assertion, say) after the artefact is written.
  */
 export function redact<T>(value: T, policy: RedactionPolicy): T {
-  return walk(value, policy, new WeakSet<object>()) as T
+  return walk(value, policy, new WeakSet()) as T
 }
 
 function walk(value: unknown, policy: RedactionPolicy, seen: WeakSet<object>): unknown {

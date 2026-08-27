@@ -36,7 +36,7 @@ export function encodeMessage(message: Record<string, unknown>): string {
 const HEADER_END = Buffer.from('\r\n\r\n', 'utf8')
 
 export class MessageDecoder {
-  private buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0)
+  private buffer: Buffer = Buffer.alloc(0)
 
   constructor(
     private readonly onMessage: (message: DapMessage) => void,

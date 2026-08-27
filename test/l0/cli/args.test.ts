@@ -39,6 +39,6 @@ describe('parseArgs', () => {
 
   it('rejects an unknown flag rather than ignoring it', () => {
     const a = parseArgs(['gate', '--stroy', 'x.json'])
-    expect(() => a.assertKnown(['story', 'json'])).toThrow(UsageError)
+    expect(() => { a.assertKnown(['story', 'json']); }).toThrow(UsageError)
   })
 })

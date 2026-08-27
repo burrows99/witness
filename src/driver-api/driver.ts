@@ -72,7 +72,7 @@ export class ApiDriver implements Driver {
 
     const controller = new AbortController()
     const timeoutMs = readNumber(args, 'timeoutMs', DEFAULT_TIMEOUT_MS)
-    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    const timer = setTimeout(() => { controller.abort(); }, timeoutMs)
     const startedMono = ctx.monoNs()
     const wall = new Date().toISOString()
 

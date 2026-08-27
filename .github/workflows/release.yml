@@ -25,7 +25,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -41,10 +41,10 @@ jobs:
 
       # No version pinned here: package.json's `packageManager` is the single
       # source of truth, and the action refuses when both name a version.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         if: steps.gate.outputs.skip != 'true'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         if: steps.gate.outputs.skip != 'true'
         with:
           node-version: 24
@@ -72,6 +72,13 @@ jobs:
       - name: Test
         if: steps.gate.outputs.skip != 'true'
         run: pnpm test
+
+      # The last check before the tarball becomes someone else's problem: the
+      # exports map resolves, and the declarations resolve with it. A release
+      # is the only place this failing actually costs anything.
+      - name: Check the package a consumer will receive
+        if: steps.gate.outputs.skip != 'true'
+        run: pnpm lint:package
 
       - name: Work out the next version and tag it
         if: steps.gate.outputs.skip != 'true'
@@ -108,10 +115,18 @@ jobs:
         if: steps.gate.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          # Through the environment rather than interpolated into the script.
+          # `${{ }}` is expanded by the runner before bash ever sees the line,
+          # so an expression carrying a quote becomes shell rather than an
+          # argument. These two are repo-controlled and the risk is remote —
+          # but the safe spelling costs nothing and stops the pattern being
+          # copied to a value that is not.
+          TAG: ${{ steps.ver.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
-          gh release create "${{ steps.ver.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --title "${{ steps.ver.outputs.tag }}" \
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --title "$TAG" \
             --generate-notes
 
       - name: Publish the packages

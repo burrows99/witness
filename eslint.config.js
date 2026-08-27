@@ -22,7 +22,7 @@ export default tseslint.config(
   },
 
   js.configs.recommended,
-  tseslint.configs.recommendedTypeChecked,
+  tseslint.configs.strictTypeChecked,
   tseslint.configs.stylisticTypeChecked,
 
   {
@@ -47,6 +47,39 @@ export default tseslint.config(
       // host provider may need to; `local` does not, and rewriting it to
       // satisfy the rule would say the opposite of what is true.
       '@typescript-eslint/require-await': 'off',
+
+      // Both of these come from `strictTypeChecked` and both are off for the
+      // same reason: `noUncheckedIndexedAccess` is on, and it is the stricter,
+      // more valuable of the two settings.
+      //
+      // `no-non-null-assertion` fights it directly. Every `events[i]` in a
+      // topological sort is `T | undefined` under that flag even where the
+      // index is provably in range, and `!` is the documented way to say "I
+      // checked". The alternative is a runtime branch that can never be taken
+      // — which `no-unnecessary-condition` would then flag. The two rules
+      // cannot both be satisfied here without rewriting the algorithm to avoid
+      // indexing, which buys nothing.
+      '@typescript-eslint/no-non-null-assertion': 'off',
+
+      // `no-unnecessary-condition` reads the declared type, and at this
+      // codebase's boundaries the declared type is the optimistic one. A story
+      // and a plan arrive as parsed JSON: `FINDING_CATALOG[code]` is typed
+      // total over `GateCode`, so `?.summary ?? ''` looks redundant — until a
+      // story carries a code this build has never heard of. Deleting those
+      // guards to satisfy the rule would trade a real runtime defence for a
+      // type-level tidiness, at exactly the layer that treats its input as
+      // hostile. It did find one genuinely dead branch when it was run, in
+      // `runner/fixture.ts`; that is a reason to run it occasionally, not to
+      // keep it on.
+      '@typescript-eslint/no-unnecessary-condition': 'off',
+
+      // Interpolating a number or a boolean is the normal way this codebase
+      // builds a message. Interpolating an object is how `[object Object]`
+      // reaches a finding's `message` and a reviewer learns nothing.
+      '@typescript-eslint/restrict-template-expressions': ['error', {
+        allowNumber: true,
+        allowBoolean: true,
+      }],
 
       // The story event union has six members. A switch that silently ignores
       // a new one is how a viewer stops rendering an event type nobody
@@ -87,9 +120,11 @@ export default tseslint.config(
     // on things a rule would call redundant.
     files: ['**/test/**/*.ts', 'test/**/*.ts'],
     rules: {
-      '@typescript-eslint/no-unnecessary-condition': 'off',
-      '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/unbound-method': 'off',
+      // `run(...).json<Shape>()` is a type assertion wearing a type parameter,
+      // which is exactly what the rule objects to — and exactly what a test
+      // wants from a helper that parses the CLI's own output.
+      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
     },
   },
 

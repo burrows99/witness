@@ -36,7 +36,14 @@ export async function invoke(argv: string[], options: McpServerOptions = {}): Pr
   return { exitCode, stdout, stderr }
 }
 
+// The SDK deprecates `Server` in favour of the high-level `McpServer`, whose
+// `registerTool` takes a zod shape. This adapter forwards raw JSON Schema
+// straight from `TOOLS` and owns no logic of its own, which is the pass-through
+// case the SDK still points `Server` at. Migrating would mean translating JSON
+// Schema to zod — a change to the MCP surface, not to its strictness.
+// eslint-disable-next-line @typescript-eslint/no-deprecated
 export function createServer(options: McpServerOptions = {}): Server {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated
   const server = new Server(
     { name: 'witness', version: options.version ?? '0.1.0' },
     { capabilities: { tools: {} }, instructions: INSTRUCTIONS },

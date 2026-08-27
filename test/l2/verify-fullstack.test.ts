@@ -115,7 +115,7 @@ beforeEach(() => {
   repo.writePlan(plan())
   base = repo.commit('base')
 })
-afterEach(() => repo.dispose())
+afterEach(() => { repo.dispose(); })
 
 const storyOf = (): Story => {
   return JSON.parse(readFileSync(join(latestRunDir(), 'story.json'), 'utf8')) as Story

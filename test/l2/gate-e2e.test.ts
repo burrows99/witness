@@ -26,7 +26,7 @@ beforeEach(() => {
   repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'auto' }))
   base = repo.commit('base')
 })
-afterEach(() => repo.dispose())
+afterEach(() => { repo.dispose(); })
 
 /** Change two executable lines inside the plan's scope. */
 function makeChange() {

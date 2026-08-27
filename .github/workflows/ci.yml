@@ -5,6 +5,13 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only by default. Nothing in this file pushes, publishes or comments, and
+# a pull_request build runs fixture code, a browser and three language runtimes
+# — none of which should be holding a token that can write to the repository.
+# release.yml asks for write, in the one job that needs it.
+permissions:
+  contents: read
+
 jobs:
   # The tiers run in the order the design puts them in: cheap logic first,
   # then adapters, then real apps, then the mutation harness that proves the
@@ -13,9 +20,10 @@ jobs:
     name: static analysis
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       # Type-checks the build graph, then everything the build excludes —
@@ -23,19 +31,45 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm typecheck:all
       - run: pnpm lint
-      # Unused exports, files and dependencies. In a nine-package workspace
+      # Unused exports, files and dependencies. Now that there is one manifest,
       # this is how a phantom dependency gets noticed.
       - run: pnpm knip
       - name: audit dependencies
         run: pnpm audit --audit-level=high
 
+      # What a consumer actually receives. `tsc` proves the sources type-check;
+      # it says nothing about whether the exports map resolves, and that map is
+      # the part a release can silently break — as the collapse to one package
+      # nearly did. publint reads the packed tarball, attw resolves every entry
+      # point the way a consumer's TypeScript would.
+      - run: pnpm build
+      - run: pnpm lint:package
+
+      # The workflows are code too, and they run with a token. actionlint is
+      # correctness (expressions, shell, action inputs); zizmor is the security
+      # audit — template injection, credential persistence, overbroad
+      # permissions, unpinned actions.
+      # `go install` rather than the upstream download-and-run script: the
+      # module proxy and checksum database verify what arrives, and a workflow
+      # that pipes a URL into a shell to audit workflows for supply-chain risk
+      # would be arguing against itself.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with: { go-version: stable, cache: false }
+      - name: lint workflows
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint" -color
+      - name: audit workflows
+        run: pipx run zizmor==1.29.0 --persona=regular .github/workflows/
+
   unit:
     name: L0 unit + architecture rules
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:l0
@@ -45,13 +79,14 @@ jobs:
     name: L1 adapter contract
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { persist-credentials: false }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: pnpm }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.12' }
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with: { go-version: 'stable' }
       - run: pnpm install --frozen-lockfile
       - run: python -m venv .venv && .venv/bin/pip install debugpy
@@ -67,12 +102,12 @@ jobs:
     name: L2 conformance + L3 mutation
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: pnpm }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with: { python-version: '3.12' }
       - run: pnpm install --frozen-lockfile
       - run: python -m venv .venv && .venv/bin/pip install debugpy
@@ -89,10 +124,10 @@ jobs:
     name: L4 — witness gates its own change
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: { fetch-depth: 0, persist-credentials: false }
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm build

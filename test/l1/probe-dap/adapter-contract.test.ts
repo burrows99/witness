@@ -146,7 +146,7 @@ for (const testCase of CASES) {
       const probe = result.installed[0]!
       // Either the adapter refused the line, or it moved it. Both are fine;
       // silently reporting the requested line as bound is not.
-      expect(probe.verified === false || probe.adapterLine !== undefined || probe.line === testCase.blankLine).toBe(true)
+      expect(!probe.verified || probe.adapterLine !== undefined || probe.line === testCase.blankLine).toBe(true)
       if (probe.adapterLine !== undefined) expect(probe.adapterLine).not.toBe(testCase.blankLine)
     })
 

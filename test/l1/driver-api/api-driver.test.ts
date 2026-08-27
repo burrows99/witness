@@ -23,7 +23,7 @@ const received: Array<{ method: string; url: string; headers: Record<string, unk
 beforeAll(async () => {
   server = createServer((req, res) => {
     let body = ''
-    req.on('data', (chunk) => { body += chunk })
+    req.on('data', (chunk: Buffer) => { body += chunk.toString('utf8') })
     req.on('end', () => {
       received.push({ method: req.method!, url: req.url!, headers: req.headers, body })
       if (req.url?.startsWith('/orders/latest')) {
@@ -45,7 +45,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await new Promise<void>((resolve) => server.close(() => resolve()))
+  await new Promise<void>((resolve) => server.close(() => { resolve(); }))
   rmSync(runDir, { recursive: true, force: true })
 })
 

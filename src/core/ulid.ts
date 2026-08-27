@@ -35,15 +35,16 @@ function encodeTime(time: number): string {
   let out = ''
   let remaining = time
   for (let i = 0; i < TIME_LENGTH; i += 1) {
-    out = ALPHABET[remaining % 32] + out
+    out = ALPHABET.charAt(remaining % 32) + out
     remaining = Math.floor(remaining / 32)
   }
   return out
 }
 
 function encodeRandom(): string {
-  const bytes = randomBytes(RANDOM_LENGTH)
+  // `charAt` over indexing, and iteration over a counter: both indices are
+  // provably in range, and neither spelling needs an assertion to say so.
   let out = ''
-  for (let i = 0; i < RANDOM_LENGTH; i += 1) out += ALPHABET[bytes[i]! % 32]
+  for (const byte of randomBytes(RANDOM_LENGTH)) out += ALPHABET.charAt(byte % 32)
   return out
 }

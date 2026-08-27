@@ -75,7 +75,11 @@ export async function applyChrome(page: Page, update: ChromeUpdate): Promise<voi
   const state = chromeState(page)
   if (update.title !== undefined) {
     state.title = update.title
-    state.sub = update.sub
+    // A new caption with no subtitle clears the previous one rather than
+    // inheriting it — under exactOptionalPropertyTypes that has to be a
+    // delete, and the delete is what the behaviour always meant.
+    if (update.sub !== undefined) state.sub = update.sub
+    else delete state.sub
   }
   if (update.probes?.length) {
     state.probes = [...update.probes, ...state.probes].slice(0, MAX_PROBES)
@@ -105,7 +109,7 @@ function drawChrome(args: DrawArgs): void {
   if (existing) existing.remove()
 
   const esc = (raw: string) =>
-    String(raw).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c)
+    raw.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c] ?? c)
 
   // The bar would otherwise sit on top of the first ~68px of the page — which
   // is exactly where a confirmation banner tends to appear. Covering the thing

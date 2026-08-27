@@ -1,0 +1,16 @@
+# Two findings survive on purpose. Both are in release.yml, both are true
+# reports, and both describe the shape this workflow has to have.
+rules:
+  artipacked:
+    ignore:
+      # This is the one checkout that genuinely needs the credential kept: the
+      # release job tags the commit and runs `git push origin "v$next"`. Every
+      # other checkout in this repository sets persist-credentials: false.
+      - release.yml
+  use-trusted-publishing:
+    ignore:
+      # Trusted publishing is an npmjs.org mechanism. This package goes to
+      # GitHub Packages, authenticated by the workflow's own GITHUB_TOKEN —
+      # which is the same "no long-lived secret to leak" property the audit is
+      # asking for, reached a different way. There is no token to exchange.
+      - release.yml

@@ -82,7 +82,7 @@ beforeEach(() => {
   }))
   base = repo.commit('base')
 })
-afterEach(() => repo.dispose())
+afterEach(() => { repo.dispose(); })
 
 const storyOf = (): Story => {
   const runs = join(repo.dir, '.witness', 'runs')

@@ -78,14 +78,14 @@ export function slideDocument(card: Slide, width: number, height: number): strin
   const scale = width / 1280
   const px = (n: number) => `${Math.round(n * scale)}px`
   const esc = (raw: string) =>
-    String(raw).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
+    raw.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] ?? c)
 
   // A caption is narration, not a heading: it can be a sentence, or a Go
   // subtest name with no spaces in it at all. Fixed type at 42px ran a real
   // one off both edges of the frame, so the size follows the length and long
   // tokens are allowed to break mid-word. Shrinking beats truncating — a card
   // that drops the end of a sentence gives the reader no sign it did.
-  const title = String(card.title)
+  const title = card.title
   const titleSize = title.length > 180 ? 20 : title.length > 120 ? 24 : title.length > 70 ? 30 : title.length > 40 ? 36 : 42
 
   const group = card.group?.toUpperCase()

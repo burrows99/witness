@@ -165,7 +165,7 @@ describe('gate — SV010 unexercised vs SV011 unobserved (FR-10, FR-11, D9)', ()
     lines[0]!.adapter_line = 41
     lines[0]!.hits = 2
     lines[1]!.hits = 0
-    lines[1]!.probe_id = undefined
+    delete lines[1]!.probe_id
     const r = evaluate(input({ diff, story: storyFor(diff, {}, lines), plans: [planRef({ scope: { include: ['src/**'] } })] }))
     expect(codes(r)).not.toContain('SV010')
   })

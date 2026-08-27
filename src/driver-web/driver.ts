@@ -104,7 +104,8 @@ export class WebDriver implements Driver {
       status = 'error'
       // Playwright's messages are long and useful; the first lines carry the
       // selector and the timeout, which is what a developer needs.
-      error = String((cause as Error).message).split('\n').slice(0, 3).join(' ').trim()
+      const message = cause instanceof Error ? cause.message : String(cause)
+      error = message.split('\n').slice(0, 3).join(' ').trim()
     }
 
     // Evidence is captured whether the step passed or failed. A failed step is
@@ -251,7 +252,7 @@ export class WebDriver implements Driver {
   private locator(page: Page, args: PlanArgs) {
     if (has(args, 'role')) {
       const name = has(args, 'name') ? readString(args, 'name') : undefined
-      return page.getByRole(readString(args, 'role') as Parameters<Page['getByRole']>[0], { name }).first()
+      return page.getByRole(readString(args, 'role') as Parameters<Page['getByRole']>[0], { ...(name !== undefined ? { name } : {}) }).first()
     }
     if (has(args, 'label')) return page.getByLabel(readString(args, 'label')).first()
     if (has(args, 'text')) return page.getByText(readString(args, 'text'), { exact: false }).first()

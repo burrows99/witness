@@ -42,7 +42,8 @@ const requests: Array<{ url: string; traceparent?: string }> = []
 
 beforeAll(async () => {
   server = createServer((req, res) => {
-    requests.push({ url: req.url!, traceparent: req.headers.traceparent as string | undefined })
+    const traceparent = req.headers.traceparent as string | undefined
+    requests.push({ url: req.url!, ...(traceparent !== undefined ? { traceparent } : {}) })
     if (req.url === '/orders') {
       res.writeHead(201, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ message: 'Order confirmed' }))
@@ -56,7 +57,7 @@ beforeAll(async () => {
   baseUrl = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`
 })
 
-afterAll(async () => { await new Promise<void>((r) => server.close(() => r())) })
+afterAll(async () => { await new Promise<void>((r) => server.close(() => { r(); })) })
 afterEach(() => { if (runDir) rmSync(runDir, { recursive: true, force: true }) })
 
 function ctx(): RunContext {

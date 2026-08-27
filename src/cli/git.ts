@@ -85,7 +85,7 @@ export function diffAgainst(cwd: string, base: string): NormalisedDiff {
     const patch = git(cwd, ['--no-pager', 'diff', '--no-color', '--no-ext-diff', '-U0', '--find-renames', '--cached', base])
     return normaliseDiff(patch, { baseSha: base, ...(headSha ? { headSha } : {}) })
   }
-  const patch = git(cwd, ['--no-pager', 'diff', '--no-color', '--no-ext-diff', '-U0', '--find-renames', `${base}`])
+  const patch = git(cwd, ['--no-pager', 'diff', '--no-color', '--no-ext-diff', '-U0', '--find-renames', base])
   return normaliseDiff(patch, { baseSha: base, ...(headSha ? { headSha } : {}) })
 }
 

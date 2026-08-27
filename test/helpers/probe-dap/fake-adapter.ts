@@ -45,7 +45,7 @@ export class FakeAdapter {
   private deferredAttach: number | null = null
 
   constructor(private readonly options: FakeAdapterOptions = {}) {
-    const decoder = new MessageDecoder((message) => this.handle(message))
+    const decoder = new MessageDecoder((message) => { this.handle(message); })
     // A hand-rolled Duplex rather than a PassThrough pair: what the client
     // writes must arrive at the adapter, and what the adapter pushes must
     // arrive at the client, on one stream object.
@@ -103,7 +103,7 @@ export class FakeAdapter {
       case 'initialize':
         this.respond(message, { supportsLogPoints: true, supportsConfigurationDoneRequest: true })
         if (this.options.initializedDelayMs) {
-          setTimeout(() => this.send({ type: 'event', event: 'initialized' }), this.options.initializedDelayMs).unref?.()
+          setTimeout(() => { this.send({ type: 'event', event: 'initialized' }); }, this.options.initializedDelayMs).unref?.()
         } else {
           this.send({ type: 'event', event: 'initialized' })
         }

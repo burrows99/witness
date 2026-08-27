@@ -18,7 +18,7 @@ beforeEach(() => {
   git('config', 'user.email', 'test@example.com')
   git('config', 'user.name', 'test')
 })
-afterEach(() => rmSync(dir, { recursive: true, force: true }))
+afterEach(() => { rmSync(dir, { recursive: true, force: true }); })
 
 const commit = (message: string) => { git('add', '-A'); git('commit', '-q', '-m', message) }
 

@@ -61,12 +61,12 @@ export class DapClient {
 
   constructor(private readonly stream: Duplex, private readonly options: DapClientOptions = {}) {
     this.decoder = new MessageDecoder(
-      (message) => this.dispatch(message),
+      (message) => { this.dispatch(message); },
       (error, raw) => this.options.log?.(`dap: undecodable message (${error.message}): ${raw.slice(0, 200)}`),
     )
-    stream.on('data', (chunk: Buffer) => this.decoder.push(chunk))
-    stream.on('error', (error: Error) => this.fail(error))
-    stream.on('close', () => this.fail(new DapError('adapter connection closed')))
+    stream.on('data', (chunk: Buffer) => { this.decoder.push(chunk); })
+    stream.on('error', (error: Error) => { this.fail(error); })
+    stream.on('close', () => { this.fail(new DapError('adapter connection closed')); })
   }
 
   get timeoutMs(): number {

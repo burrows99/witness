@@ -105,8 +105,7 @@ export class DapSession {
   private pendingChild: { request: string; configuration: Record<string, unknown> } | null = null
   private childArrived: (() => void) | null = null
   /** Kept open deliberately: closing the parent tears the child down with it. */
-  private parentClient: DapClient | null = null
-  private childSocket: Duplex | null = null
+  private readonly retained: Array<DapClient | Duplex> = []
   /** Every child being watched, so probes reach the one that runs the code. */
   private readonly followed: DapClient[] = []
   private readonly extraSockets: Duplex[] = []
@@ -132,7 +131,7 @@ export class DapSession {
     const session: DapSession = new DapSession(
       new DapClient(socket, {
         ...options,
-        onEvent: (event) => session.onEvent(event),
+        onEvent: (event) => { session.onEvent(event); },
         onReverseRequest: (command, args): boolean => session.onReverseRequest(command, args),
       }),
       options,
@@ -144,7 +143,7 @@ export class DapSession {
   /** For tests and for adapters that speak DAP over an existing stream. */
   static overStream(stream: Duplex, options: SessionOptions): DapSession {
     const session = new DapSession(
-      new DapClient(stream, { ...options, onEvent: (event) => session.onEvent(event) }),
+      new DapClient(stream, { ...options, onEvent: (event) => { session.onEvent(event); } }),
       options,
       null,
     )
@@ -206,7 +205,7 @@ export class DapSession {
   private async followChild(at: { host: string; port: number }): Promise<void> {
     if (!this.pendingChild) {
       await new Promise<void>((resolve) => {
-        if (this.pendingChild) return resolve()
+        if (this.pendingChild) { resolve(); return; }
         this.childArrived = resolve
         setTimeout(resolve, 15_000)
       })
@@ -218,13 +217,13 @@ export class DapSession {
     }
 
     const socket = await openSocket(at.host, at.port, 15_000)
-    this.parentClient = this.client
+    this.retained.push(this.client)
     this.client = new DapClient(socket, {
       ...this.options,
-      onEvent: (event) => this.onEvent(event),
+      onEvent: (event) => { this.onEvent(event); },
       onReverseRequest: (command, args) => this.onReverseRequest(command, args),
     })
-    this.childSocket = socket
+    this.retained.push(socket)
     this.followed.push(this.client)
     await this.client.request('initialize', INITIALIZE_ARGS, this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
     const started = this.client.waitFor('initialized', this.options.launchTimeoutMs ?? DEFAULT_LAUNCH_TIMEOUT_MS)
@@ -255,7 +254,7 @@ export class DapSession {
       this.extraSockets.push(socket)
       const client = new DapClient(socket, {
         ...this.options,
-        onEvent: (event) => this.onEvent(event),
+        onEvent: (event) => { this.onEvent(event); },
         onReverseRequest: (command, args) => this.onReverseRequest(command, args),
       })
       this.followed.push(client)
@@ -534,7 +533,7 @@ function openSocket(host: string, port: number, timeoutMs: number): Promise<Sock
     const started = Date.now()
     const attempt = () => {
       const socket = connect({ host, port })
-      socket.once('connect', () => resolve(socket))
+      socket.once('connect', () => { resolve(socket); })
       socket.once('error', (error) => {
         socket.destroy()
         // The debuggee may still be starting; retry until the budget is spent

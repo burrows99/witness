@@ -26,10 +26,11 @@ export async function gateCommand(ctx: CommandContext, options: { checkArgs?: bo
   const story = resolveStory(ctx)
 
   const selector = (ctx.args.flag('vcs') ?? ctx.config.vcs) as ProviderSelector
+  const bypassReason = ctx.args.flag('bypass')
   const provider = createProvider(detectProvider(ctx.env, selector), {
     env: ctx.env,
     bypassLabel: ctx.config.bypass.label,
-    ...(ctx.args.flag('bypass') !== undefined ? { bypassReason: ctx.args.flag('bypass') } : {}),
+    ...(bypassReason !== undefined ? { bypassReason } : {}),
   })
 
   const result = evaluate({

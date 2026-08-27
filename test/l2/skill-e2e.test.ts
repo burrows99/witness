@@ -20,7 +20,7 @@ beforeEach(() => {
   repo.write('.witness/config.json', JSON.stringify({ schema: 'witness/config@1', vcs: 'local' }))
   repo.commit('base')
 })
-afterEach(() => repo.dispose())
+afterEach(() => { repo.dispose(); })
 
 const DEFAULT_PATH = join('.claude', 'skills', 'verify-acme-checkout', 'SKILL.md')
 const read = (path = DEFAULT_PATH) => readFileSync(join(repo.dir, path), 'utf8')

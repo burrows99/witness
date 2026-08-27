@@ -137,14 +137,13 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
         pathMapping: null,
         env: options.env,
       })
-    : adapter.plain?.({ program: fixture.program, cwd, args: fixture.args ?? [], env: options.env })
+    : adapter.plain({ program: fixture.program, cwd, args: fixture.args ?? [], env: options.env })
 
-  if (!command) {
-    throw new UsageError(
-      `no debug adapter available for ${fixture.language}: ${availability.detail}`,
-      availability.remedy ?? 'Install the adapter for this language, or use "kind": "none" and start the app yourself.',
-    )
-  }
+  // No guard on `command` here: `plain` is required of every adapter, and the
+  // unavailable-adapter case is already handled above — it logs, clears
+  // `debuggable`, and lets the app start unwatched so the run reports SV016
+  // rather than dying. A `!command` throw here was reachable only when `plain`
+  // was optional, and had been dead since it stopped being.
 
   let stdout = ''
   let stderr = ''
@@ -185,7 +184,7 @@ export async function startFixture(options: FixtureOptions): Promise<FixtureHand
         child.kill('SIGTERM')
         // A fixture that ignores SIGTERM must not hold the run open (NFR-11).
         await Promise.race([
-          new Promise<void>((r) => child.once('exit', () => r())),
+          new Promise<void>((r) => child.once('exit', () => { r(); })),
           new Promise<void>((r) => setTimeout(() => { child.kill('SIGKILL'); r() }, 5_000).unref?.()),
         ])
       }

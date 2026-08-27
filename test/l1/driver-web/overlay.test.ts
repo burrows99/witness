@@ -37,7 +37,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await browser?.close()
-  await new Promise<void>((r) => server.close(() => r()))
+  await new Promise<void>((r) => server.close(() => { r(); }))
 })
 
 /**

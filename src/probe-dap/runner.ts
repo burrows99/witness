@@ -57,7 +57,10 @@ export async function freePort(): Promise<number> {
     server.listen(0, '127.0.0.1', () => {
       const address = server.address()
       const port = typeof address === 'object' && address ? address.port : 0
-      server.close(() => (port ? resolve(port) : reject(new Error('could not allocate a port'))))
+      server.close(() => {
+        if (port) resolve(port)
+        else reject(new Error('could not allocate a port'))
+      })
     })
   })
 }
@@ -93,7 +96,7 @@ export async function runWithProbes(options: ProbeRunOptions): Promise<ProbeRunR
   child.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
   child.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
 
-  const exited = new Promise<number | null>((resolve) => child.once('exit', (code) => resolve(code)))
+  const exited = new Promise<number | null>((resolve) => child.once('exit', (code) => { resolve(code); }))
   const timeoutMs = options.timeoutMs ?? 60_000
 
   let session: DapSession | null = null

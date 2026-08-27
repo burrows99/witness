@@ -87,7 +87,7 @@ export async function runPlan(options: RunOptions): Promise<RunOutcome> {
 
   const scoped = gatedDiff(options.diff, options.config)
   const targets = planProbes(scoped, options.config, {
-    onTruncate: (dropped) => log(`instrumentation truncated: ${dropped} line(s) over the ${options.config.budgets.probeLines}-probe budget`),
+    onTruncate: (dropped) => { log(`instrumentation truncated: ${dropped} line(s) over the ${options.config.budgets.probeLines}-probe budget`); },
   })
   log(`run ${runId}: ${scoped.changedLines} changed line(s), ${targets.length} probe target(s)`)
 
@@ -506,7 +506,7 @@ async function attachProbes(params: {
     log,
     connectTimeoutMs: 30_000,
     launchTimeoutMs: params.launchMs,
-    onOutput: (text) => log(`app: ${text.trimEnd()}`),
+    onOutput: (text) => { log(`app: ${text.trimEnd()}`); },
   })
 
   await session.initialize()
