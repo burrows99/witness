@@ -41,7 +41,8 @@
     "vitest": "^4.1.11"
   },
   "bin": {
-    "witness": "./dist/cli/bin.js"
+    "witness": "./dist/cli/bin.js",
+    "witness-mcp": "./dist/mcp/bin.js"
   },
   "main": "./dist/core/index.js",
   "types": "./dist/core/index.d.ts",
@@ -53,6 +54,10 @@
     "./cli": {
       "types": "./dist/cli/index.d.ts",
       "default": "./dist/cli/index.js"
+    },
+    "./mcp": {
+      "types": "./dist/mcp/index.d.ts",
+      "default": "./dist/mcp/index.js"
     }
   },
   "files": [

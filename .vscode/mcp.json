@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "witness": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${workspaceFolder}/dist/mcp/bin.js"]
+    }
+  }
+}
