@@ -32,7 +32,7 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^26.3.0",
     "eslint": "^10.9.1",
-    "knip": "^6.32.2",
+    "knip": "^6.32.3",
     "playwright": "^1.62.1",
     "publint": "^0.3.24",
     "typescript": "^5.7.2",
