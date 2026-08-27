@@ -1,4 +1,11 @@
-# witness
+# witness _(@macquery-labs/witness)_
+
+[![ci](https://github.com/macquery-labs/witness/actions/workflows/ci.yml/badge.svg)](https://github.com/macquery-labs/witness/actions/workflows/ci.yml)
+[![codeql](https://github.com/macquery-labs/witness/actions/workflows/codeql.yml/badge.svg)](https://github.com/macquery-labs/witness/actions/workflows/codeql.yml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg)](https://github.com/RichardLitt/standard-readme)
+
+A CI gate that blocks a merge when changed code was never executed.
 
 **Coding agents change code and declare it done without ever running it.** `witness` moves the
 check to the only layer that is both universal and binding: CI. A run produces one artefact — a
@@ -8,6 +15,9 @@ the changed code was never exercised, the evidence is stale, or the assertions f
 
 Because the gate reads a diff and a JSON file, it works with any vendor's agent, with several at
 once, or with none.
+
+The binary is `witness`; the package that installs it is `@macquery-labs/witness`, because the
+GitHub Packages namespace for a scoped package is the owning organisation.
 
 ```console
 $ witness init
@@ -36,6 +46,46 @@ exit 2
 
 ---
 
+## Table of Contents
+
+- [Background](#background)
+- [Install](#install)
+  - [Dependencies](#dependencies)
+- [Usage](#usage)
+  - [CLI](#cli)
+  - [GitHub Actions](#github-actions)
+- [Exit codes](#exit-codes)
+- [Findings](#findings)
+- [Measured, every run](#measured-every-run)
+- [Static analysis](#static-analysis)
+- [Test tiers](#test-tiers)
+- [What is supported](#what-is-supported)
+- [Telling an agent how to work here](#telling-an-agent-how-to-work-here)
+- [Free by default](#free-by-default)
+- [Not yet built](#not-yet-built)
+- [Repository layout](#repository-layout)
+- [API](#api)
+- [Maintainers](#maintainers)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Background
+
+Four moving parts, in the order they run:
+
+1. **Plan** — committed, reviewable, declares intent and scope. A reviewer can push back on what the
+   change *intends* to prove before looking at whether it went green.
+2. **Instrumentation** — the diff decides where probes go. No human and no agent picks lines.
+3. **Run** — a driver acts, probes observe, recorders capture. One story comes out.
+4. **Gate** — a pure function turns story + diff into a verdict.
+
+Probes are **DAP logpoints**, not breakpoints. The Debug Adapter Protocol is explicit that when
+`logMessage` is set the adapter must log rather than break — which is the only way to observe a
+request without suspending the server that is serving it.
+
+One `traceparent` threads browser → server → data, so the harness correlates evidence at capture
+time. The agent never correlates by timestamp.
+
 ## Install
 
 The package lives on this repository's own npm registry, so npm needs to be told
@@ -52,6 +102,10 @@ npm install -g @macquery-labs/witness
 witness doctor
 ```
 
+Node 22 or newer is required.
+
+### Dependencies
+
 `doctor` reports which languages this machine can instrument. Python and Go need
 no setup beyond `debugpy` and `dlv`; JavaScript and TypeScript need js-debug,
 which Microsoft ships only as a release asset:
@@ -62,22 +116,55 @@ gh release download --repo microsoft/vscode-js-debug \
   --pattern 'js-debug-dap-*.tar.gz' -O - | tar xz -C ~/.witness/adapters
 ```
 
-## How it works
+## Usage
 
-Four moving parts, in the order they run:
+Three commands cover the loop: describe what the change should prove, run it, and read the verdict.
 
-1. **Plan** — committed, reviewable, declares intent and scope. A reviewer can push back on what the
-   change *intends* to prove before looking at whether it went green.
-2. **Instrumentation** — the diff decides where probes go. No human and no agent picks lines.
-3. **Run** — a driver acts, probes observe, recorders capture. One story comes out.
-4. **Gate** — a pure function turns story + diff into a verdict.
+```bash
+witness init                                             # scaffold .witness/config.json
+witness plan --intent "..." --scope 'src/pricing/**'     # emit a plan skeleton, then edit it
+witness verify --plan checkout-applies-the-tiered        # run + gate in one step
+```
 
-Probes are **DAP logpoints**, not breakpoints. The Debug Adapter Protocol is explicit that when
-`logMessage` is set the adapter must log rather than break — which is the only way to observe a
-request without suspending the server that is serving it.
+The plan is committed alongside the change it describes, so a reviewer can argue with the intent
+before looking at whether it went green. `verify` exits non-zero when the changed code was never
+exercised — see [Exit codes](#exit-codes).
 
-One `traceparent` threads browser → server → data, so the harness correlates evidence at capture
-time. The agent never correlates by timestamp.
+### CLI
+
+```console
+$ witness --help
+  witness init [--agents] [--hooks]               scaffold config, AGENTS.md, hooks
+  witness plan   --intent <s> --scope <glob>...   emit a plan skeleton
+  witness run    --plan <path> [--record]         execute, emit story (and film it)
+  witness gate   --run <id> | --story <path>      evaluate, publish
+  witness verify --plan <path>                    run + gate (one command)
+  witness show   --run <id> [--open]              render viewer
+  witness skill  [--out <path>] [--check]         generate this project's agent skill
+  witness doctor                                  adapters, ports, path mappings
+```
+
+Common flags: `--json` for machine-readable output on stdout and nothing else, `--vcs <name>` to
+pick the host provider, `--base <ref>` to choose what the diff is taken against, `--bypass <why>`
+to record a reasoned bypass, and `--cwd <path>` to run against another working directory.
+
+`witness run --record` films the run; `witness show --run <id> --open` renders the story as one
+self-contained HTML file.
+
+### GitHub Actions
+
+`gate` evaluates a story an earlier job produced; `verify` runs the plan first.
+
+```yaml
+- uses: macquery-labs/witness@v0
+  with:
+    command: gate
+    story: .witness/runs/${{ github.run_id }}/story.json
+    # warn-only: true   # report findings without failing the job, for a staged rollout
+```
+
+Outputs are `verdict` (`allow` | `block` | `bypass`), `exit-code`, and `findings` — the full
+`GateResult` as JSON.
 
 ## Exit codes
 
@@ -287,6 +374,47 @@ Four dependency rules are enforced by `pnpm test:arch`, not by review:
 3. No module may import the cloud control plane — otherwise the open core is a demo.
 4. Redaction lives in `core`, because it has to run before disk, not before upload.
 
-## Licence
+## API
 
-Apache-2.0 for everything in `src/`, `action/` and `fixtures/`.
+The package ships the CLI as its main entry point, and exposes the gate as a library for anyone who
+wants the verdict without the binary. Both entry points are ESM only.
+
+```js
+import { evaluate, storySchema, diffHash } from '@macquery-labs/witness'
+import { run } from '@macquery-labs/witness/cli'
+```
+
+| Entry point | Contains |
+|---|---|
+| `@macquery-labs/witness` | `core` — the story schema, `diff_hash`, coverage math, ordering, redaction, seal, and `evaluate`, the pure story + diff → verdict function |
+| `@macquery-labs/witness/cli` | `run` (the CLI as a function), `runPlan`, `assembleStory`, `parseArgs`, and the `EXIT` codes |
+
+`core` performs no I/O and imports no driver, probe or recorder, so the gate runs in CI with no
+browser and no debugger installed. That rule is enforced by `pnpm test:arch`, not by review.
+
+## Maintainers
+
+[@burrows99](https://github.com/burrows99)
+
+## Contributing
+
+Questions and bug reports go in [GitHub Issues](https://github.com/macquery-labs/witness/issues);
+open-ended discussion goes in
+[GitHub Discussions](https://github.com/macquery-labs/witness/discussions).
+
+PRs are accepted. Before opening one:
+
+- `pnpm check` must pass — typecheck, typecheck of the tests, lint, knip, L0 and the architecture
+  rules. `pnpm test:l1` and `pnpm test:l2` need the adapters and a browser; `witness doctor` says
+  what is missing.
+- Commit the plan with the change it describes. This project gates itself (`pnpm test:l4`), so a
+  change to instrumentable code that no plan reaches will block its own pull request.
+- Style is not enforced and there is no formatter. Match the surrounding code.
+
+Small, focused pull requests are much easier to review than large ones.
+
+## License
+
+Apache-2.0 © Macquery Labs. See [LICENSE](LICENSE).
+
+Covers everything in `src/`, `action/` and `fixtures/`.
