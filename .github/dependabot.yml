@@ -13,6 +13,25 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule: { interval: weekly }
+    # One day, not the three Dependabot applies when this key is absent.
+    #
+    # Dependabot passes its cooldown to pnpm as `--config.minimumReleaseAge`,
+    # and pnpm's gate is verify-only: it resolves the newest version in range
+    # and then rejects it for being too young. It is not applied to the version
+    # being bumped, it is applied to every direct dependency in the tree. This
+    # project adopts releases within a day or two of publication, so under the
+    # three-day default the floors in package.json are themselves too fresh —
+    # `eslint@10.9.1` and `typescript-eslint@8.68.0`, 58 hours old, left no
+    # mature version in range and resolution failed with
+    # ERR_PNPM_NO_MATURE_MATCHING_VERSION before any update was attempted.
+    # Upstream: dependabot/dependabot-core#13165 and #13405.
+    #
+    # One day is the floor the schema allows (`minimum: 1`), so it is as close
+    # to "off" as this can be configured while the interaction stands. The
+    # github-actions ecosystem above keeps the default: it does not go through
+    # pnpm, and nothing there is affected.
+    cooldown:
+      default-days: 1
     # Security fixes arrive one PR per advisory; everything else arrives as one
     # PR a week, because thirty separate patch bumps is how a review queue stops
     # being read.
