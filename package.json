@@ -11,11 +11,11 @@
   "scripts": {
     "build": "tsc --build",
     "check": "pnpm typecheck && pnpm typecheck:all && pnpm lint && pnpm knip && pnpm test:l0 && pnpm test:arch",
-    "clean": "tsc --build --clean && pnpm -r exec rm -rf dist",
+    "clean": "tsc --build --clean && rm -rf dist",
     "knip": "knip",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "witness": "node packages/cli/dist/bin.js",
+    "witness": "node dist/cli/bin.js",
     "test": "vitest run",
     "test:arch": "vitest run --project arch",
     "test:l0": "vitest run --project l0",

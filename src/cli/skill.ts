@@ -368,7 +368,7 @@ witness plan --intent "<what this change proves>" --scope "<glob>" --json
 /**
  * The assertion kinds this build actually ships.
  *
- * An agent hit SV021 on a process fixture and had to read `packages/core` to
+ * An agent hit SV021 on a process fixture and had to read `src/core` to
  * discover `terminal-match` existed: the skill named no assertion kind at
  * all, and the only example anywhere came from the `plan` skeleton, which
  * emits `http-status` — useless to a fixture that serves no HTTP. Without

@@ -38,7 +38,7 @@ exit 2
 
 ## Install
 
-The packages live on this repository's own npm registry, so npm needs to be told
+The package lives on this repository's own npm registry, so npm needs to be told
 where the scope comes from once:
 
 ```
@@ -48,7 +48,7 @@ where the scope comes from once:
 in your `.npmrc`, then:
 
 ```bash
-npm install -g @macquery-labs/cli
+npm install -g @macquery-labs/witness
 witness doctor
 ```
 
@@ -255,9 +255,9 @@ Stated plainly, because a spec is not a shipped feature:
 ## Repository layout
 
 ```
-packages/
+src/
   core/         story schema, diff_hash, coverage, gate, redaction, seal   (no I/O, ever)
-  cli/          the binary — the only package that composes everything
+  cli/          the binary — the only module that composes everything
   probe-dap/    DAP client, logpoints, adapter registry, path mapping
   driver-api/   HTTP driver, W3C trace context, HTTP assertions
   driver-web/   Playwright driver, a11y snapshots, ui-text assertion
@@ -270,26 +270,13 @@ fixtures/       per-language contract fixtures
 test/           l2 conformance · l3 mutation · l4 dogfood · arch rules
 ```
 
-### Workspace layout
+One manifest, one published package: `@macquery-labs/witness`. The directories under `src/` are
+module boundaries, not distribution units — a consumer installs the whole thing and gets the CLI on
+their `PATH`, and the layout exists so the dependency rules below have something to be rules about.
 
-One manifest per package is the workspace unit, not duplication: it is what makes each package
-independently useful and independently forkable. What would rot is their *consistency*, so that is
-enforced by `pnpm test:arch` rather than by review.
-
-- **`pnpm-workspace.yaml` defines the workspace.** pnpm does not read the `workspaces` field in
-  `package.json` — that is npm's and yarn's spelling — so the field is deliberately absent rather
-  than sitting in the root manifest as dead configuration.
-- **Every external version lives once, in the `catalog:` block** of `pnpm-workspace.yaml`. Manifests
-  reference it as `"ajv": "catalog:"`. Upgrading is a one-line change, and two packages cannot drift
-  onto different versions of the same library.
-- **Internal dependencies use `workspace:*`.** A plain version range would resolve from the registry
-  the day someone publishes that name, and nobody would notice. Both `workspace:` and `catalog:` are
-  rewritten to real ranges on publish, so consumers on any package manager are unaffected.
-- **Every workspace dependency is also a TypeScript project reference**, so `tsc --build` never
-  compiles a package against a stale `dist/`.
-
-Switching to npm workspaces would mean giving up both protocols: npm rejects `workspace:*` with
-`EUNSUPPORTEDPROTOCOL`, so every internal dependency would become a version range.
+Splitting them back into separate packages would buy independent versioning that nothing here wants
+and cost a release matrix, nine changelogs, and the standing risk of publishing a set that does not
+work together. The boundaries are worth keeping; the manifests were not.
 
 Four dependency rules are enforced by `pnpm test:arch`, not by review:
 
@@ -297,9 +284,9 @@ Four dependency rules are enforced by `pnpm test:arch`, not by review:
    debugger installed.
 2. `core` must not import `vcs` — it receives a resolved bypass as data and returns a verdict; it
    does not know what a pull request is.
-3. No package may import the cloud control plane — otherwise the open core is a demo.
+3. No module may import the cloud control plane — otherwise the open core is a demo.
 4. Redaction lives in `core`, because it has to run before disk, not before upload.
 
 ## Licence
 
-Apache-2.0 for everything in `packages/`, `action/` and `fixtures/`.
+Apache-2.0 for everything in `src/`, `action/` and `fixtures/`.

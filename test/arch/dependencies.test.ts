@@ -82,7 +82,7 @@ describe('core is pure (NFR-7)', () => {
 })
 
 describe('the open core is not a demo (NFR-10)', () => {
-  it('no packages/* source imports cloud/*', () => {
+  it('no src/* source imports cloud/*', () => {
     for (const pkg of packages()) {
       for (const { file, imports } of packageSources(pkg)) {
         for (const imported of imports) {
